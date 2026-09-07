@@ -1,0 +1,14 @@
+{
+  "id": "pick-list",
+  "audience": "user",
+  "category": "Warehouse Console",
+  "size": "Big",
+  "history": [
+    {
+      "version": 1,
+      "name": "Pick list for the day",
+      "description": "Staff see the day's orders as one route-ordered pick list, grouped by aisle, with each line ticked off as it is collected.",
+      "changes": null
+    }
+  ]
+}

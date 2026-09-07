@@ -1,0 +1,7 @@
+[
+  {
+    "version": 2,
+    "audience": "user",
+    "description": "Every date on the site now reads as \"Tue 3 Mar\" rather than 03/03/2026, after two support calls from customers who read the American order."
+  }
+]

@@ -1,0 +1,36 @@
+{
+  "name": "feature-ledger",
+  "version": "0.1.0",
+  "description": "A versioned, client-facing feature ledger for any codebase: a small JSON corpus, three generated Markdown docs, and a printed PDF edition per release.",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "ledger": "bin/ledger.mjs"
+  },
+  "engines": {
+    "node": ">=18.17"
+  },
+  "files": [
+    "bin",
+    "src",
+    "assets",
+    "scripts",
+    "examples",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node test/smoke.mjs",
+    "fonts:coverage": "node scripts/font-coverage.mjs"
+  },
+  "dependencies": {
+    "playwright-core": "^1.40.0"
+  },
+  "keywords": [
+    "changelog",
+    "release-notes",
+    "documentation",
+    "pdf",
+    "agents"
+  ]
+}

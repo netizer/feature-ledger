@@ -1,0 +1,14 @@
+{
+  "id": "live-stock",
+  "audience": "user",
+  "category": "Ordering",
+  "size": "Big",
+  "history": [
+    {
+      "version": 1,
+      "name": "Live stock levels",
+      "description": "Quantities shown on a product are the ones the warehouse can actually pick right now, and a line that goes out of stock mid-basket is flagged before payment rather than after it.",
+      "changes": null
+    }
+  ]
+}

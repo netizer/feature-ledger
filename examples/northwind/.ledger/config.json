@@ -1,0 +1,21 @@
+{
+  "product": "Northwind Portal",
+  "tagline": "",
+  "prepared_for": "the client",
+  "categories": [
+    "Ordering",
+    "Account & Self-Service",
+    "Warehouse Console",
+    "Platform & Reliability"
+  ],
+  "min_subcategory_features": 4,
+  "output": {
+    "dir": "docs/generated",
+    "client_dir": "docs/generated/client",
+    "pdf_name": "{slug}-Feature-Ledger_{version}.pdf",
+    "features": "FEATURES.md",
+    "extended": "FEATURES_EXTENDED.md",
+    "dev": "DEV_FEATURES.md"
+  },
+  "docs": {}
+}

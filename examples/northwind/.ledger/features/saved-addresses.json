@@ -1,0 +1,22 @@
+{
+  "id": "saved-addresses",
+  "audience": "user",
+  "category": "Account & Self-Service",
+  "size": "Medium",
+  "history": [
+    {
+      "version": 1,
+      "name": "Saved addresses",
+      "description": "A returning customer picks from the addresses they have used before instead of retyping one, with the most recently used offered first.",
+      "changes": null
+    },
+    {
+      "version": 2,
+      "name": "Address book",
+      "description": "A returning customer picks from the addresses they have used before instead of retyping one, with the most recently used offered first.",
+      "changes": [
+        "Was \"Saved addresses\", which read as a settings screen; customers were looking for it under the order, not under their account. The name now matches the label it sits behind."
+      ]
+    }
+  ]
+}

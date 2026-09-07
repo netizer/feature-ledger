@@ -1,0 +1,14 @@
+{
+  "id": "seed-data",
+  "audience": "dev",
+  "category": "Platform & Reliability",
+  "size": "Small",
+  "history": [
+    {
+      "version": 1,
+      "name": "Seeded development data",
+      "description": "A single command fills a fresh checkout with a fortnight of plausible orders, stock levels and van schedules, so the console has something to show without hand-built fixtures.",
+      "changes": null
+    }
+  ]
+}

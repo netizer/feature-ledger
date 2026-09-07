@@ -1,0 +1,10 @@
+{
+  "name": "Northwind Portal",
+  "logo": null,
+  "logo_height": 32,
+  "accent": "#8e2a58",
+  "fonts": {
+    "display": "Source Serif 4",
+    "body": "Inter"
+  }
+}

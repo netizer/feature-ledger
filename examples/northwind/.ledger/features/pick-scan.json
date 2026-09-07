@@ -1,0 +1,15 @@
+{
+  "id": "pick-scan",
+  "audience": "user",
+  "category": "Warehouse Console",
+  "subcategory": "picking-day",
+  "size": "Medium",
+  "history": [
+    {
+      "version": 2,
+      "name": "Barcode confirmation at the shelf",
+      "description": "Scanning the item confirms the line rather than tapping it, so a lookalike product in the next bay is caught at the shelf instead of at the customer's door.",
+      "changes": null
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "id": "guided-checkout",
+  "audience": "user",
+  "category": "Ordering",
+  "size": "Big",
+  "history": [
+    {
+      "version": 1,
+      "name": "Guided checkout",
+      "description": "A customer moves through basket, delivery window, address and review in four clearly-numbered steps, with the running total visible at every one, and no account required until the final screen.",
+      "changes": null,
+      "dev_notes": "app/checkout/*; each step is a server-rendered page with the draft order held in a signed cookie."
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "id": "basket-recovery",
+  "audience": "user",
+  "category": "Ordering",
+  "size": "Small",
+  "history": [
+    {
+      "version": 1,
+      "name": "Basket survives a lost connection",
+      "description": "A basket is held for seven days against the browser it was built in, so a customer who closes the tab or loses signal comes back to what they had.",
+      "changes": null
+    },
+    {
+      "version": 2,
+      "removed": true,
+      "reason": "Folded into the account itself: a basket now belongs to the customer rather than to one browser, so the seven-day browser-local hold has nothing left to do."
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "id": "exception-queue",
+  "audience": "user",
+  "category": "Warehouse Console",
+  "size": "Medium",
+  "history": [
+    {
+      "version": 1,
+      "name": "Exception queue",
+      "description": "Anything that cannot be picked as ordered — short stock, a damaged item, an address the van cannot reach — lands in one queue with the customer's contact details beside it.",
+      "changes": null
+    }
+  ]
+}

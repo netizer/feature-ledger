@@ -1,0 +1,19 @@
+{
+  "order": [
+    "guided-checkout",
+    "live-stock",
+    "delivery-window-picker",
+    "basket-recovery",
+    "order-tracking",
+    "saved-addresses",
+    "pick-list",
+    "exception-queue",
+    "audit-trail",
+    "seed-data",
+    "substitutions",
+    "pick-scan",
+    "pick-reassign",
+    "pick-timer",
+    "pick-print"
+  ]
+}
