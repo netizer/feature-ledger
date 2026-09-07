@@ -1,0 +1,16 @@
+{
+  "id": "embedded-fonts",
+  "audience": "user",
+  "category": "The client's printed edition",
+  "subcategory": "print-fidelity",
+  "size": "Medium",
+  "history": [
+    {
+      "version": 1,
+      "name": "The document carries its own type",
+      "description": "The two typefaces the edition is set in travel inside the file itself rather than being fetched, so the finished document depends on nothing: it prints identically on a machine that has never seen those fonts, and generating one needs no network connection at all.",
+      "changes": null,
+      "dev_notes": "src/render/fonts.mjs embeds one static WOFF per weight as a data URI; the print step waits on document.fonts.ready, since network idle says nothing about fonts that were never fetched."
+    }
+  ]
+}

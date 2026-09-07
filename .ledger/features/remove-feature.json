@@ -1,0 +1,15 @@
+{
+  "id": "remove-feature",
+  "audience": "user",
+  "category": "Recording what changed",
+  "size": "Medium",
+  "history": [
+    {
+      "version": 1,
+      "name": "Recording that something went away",
+      "description": "A capability that no longer exists is marked as withdrawn, with the reason it went. The edition for that release says plainly what is no longer available and why, and every earlier edition still shows the feature exactly as it stood while it was there.",
+      "changes": null,
+      "dev_notes": "cmdRemove appends a { removed: true, reason } history entry rather than deleting the file, which is what keeps older editions reproducible."
+    }
+  ]
+}

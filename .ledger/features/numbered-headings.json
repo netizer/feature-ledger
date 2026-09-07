@@ -1,0 +1,15 @@
+{
+  "id": "numbered-headings",
+  "audience": "user",
+  "category": "The team's living documents",
+  "size": "Small",
+  "history": [
+    {
+      "version": 1,
+      "name": "Numbered areas and sub-sections",
+      "description": "Areas are numbered in reading order and sub-sections numbered within them, so any part of the product can be referred to by number in a conversation, an email or a ticket, and two people reading separate copies are looking at the same place.",
+      "changes": null,
+      "dev_notes": "MarkdownRenderer#category() emits `## N. Area` and `### N.M Sub-section`."
+    }
+  ]
+}

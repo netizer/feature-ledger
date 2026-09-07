@@ -1,0 +1,15 @@
+{
+  "id": "print-warnings",
+  "audience": "user",
+  "category": "The house rules it enforces",
+  "size": "Medium",
+  "history": [
+    {
+      "version": 1,
+      "name": "Warnings for what is valid but prints badly",
+      "description": "Checking also reports the things that are perfectly legal and would still embarrass the finished document: a feature nobody sized, an area with nothing in it, a brand pointing at a logo that isn't there, fonts that can't be embedded, an accent colour that collides with the colours meaning \"new\" and \"updated\", and features the reading order hasn't caught up with. They are warnings rather than failures, because each is a judgement call.",
+      "changes": null,
+      "dev_notes": "The warnings block in cmdCheck; the unindexed-file warning notes that any `ledger` write heals it."
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "id": "whats-changed-notes",
+  "audience": "user",
+  "category": "The team's living documents",
+  "subcategory": "change-surfacing",
+  "size": "Medium",
+  "history": [
+    {
+      "version": 1,
+      "name": "The reasons print with the entry",
+      "description": "A feature that changed this cycle prints its reasons directly beneath it, as their own short list. The description says what the thing is now, and immediately under it is what it was before and why it moved — which is the pairing the whole record exists to produce.",
+      "changes": null,
+      "dev_notes": "The \"What changed\" block in MarkdownRenderer#bullet(), rendered only while the entry is tagged."
+    }
+  ]
+}

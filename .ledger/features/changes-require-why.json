@@ -1,0 +1,15 @@
+{
+  "id": "changes-require-why",
+  "audience": "user",
+  "category": "The house rules it enforces",
+  "size": "Big",
+  "history": [
+    {
+      "version": 1,
+      "name": "A change has to say what it was and why it moved",
+      "description": "An existing feature cannot quietly acquire a new description. Changing one requires the bullets that say what it was before and why it moved — the description already shows a reader what it is now, and the reason is the part only the people who built it know. That reason is what makes the ledger worth reading rather than a diff of a document, and where it isn't known the instruction is to ask for it, never to write a plausible-sounding one into something a client reads.",
+      "changes": null,
+      "dev_notes": "The existedBefore check at the end of cmdUpdate; the refusal text itself carries the rule, so an agent that hits it is told what to supply."
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "id": "draft-marking",
+  "audience": "user",
+  "category": "The client's printed edition",
+  "size": "Small",
+  "history": [
+    {
+      "version": 1,
+      "name": "An edition that hasn't been presented says so",
+      "description": "Printing the release still in progress produces a document marked as a draft not yet presented, in a neutral colour rather than one of the two that carry meaning. A work-in-progress copy can be circulated internally without any chance of it being mistaken for the client's edition.",
+      "changes": null,
+      "dev_notes": "The .edition.is-draft / .is-final states on the cover, keyed off the release's status."
+    }
+  ]
+}

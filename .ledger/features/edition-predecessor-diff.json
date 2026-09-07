@@ -1,0 +1,15 @@
+{
+  "id": "edition-predecessor-diff",
+  "audience": "user",
+  "category": "Releases and editions",
+  "size": "Medium",
+  "history": [
+    {
+      "version": 1,
+      "name": "Every edition is measured against the one before it",
+      "description": "An edition highlights what is different from the edition that preceded it, however long ago that was — which is what makes a printed edition reproduce the conversation it was printed for, rather than being rewritten by later work. Reprinting version 3 today still shows what was new about version 3 in front of the client that day.",
+      "changes": null,
+      "dev_notes": "LedgerHtml uses releases.predecessorOf(version) for badges; deliberately different from the Markdown docs, which only mark the in-progress release."
+    }
+  ]
+}

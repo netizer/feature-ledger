@@ -1,0 +1,15 @@
+{
+  "id": "wording-overrides",
+  "audience": "user",
+  "category": "Branding and wording for each client",
+  "size": "Medium",
+  "history": [
+    {
+      "version": 1,
+      "name": "The document's own wording is the project's",
+      "description": "Every line of standing prose the documents emit — their titles, the paragraph that opens each one, the cover's introduction, the closing note about who the ledger was prepared for — can be replaced per project. The defaults are written around the product's name and its one-line description, so they read as being about this product rather than about software in general, and only need replacing when a project wants its own voice.",
+      "changes": null,
+      "dev_notes": "src/wording.mjs holds every default in one place, merged with config.docs per document."
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "id": "ledger-rows",
+  "audience": "user",
+  "category": "The client's printed edition",
+  "size": "Medium",
+  "history": [
+    {
+      "version": 1,
+      "name": "Each feature as a row of the ledger",
+      "description": "The body reads as a ledger: every feature is a ruled row carrying its size chip, its name, and its description set to a fixed comfortable measure, under a numbered area heading that says how many features that area holds and how many of them moved. The regularity is the point — the document is scanned as much as it is read.",
+      "changes": null,
+      "dev_notes": "LedgerHtml#featureRow(), shared by the first row of a section and every row after it so the two can't drift; --measure is one shared ~70-character text width."
+    }
+  ]
+}

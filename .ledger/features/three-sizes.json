@@ -1,0 +1,15 @@
+{
+  "id": "three-sizes",
+  "audience": "user",
+  "category": "What the ledger records",
+  "size": "Medium",
+  "history": [
+    {
+      "version": 1,
+      "name": "Three sizes, which are also the reading order",
+      "description": "Every feature is sized: Big for a standalone capability, Medium for a meaningful piece of a bigger area, Small for one specific behaviour or guardrail. The size shows on the entry wherever it prints, and it orders every section — the standalone capabilities first, then the pieces, then the specific touches — so a reader skimming for what the product does gets it before the detail, and an area can't bury its Big entry behind six Smalls just because that was the order things got written down in.",
+      "changes": null,
+      "dev_notes": "SIZE_ORDER and FeatureSet#bySize in src/model/feature-set.mjs; unsized entries sort last and print without a chip."
+    }
+  ]
+}

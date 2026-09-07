@@ -1,0 +1,16 @@
+{
+  "id": "renamed-footnote",
+  "audience": "user",
+  "category": "The team's living documents",
+  "subcategory": "change-surfacing",
+  "size": "Small",
+  "history": [
+    {
+      "version": 1,
+      "name": "A renamed feature shows what it was called",
+      "description": "A feature that has been renamed prints its previous name alongside the new one, so a reader who knew it by the old name recognises it instead of assuming something disappeared and something else arrived.",
+      "changes": null,
+      "dev_notes": "state.renamedFrom, derived from the naming entries in the feature's history rather than stored separately."
+    }
+  ]
+}

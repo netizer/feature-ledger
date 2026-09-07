@@ -1,0 +1,15 @@
+{
+  "id": "corpus-order-index",
+  "audience": "user",
+  "category": "What the ledger records",
+  "size": "Small",
+  "history": [
+    {
+      "version": 1,
+      "name": "A deliberate order within each size",
+      "description": "The record keeps the order its features were written in, which is what settles their sequence when several share a size. It is maintained as features are added and removed, and a feature it hasn't caught up with simply sorts last rather than causing a problem.",
+      "changes": null,
+      "dev_notes": ".ledger/index.json { order: [...] }, rewritten by Project#saveIndex() on every write; pruned of dead ids, and unknown files appended alphabetically."
+    }
+  ]
+}

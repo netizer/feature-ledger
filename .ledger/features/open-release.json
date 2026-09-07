@@ -1,0 +1,15 @@
+{
+  "id": "open-release",
+  "audience": "user",
+  "category": "Releases and editions",
+  "size": "Medium",
+  "history": [
+    {
+      "version": 1,
+      "name": "One open release, and everything lands on it",
+      "description": "There is always exactly one release in progress at the end of the timeline, and every entry written goes onto it. Nobody has to say which version a piece of work belongs to, and work can't be recorded against something already presented to a client — if the last release has shipped, the tool says to open the next one first.",
+      "changes": null,
+      "dev_notes": "Project#workingVersion; ReleaseSet enforces at most one future release and that it is last."
+    }
+  ]
+}

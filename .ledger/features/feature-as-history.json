@@ -1,0 +1,15 @@
+{
+  "id": "feature-as-history",
+  "audience": "user",
+  "category": "What the ledger records",
+  "size": "Big",
+  "history": [
+    {
+      "version": 1,
+      "name": "A feature is its own history",
+      "description": "Each feature in the record carries every version of itself, and a version only appears in that history when something about the feature actually changed — an absent version means it was still whatever the last entry said. So the record is a list of the moments that mattered rather than a full snapshot per release, and the question \"what did this look like at version 4?\" always has an answer, which is what lets an edition from a year ago still reproduce exactly what was presented that day.",
+      "changes": null,
+      "dev_notes": "src/model/feature.mjs — Feature#stateAt(version) walks history up to the target and returns the last entry; #touchedAt is the mechanical New/Changed test."
+    }
+  ]
+}

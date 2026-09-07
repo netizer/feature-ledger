@@ -1,0 +1,15 @@
+{
+  "id": "one-file-per-feature",
+  "audience": "user",
+  "category": "What the ledger records",
+  "size": "Medium",
+  "history": [
+    {
+      "version": 1,
+      "name": "One file per feature",
+      "description": "Each feature is its own small file in the project's repository. A change to one feature is a change to one file, so the record's version history reads as a sequence of legible edits, and two branches that each add a feature don't collide.",
+      "changes": null,
+      "dev_notes": ".ledger/features/<id>.json, loaded by Project#load(); a file whose name doesn't match the id it declares is refused."
+    }
+  ]
+}

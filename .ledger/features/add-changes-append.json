@@ -1,0 +1,16 @@
+{
+  "id": "add-changes-append",
+  "audience": "user",
+  "category": "Recording what changed",
+  "subcategory": "write-mechanics",
+  "size": "Small",
+  "history": [
+    {
+      "version": 1,
+      "name": "A second reason, added later in the cycle",
+      "description": "When something changes twice before a release is presented, the second reason is appended to the ones already recorded rather than replacing them. The release ends up remembering both, which is what actually happened.",
+      "changes": null,
+      "dev_notes": "add_changes on the update payload, versus changes which replaces outright."
+    }
+  ]
+}

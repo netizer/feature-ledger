@@ -1,0 +1,15 @@
+{
+  "id": "agent-pointer-stanza",
+  "audience": "user",
+  "category": "Working with coding agents",
+  "size": "Big",
+  "history": [
+    {
+      "version": 1,
+      "name": "The coding agent is told the ledger exists",
+      "description": "Setting up a ledger writes a short standing instruction into the project's agent files: that the record exists, that a change which ships a feature isn't finished until the record says so, which commands to use, and to read the full rules before the first edit. From then on any agent working in the project already knows to keep the ledger current, without anyone having to remember to ask.",
+      "changes": null,
+      "dev_notes": "assets/agent-pointer.md, installed by wireAgents() in src/commands/init.mjs."
+    }
+  ]
+}

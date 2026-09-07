@@ -1,0 +1,15 @@
+{
+  "id": "update-feature",
+  "audience": "user",
+  "category": "Recording what changed",
+  "size": "Medium",
+  "history": [
+    {
+      "version": 1,
+      "name": "Recording a change to something that exists",
+      "description": "When an existing capability changes, the record takes its full current-state description — rewritten, not a diff — together with the bullets saying what it was before and why it moved. Both are kept: the description is what every future reader sees, and the bullets are what the release it changed in is remembered for. A second edit within the same release merges into the same entry rather than adding a duplicate.",
+      "changes": null,
+      "dev_notes": "cmdUpdate. Creates or amends the history entry at the working version; the current-state description is what stateAt() returns from then on."
+    }
+  ]
+}

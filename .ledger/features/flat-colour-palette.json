@@ -1,0 +1,16 @@
+{
+  "id": "flat-colour-palette",
+  "audience": "user",
+  "category": "The client's printed edition",
+  "subcategory": "print-fidelity",
+  "size": "Small",
+  "history": [
+    {
+      "version": 1,
+      "name": "Colour that prints as specified",
+      "description": "Every tint in the edition is a real flat colour rather than a transparency laid over something else, so what comes off an office laser or a commercial press is what the document specifies rather than an approximation of it.",
+      "changes": null,
+      "dev_notes": "No alpha blends anywhere in STYLES; the tints are defined outright in the palette."
+    }
+  ]
+}

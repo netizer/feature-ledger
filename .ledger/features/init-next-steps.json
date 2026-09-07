@@ -1,0 +1,15 @@
+{
+  "id": "init-next-steps",
+  "audience": "user",
+  "category": "Setting up a ledger in a project",
+  "size": "Small",
+  "history": [
+    {
+      "version": 1,
+      "name": "Setup ends by naming the next step",
+      "description": "Setup finishes by printing the route from an empty ledger to a first edition in order — survey the codebase, check it, cut the baseline, build — so the sequence doesn't have to be looked up, and the ledger doesn't sit empty because it wasn't clear what came next.",
+      "changes": null,
+      "dev_notes": "The trailing `out()` block in cmdInit; the baseline-date placeholder honours --baseline-date when given."
+    }
+  ]
+}

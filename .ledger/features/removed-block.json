@@ -1,0 +1,15 @@
+{
+  "id": "removed-block",
+  "audience": "user",
+  "category": "The client's printed edition",
+  "size": "Small",
+  "history": [
+    {
+      "version": 1,
+      "name": "Withdrawals get their own section",
+      "description": "Anything withdrawn in this edition is collected in its own closing section, each with the reason it went, so a client who remembers a capability finds out what happened to it rather than being left to notice its absence.",
+      "changes": null,
+      "dev_notes": "removedThisVersion + the .removed-box markup; empty and omitted when nothing was withdrawn."
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "id": "removal-needs-reason",
+  "audience": "user",
+  "category": "The house rules it enforces",
+  "subcategory": "write-time-refusals",
+  "size": "Small",
+  "history": [
+    {
+      "version": 1,
+      "name": "A withdrawal explains itself",
+      "description": "Taking a feature out of the record requires the reason it went, which is what the client reads in the edition where it disappears. Something that was there and then wasn't is a question the document should answer on its own.",
+      "changes": null,
+      "dev_notes": "cmdRemove requires --reason; the reason is stored on the removal history entry and rendered in the \"no longer available\" block."
+    }
+  ]
+}

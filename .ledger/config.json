@@ -1,0 +1,28 @@
+{
+  "product": "Feature Ledger",
+  "tagline": "",
+  "prepared_for": "the client",
+  "categories": [
+    "Setting up a ledger in a project",
+    "What the ledger records",
+    "Recording what changed",
+    "The house rules it enforces",
+    "Reading the ledger",
+    "Working with coding agents",
+    "Releases and editions",
+    "The team's living documents",
+    "The client's printed edition",
+    "Branding and wording for each client",
+    "Running it anywhere"
+  ],
+  "min_subcategory_features": 4,
+  "output": {
+    "dir": "docs/generated",
+    "client_dir": "docs/generated/client",
+    "pdf_name": "{slug}-Feature-Ledger_{version}.pdf",
+    "features": "FEATURES.md",
+    "extended": "FEATURES_EXTENDED.md",
+    "dev": "DEV_FEATURES.md"
+  },
+  "docs": {}
+}

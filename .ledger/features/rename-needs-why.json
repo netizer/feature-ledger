@@ -1,0 +1,16 @@
+{
+  "id": "rename-needs-why",
+  "audience": "user",
+  "category": "The house rules it enforces",
+  "subcategory": "write-time-refusals",
+  "size": "Small",
+  "history": [
+    {
+      "version": 1,
+      "name": "A rename explains itself",
+      "description": "Renaming a feature that a client has already read about requires a line saying what it was called and why the name moved. A name changing under a reader with no explanation is exactly the thing that makes a document feel unreliable.",
+      "changes": null,
+      "dev_notes": "cmdRename requires --why once feature.firstVersion < the working version; the bullet is appended to that release's changes."
+    }
+  ]
+}

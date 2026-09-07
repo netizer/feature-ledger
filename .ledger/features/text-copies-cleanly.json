@@ -1,0 +1,16 @@
+{
+  "id": "text-copies-cleanly",
+  "audience": "user",
+  "category": "The client's printed edition",
+  "subcategory": "print-fidelity",
+  "size": "Medium",
+  "history": [
+    {
+      "version": 1,
+      "name": "Text copies out as the words it is",
+      "description": "Prose selected out of the finished document pastes back as the sentences it was — a client can quote a feature description into an email, and the document is searchable and readable by assistive software. This is the reason the edition is set in the specific font files it is: the convenient alternative produces a file that looks right and whose text comes back shredded when anyone copies it.",
+      "changes": null,
+      "dev_notes": "Static font instances embed as CID TrueType with Identity-H; a variable instance exports through Chromium as a Type 3 font whose glyphs are drawing procedures. Six decorative tracked-caps labels on the cover are the deliberate exception; every line of content copies verbatim."
+    }
+  ]
+}

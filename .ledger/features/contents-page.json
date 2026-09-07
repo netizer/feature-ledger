@@ -1,0 +1,15 @@
+{
+  "id": "contents-page",
+  "audience": "user",
+  "category": "The client's printed edition",
+  "size": "Medium",
+  "history": [
+    {
+      "version": 1,
+      "name": "Contents, with what moved in each area",
+      "description": "A numbered contents list follows the front page, naming every area with how many features it holds and a dot for each one that is new or updated in this edition. The reader can see at a glance which parts of the product the release touched before reading any of it.",
+      "changes": null,
+      "dev_notes": "The .contents block; the dots reuse the same green/blue semantics as the body."
+    }
+  ]
+}

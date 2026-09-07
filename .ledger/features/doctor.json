@@ -1,0 +1,15 @@
+{
+  "id": "doctor",
+  "audience": "user",
+  "category": "Setting up a ledger in a project",
+  "size": "Medium",
+  "history": [
+    {
+      "version": 1,
+      "name": "A resolved view of the whole setup",
+      "description": "`ledger doctor` reports the setup as the tool actually resolves it, rather than as the settings files state it: where the project and its ledger are, how many features and releases exist, the full accent palette derived from the one brand colour, whether the front page will use a logo or a wordmark, whether the requested fonts are ones that can be embedded, whether a local style override is present, and which browser on this machine will print the edition.",
+      "changes": null,
+      "dev_notes": "src/commands/build.mjs — cmdDoctor. The browser line calls probeBrowser(), which launches and closes a Chromium, so it reports the real resolution order rather than a guess."
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "id": "pointer-not-copy",
+  "audience": "user",
+  "category": "Working with coding agents",
+  "size": "Medium",
+  "history": [
+    {
+      "version": 1,
+      "name": "A pointer, so the rules stay in one place",
+      "description": "What goes into the agent files is a pointer to the rules, not a copy of them. There is one source of truth to change when a convention changes, every agent reaches the same version of it, and the full text is only pulled in at the moment an edit is actually being made rather than sitting in every session.",
+      "changes": null,
+      "dev_notes": "The stanza's last line sends the agent to `ledger rules`, which resolves the project's own RULES.md when it has one."
+    }
+  ]
+}

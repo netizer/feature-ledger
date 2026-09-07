@@ -1,0 +1,15 @@
+{
+  "id": "rename-feature",
+  "audience": "user",
+  "category": "Recording what changed",
+  "size": "Medium",
+  "history": [
+    {
+      "version": 1,
+      "name": "Renaming a feature",
+      "description": "A feature can be renamed without losing anything: its history stays attached, the documents footnote what it used to be called so a reader isn't left wondering where something went, and the reason the name moved is recorded alongside.",
+      "changes": null,
+      "dev_notes": "cmdRename; the previous name is derived by stateAt() from the naming entries, so the footnote needs no bookkeeping of its own."
+    }
+  ]
+}

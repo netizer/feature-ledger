@@ -1,0 +1,15 @@
+{
+  "id": "generated-header",
+  "audience": "user",
+  "category": "The team's living documents",
+  "size": "Small",
+  "history": [
+    {
+      "version": 1,
+      "name": "Every generated file says it is generated",
+      "description": "Each document opens with a note that it is generated, shouldn't be hand-edited or committed, and where the source of truth actually is — so an edit that would have been overwritten on the next build gets made in the right place instead.",
+      "changes": null,
+      "dev_notes": "GENERATED_HEADER() in src/wording.mjs, prepended to all three Markdown docs."
+    }
+  ]
+}

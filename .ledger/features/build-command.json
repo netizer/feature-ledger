@@ -1,0 +1,15 @@
+{
+  "id": "build-command",
+  "audience": "user",
+  "category": "The team's living documents",
+  "size": "Medium",
+  "history": [
+    {
+      "version": 1,
+      "name": "Generating the documents",
+      "description": "`ledger build` writes the documents and the client's edition, together or one at a time, into the project's output directory or anywhere else asked for. It is run by hand, when someone needs a fresh copy and always when a release is presented — the record is the thing that's kept, and the documents are made from it on demand.",
+      "changes": null,
+      "dev_notes": "src/commands/build.mjs — cmdBuild; --md / --pdf select, --out overrides the directory. Shape rules are enforced here as errors, so a badly shaped record can't be printed."
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "id": "pdf-edition",
+  "audience": "user",
+  "category": "The client's printed edition",
+  "size": "Big",
+  "history": [
+    {
+      "version": 1,
+      "name": "A printed edition for the client",
+      "description": "Each release can be printed as a single self-contained document for the client: a covered, typeset catalogue of everything the product does, laid out area by area with each feature named, sized and described in plain language. It is a real designed document rather than a dump of the record — the thing that gets attached to an email or handed over at a presentation — and one is minted per release, so the client accumulates a shelf of editions rather than a file that keeps changing under them.",
+      "changes": null,
+      "dev_notes": "src/render/ledger-html.mjs renders real HTML/CSS; src/render/pdf.mjs prints it through headless Chromium with printBackground on, exactly as a person would print a styled page."
+    }
+  ]
+}

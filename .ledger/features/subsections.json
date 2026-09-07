@@ -1,0 +1,15 @@
+{
+  "id": "subsections",
+  "audience": "user",
+  "category": "What the ledger records",
+  "size": "Medium",
+  "history": [
+    {
+      "version": 1,
+      "name": "Sub-sections for an area that outgrew one list",
+      "description": "An area that has grown big enough to read as a wall can be broken into named sub-sections, each with a sentence or two of its own saying what that whole part of the product is. The heading and its overview do the work the one oversized entry used to, and everything filed beneath it stays at the size it really is.",
+      "changes": null,
+      "dev_notes": ".ledger/subcategories.json; FeatureSet#sections() returns loose features first, then each sub-section's members, and both renderers walk it so the docs and the PDF can't drift on layout."
+    }
+  ]
+}

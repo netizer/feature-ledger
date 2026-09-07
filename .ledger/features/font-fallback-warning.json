@@ -1,0 +1,16 @@
+{
+  "id": "font-fallback-warning",
+  "audience": "user",
+  "category": "The client's printed edition",
+  "subcategory": "print-fidelity",
+  "size": "Small",
+  "history": [
+    {
+      "version": 1,
+      "name": "A typeface that can't be embedded is flagged",
+      "description": "Asking for a typeface the tool doesn't carry still produces a document — printed in whatever the machine has — but says so both when the record is checked and when the edition is built, along with the warning that its text may not copy cleanly. The trade-off is a decision rather than a surprise.",
+      "changes": null,
+      "dev_notes": "fontFaceCss() returns embedded: false; warned by both cmdCheck and renderLedgerHtml."
+    }
+  ]
+}

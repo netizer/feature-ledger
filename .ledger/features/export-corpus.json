@@ -1,0 +1,15 @@
+{
+  "id": "export-corpus",
+  "audience": "user",
+  "category": "Reading the ledger",
+  "size": "Medium",
+  "history": [
+    {
+      "version": 1,
+      "name": "The record as one portable document",
+      "description": "The whole record — product, timeline, areas, sub-sections, product-wide changes and every feature with its full history — can be written out as a single structured document, to print, to keep as a backup, or to hand to something that isn't this tool.",
+      "changes": null,
+      "dev_notes": "cmdExport, versioned with schema_version: 1; --out writes to a file, otherwise it goes to standard output."
+    }
+  ]
+}

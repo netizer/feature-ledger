@@ -1,0 +1,15 @@
+{
+  "id": "list-filters",
+  "audience": "user",
+  "category": "Reading the ledger",
+  "size": "Small",
+  "history": [
+    {
+      "version": 1,
+      "name": "Narrowing the list",
+      "description": "The record can be listed for one area, one readership, one size, or only what has moved in the release currently open — which is how a large record stays readable when the question is about one part of the product rather than all of it.",
+      "changes": null,
+      "dev_notes": "--category (substring, case-insensitive), --audience, --size, --changed on cmdList."
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "id": "automatic-new-changed",
+  "audience": "user",
+  "category": "The team's living documents",
+  "subcategory": "change-surfacing",
+  "size": "Medium",
+  "history": [
+    {
+      "version": 1,
+      "name": "New and Changed mark themselves",
+      "description": "While a release is in progress, anything added or changed during it is tagged in the documents; once that release is presented the tags go quiet by themselves, and the documents read as a clean present-tense list of what the product does. There is nothing to apply and nothing to strip afterwards, which is the part that otherwise gets forgotten and leaves last quarter's work still labelled new.",
+      "changes": null,
+      "dev_notes": "MarkdownRenderer tags only when the latest history entry lands on the target version and that release is still future."
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "id": "dry-run",
+  "audience": "user",
+  "category": "Recording what changed",
+  "subcategory": "write-mechanics",
+  "size": "Small",
+  "history": [
+    {
+      "version": 1,
+      "name": "Previewing a write before it lands",
+      "description": "Any write can be run as a preview: it prints exactly what would be recorded and leaves the files untouched. Useful for checking how an entry will read before it becomes part of the record.",
+      "changes": null,
+      "dev_notes": "--dry-run, honoured by add, update, rename, remove, other-change, categories add, subcategory add and release cut."
+    }
+  ]
+}

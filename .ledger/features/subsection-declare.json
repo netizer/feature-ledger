@@ -1,0 +1,15 @@
+{
+  "id": "subsection-declare",
+  "audience": "user",
+  "category": "Recording what changed",
+  "size": "Small",
+  "history": [
+    {
+      "version": 1,
+      "name": "Opening a sub-section and filling it",
+      "description": "A sub-section is declared with the one-or-two-sentence overview that says what its part of the product is, and features are then filed into it. Declaring and filling are separate steps, so an area can be reorganised in place rather than having to arrive fully formed.",
+      "changes": null,
+      "dev_notes": "`ledger subcategory add` (JSON on stdin), then `ledger update <id> --subcategory <sub>`; the shape rules are checked at `ledger check` time precisely so this sequence is possible."
+    }
+  ]
+}

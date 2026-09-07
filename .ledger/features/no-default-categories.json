@@ -1,0 +1,15 @@
+{
+  "id": "no-default-categories",
+  "audience": "user",
+  "category": "Setting up a ledger in a project",
+  "size": "Small",
+  "history": [
+    {
+      "version": 1,
+      "name": "No taxonomy out of the box",
+      "description": "A new ledger starts with no categories at all. The areas a product divides into are decided by looking at that product, so the first survey of the codebase is what defines them — rather than a supplied default taxonomy that would fit nothing exactly and quietly become the one nobody revisits.",
+      "changes": null,
+      "dev_notes": "config.categories is written as [] by cmdInit, deliberately, and `ledger add` refuses a category that isn't in the list."
+    }
+  ]
+}

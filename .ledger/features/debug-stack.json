@@ -1,0 +1,15 @@
+{
+  "id": "debug-stack",
+  "audience": "dev",
+  "category": "Running it anywhere",
+  "size": "Small",
+  "history": [
+    {
+      "version": 1,
+      "name": "Full stack traces on request",
+      "description": "Failures print as a single line meant to be read and acted on. Setting the debug switch adds the full trace behind it, for the case where something has gone wrong in the tool rather than in what it was asked to do.",
+      "changes": null,
+      "dev_notes": "LEDGER_DEBUG in bin/ledger.mjs."
+    }
+  ]
+}

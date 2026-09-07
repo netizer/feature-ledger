@@ -1,0 +1,16 @@
+{
+  "id": "empty-release-refused",
+  "audience": "user",
+  "category": "The house rules it enforces",
+  "subcategory": "write-time-refusals",
+  "size": "Small",
+  "history": [
+    {
+      "version": 1,
+      "name": "A release with nothing in it isn't cut by accident",
+      "description": "Closing a release that has nothing recorded against it would produce an edition identical to the last one, which almost always means the work shipped without the record following it. That is refused, with a pointer to what the release currently holds — and can still be overridden for the rare case where an unchanged edition really is being re-issued.",
+      "changes": null,
+      "dev_notes": "The touched === 0 && other === 0 guard in release cut, overridable with --force."
+    }
+  ]
+}

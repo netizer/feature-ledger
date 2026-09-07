@@ -1,0 +1,16 @@
+{
+  "id": "dev-notes-carry-forward",
+  "audience": "user",
+  "category": "Recording what changed",
+  "subcategory": "write-mechanics",
+  "size": "Small",
+  "history": [
+    {
+      "version": 1,
+      "name": "Technical notes survive the next edit",
+      "description": "The implementation notes attached to a feature stay attached when that feature is next changed, without having to be restated, so a routine description edit doesn't quietly strip the detail the team relies on. They can still be replaced, or cleared deliberately.",
+      "changes": null,
+      "dev_notes": "cmdUpdate and cmdRename copy prev.dev_notes onto a newly created entry; an explicitly blank dev_notes deletes them."
+    }
+  ]
+}

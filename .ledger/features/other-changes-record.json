@@ -1,0 +1,15 @@
+{
+  "id": "other-changes-record",
+  "audience": "user",
+  "category": "What the ledger records",
+  "size": "Small",
+  "history": [
+    {
+      "version": 1,
+      "name": "Changes that belong to no single feature",
+      "description": "A change that runs across the whole product — a colour meaning, a wording pass over many screens — is recorded once against the release rather than being forced onto a dozen unrelated features. It prints once too, closing the document, instead of reading as though every area had made the same change independently.",
+      "changes": null,
+      "dev_notes": ".ledger/other-changes.json; written by `ledger other-change`, rendered as the trailing \"Also since last time\" block in both the Markdown and the PDF."
+    }
+  ]
+}

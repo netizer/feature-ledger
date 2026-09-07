@@ -1,0 +1,15 @@
+{
+  "id": "since-last-edition",
+  "audience": "user",
+  "category": "The client's printed edition",
+  "size": "Medium",
+  "history": [
+    {
+      "version": 1,
+      "name": "What is different, marked on the page",
+      "description": "From the second edition onward, the front page states how many features are new, updated and unchanged since the last one and explains the marking, and every affected entry carries it: a green stripe for a feature that is new, a blue one for an existing feature that was materially reworked, with its own note of what changed and why directly beneath. Anything unstriped hasn't changed. A client reading a fresh edition can find the release's work without being handed a separate list of it.",
+      "changes": null,
+      "dev_notes": "Two hues with fixed meanings across the whole document — the reason the brand accent is refused if it lands in that band."
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "id": "accent-family",
+  "audience": "user",
+  "category": "Branding and wording for each client",
+  "size": "Big",
+  "history": [
+    {
+      "version": 1,
+      "name": "A whole palette from one colour",
+      "description": "A client gives one colour, and the edition takes on a complete family derived from it — the deeper tone that holds up as small text, the muted one for quiet labels, and the two pale grounds behind chips and panels. The document reads as designed for that client rather than tinted for them, without anyone having to specify five colours; and any one of the five can still be pinned outright when a brand guide insists.",
+      "changes": null,
+      "dev_notes": "resolveBrand() in src/render/brand.mjs derives accent_deep/quiet/mid/pale in HSL by the same relationships the hand-tuned original used; explicit values in brand.json override."
+    }
+  ]
+}

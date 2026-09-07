@@ -1,0 +1,15 @@
+{
+  "id": "status-command",
+  "audience": "user",
+  "category": "Reading the ledger",
+  "size": "Medium",
+  "history": [
+    {
+      "version": 1,
+      "name": "What this release has collected so far",
+      "description": "`ledger status` shows the release in progress: which features have been added, which changed, which withdrawn, and how many product-wide changes it holds. It is the check before presenting to a client — does the record reflect what actually got done this cycle — and the quick way to see whether work just finished has been written down.",
+      "changes": null,
+      "dev_notes": "cmdStatus; --json gives the same split as arrays of ids, for a script or a hook."
+    }
+  ]
+}

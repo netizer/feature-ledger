@@ -1,0 +1,15 @@
+{
+  "id": "release-cut",
+  "audience": "user",
+  "category": "Releases and editions",
+  "size": "Big",
+  "history": [
+    {
+      "version": 1,
+      "name": "Closing a release",
+      "description": "When the product is actually presented, closing the release is the one moment the timeline moves: the work in progress gets the name of the moment it stands for and the date it happened, a fresh release opens behind it for whatever comes next, and everything marked as new or changed during the cycle goes quiet on its own. Nothing has to be un-tagged by hand, and the release just closed can be printed as an edition that will never change again.",
+      "changes": null,
+      "dev_notes": "src/commands/release.mjs — cut(). Reports what it covered and points at `ledger build` as the next step."
+    }
+  ]
+}

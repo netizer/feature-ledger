@@ -1,0 +1,16 @@
+{
+  "id": "other-changes-close-doc",
+  "audience": "user",
+  "category": "The team's living documents",
+  "subcategory": "change-surfacing",
+  "size": "Small",
+  "history": [
+    {
+      "version": 1,
+      "name": "Product-wide changes close the document",
+      "description": "Changes that ran across the whole product are collected once at the end, under a heading that says as much. Repeating them under every area would read as though each part of the product had made the same change independently.",
+      "changes": null,
+      "dev_notes": "The \"Also since last time\" trailer; same placement in the printed edition."
+    }
+  ]
+}

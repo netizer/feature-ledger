@@ -1,0 +1,15 @@
+{
+  "id": "version-1-no-flags",
+  "audience": "user",
+  "category": "Releases and editions",
+  "size": "Small",
+  "history": [
+    {
+      "version": 1,
+      "name": "A first edition is a plain inventory",
+      "description": "The first release has nothing before it to be compared against, so its edition prints with nothing marked as new or changed anywhere. That is exactly right for a baseline of a product that already existed — it reads as a catalogue of what there is, not as a claim about what was just built.",
+      "changes": null,
+      "dev_notes": "buildRows() clears every badge when there's no predecessor; the front-page callout and the since-last-edition tallies are omitted too."
+    }
+  ]
+}

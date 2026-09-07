@@ -1,0 +1,15 @@
+{
+  "id": "init-preserves-existing",
+  "audience": "user",
+  "category": "Setting up a ledger in a project",
+  "size": "Small",
+  "history": [
+    {
+      "version": 1,
+      "name": "Setup is safe to run again",
+      "description": "Running setup a second time on a project that already has a ledger leaves the record alone: the branding, timeline and features stay as they are, and the settings file is only replaced when overwriting it is asked for explicitly.",
+      "changes": null,
+      "dev_notes": "cmdInit bails on an existing config.json unless --force; every other file is written only when absent."
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "id": "removed-trailer",
+  "audience": "user",
+  "category": "The team's living documents",
+  "subcategory": "change-surfacing",
+  "size": "Small",
+  "history": [
+    {
+      "version": 1,
+      "name": "What is no longer available, said in place",
+      "description": "A feature withdrawn during the cycle is listed at the end of its own area, with the reason it went, rather than simply vanishing from the list. A reader looking for something they remember finds the answer where they were looking for the feature.",
+      "changes": null,
+      "dev_notes": "The per-category removed trailer in MarkdownRenderer#category(); it steps up to the sub-section heading level when the area has sub-sections, so it can't read as a footnote to the last one."
+    }
+  ]
+}

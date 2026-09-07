@@ -1,0 +1,15 @@
+{
+  "id": "categories-reading-order",
+  "audience": "user",
+  "category": "What the ledger records",
+  "size": "Medium",
+  "history": [
+    {
+      "version": 1,
+      "name": "Areas, in the order a reader meets them",
+      "description": "Features are filed into named areas of the product, and the order of that list is the reading order of every document and edition the ledger produces. An area with nothing in it never prints as a bare heading, so the list can be planned ahead of the work that fills it.",
+      "changes": null,
+      "dev_notes": "config.categories; FeatureSet#categories() filters to those actually populated for the audience being rendered."
+    }
+  ]
+}
