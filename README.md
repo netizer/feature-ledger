@@ -395,6 +395,13 @@ Every command takes `--dir PATH` to point at a `.ledger` directory
 elsewhere; otherwise it's found by walking up from the working directory.
 `$LEDGER_DIR` does the same thing.
 
+`ledger build` prints the newest edition that has something in it. Straight
+after `ledger release cut` that's the release you just cut, not the empty one
+the cut opened — so the usual `cut && build` mints the edition for what was
+just shipped. Once work is recorded against the open release, the default
+moves on to it, and `--version N` prints any release by number, including an
+empty one.
+
 `ledger build --html` writes the ledger as HTML instead of printing it — the
 fast loop when you're tuning `theme.css`.
 
@@ -428,7 +435,7 @@ node test/smoke.mjs      # builds a project from nothing, exercises every guardr
 
 `examples/northwind/` is a small worked corpus — two releases, a change, a
 rename, a removal, a global change and a sub-section. `cd examples/northwind
-&& ledger build` prints both editions.
+&& ledger build --version all` prints both editions.
 
 Fonts: see `assets/fonts/README.md`. The short version is that they're
 **static** instances, not variable ones, because Chromium exports a variable

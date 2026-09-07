@@ -139,6 +139,33 @@ export class Project {
     return current.version;
   }
 
+  /**
+   * The versions that are real editions. The in-progress release is one only
+   * once something has been recorded against it: a release opened by
+   * `release cut` and not yet written to would print an edition identical to
+   * the one just shipped, which is not a document anybody wants handed to a
+   * client. The very first release is always an edition, empty or not —
+   * there is nothing behind it to fall back to.
+   */
+  get editionVersions() {
+    const all = this.releases.versions;
+    const current = this.releases.current;
+    if (all.length > 1 && current.future && !this.recordedAt(current.version)) return all.slice(0, -1);
+    return all;
+  }
+
+  /** The edition `ledger build` prints when no `--version` says otherwise. */
+  get editionVersion() {
+    const versions = this.editionVersions;
+    return versions[versions.length - 1];
+  }
+
+  /** Whether anything at all was written against a version. */
+  recordedAt(version) {
+    return this.featureSet.features().some((f) => f.touchedAt(version))
+      || this.featureSet.otherChanges({ version }).length > 0;
+  }
+
   featurePath(id) {
     return path.join(this.featuresDir, `${id}.json`);
   }

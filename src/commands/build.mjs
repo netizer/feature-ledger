@@ -64,7 +64,8 @@ export async function cmdCheck({ flags }) {
 
   const n = project.featureSet.features().length;
   out(`OK — ${n} feature${n === 1 ? "" : "s"}, ${project.featureSet.categories().length} categories, ` +
-      `${project.releases.releases.length} releases, working version v${project.releases.latestVersion}`);
+      `${project.releases.releases.length} releases, working version v${project.releases.latestVersion}, ` +
+      `\`build\` prints v${project.editionVersion}`);
   for (const w of warnings) warn(w);
 }
 
@@ -94,9 +95,20 @@ export async function cmdBuild({ flags }) {
 
   if (wantPdf) {
     const arg = flags.version;
+    const asked = arg !== undefined && arg !== true;
+    // Editions, not releases: a release opened by `release cut` and not yet
+    // written to isn't one, so the default straight after a cut is the
+    // edition that was just shipped rather than an empty reprint of it.
+    // Asking for it by number still prints it — that's the in-progress proof.
     const versions = String(arg ?? "").toLowerCase() === "all"
-      ? project.releases.versions
-      : [arg === undefined || arg === true ? project.releases.latestVersion : Number(arg)];
+      ? project.editionVersions
+      : [asked ? Number(arg) : project.editionVersion];
+
+    if (!asked && project.editionVersion !== project.releases.latestVersion) {
+      const working = project.releases.latestVersion;
+      out(`v${working} is open with nothing recorded against it yet — printing the v${project.editionVersion} edition. ` +
+          `(\`ledger build --version ${working}\` prints it anyway, as a draft.)`);
+    }
 
     for (const version of versions) {
       if (!project.releases.versions.includes(version)) fail(`no release v${version}`);
@@ -130,7 +142,7 @@ export async function cmdDoctor({ flags }) {
   out(`ledger dir   ${path.relative(project.root, project.ledgerDir)}/`);
   out(`product      ${project.config.product}`);
   out(`features     ${project.featureSet.features().length} (${project.featureSet.features({ audience: "user" }).length} user, ${project.featureSet.features({ audience: "dev" }).length} dev)`);
-  out(`releases     ${project.releases.releases.length}, working version v${project.releases.latestVersion}`);
+  out(`releases     ${project.releases.releases.length}, working version v${project.releases.latestVersion}, build prints v${project.editionVersion}`);
   out(`accent       ${brand.accent} → deep ${brand.accent_deep} · quiet ${brand.accent_quiet} · mid ${brand.accent_mid} · pale ${brand.accent_pale}`);
   out(`masthead     ${brand.logo ?? `wordmark “${brand.name}”`}`);
   out(`fonts        ${brand.fonts.display} / ${brand.fonts.body} — ${fontFaceCss(brand).embedded ? "embedded" : "NOT bundled, will fall back"}`);

@@ -64,6 +64,19 @@ run(["release", "cut", "--name", "Baseline", "--date", "2026-01-15"]);
 // A release with nothing recorded against it would print an identical edition.
 run(["release", "cut", "--name", "Too soon"], { expect: "fail" });
 
+// …and for the same reason the edition to print straight after a cut is the
+// one just shipped, not the empty release the cut opened.
+const fresh = run(["build", "--pdf", "--html"]);
+assert(
+  "a fresh cut prints the edition just shipped, not the empty release it opened",
+  fresh.includes("Testbed-Feature-Ledger_1.html") && !fresh.includes("_2.html"),
+);
+assert(
+  "the empty in-progress release still prints on request",
+  run(["build", "--pdf", "--html", "--version", "2"]).includes("Testbed-Feature-Ledger_2.html"),
+);
+fs.rmSync(path.join(dir, "docs/generated"), { recursive: true, force: true });
+
 // A pre-existing feature can't quietly acquire a new description.
 run(["update", "alpha", "--description", "Does the alpha thing, better."], { expect: "fail" });
 run(["update", "alpha"], {
