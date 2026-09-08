@@ -96,65 +96,61 @@ sizes are capabilities.
 Needs Node 18.17+. The PDF needs a Chromium: Google Chrome or Edge if you have
 one (used automatically), otherwise `npx playwright install chromium`.
 
-### From npm
+It's on npm as [`feature-ledger`](https://www.npmjs.com/package/feature-ledger).
 
 ```bash
-npx feature-ledger init          # or: npm install -g feature-ledger
+npm install -g feature-ledger
 ```
 
-### From a local checkout — no registry, no remote
+That puts `ledger` on your PATH, and it works in any project, in any language.
 
-This is the normal case while the tool is still yours. Pick one:
-
-**Globally linked (recommended — edits to the source are live everywhere):**
+**Without installing anything** — every command works through `npx`, which is
+handy for a one-off, a container, or CI:
 
 ```bash
-cd ~/dev/feature-ledger
-npm install
-npm link                 # puts `ledger` on your PATH, symlinked to this checkout
+npx feature-ledger init
+npx feature-ledger list
 ```
 
-Now `ledger` works in any project, in any language. `npm unlink -g
-feature-ledger` undoes it.
-
-**As a dependency of a JS project (pins the copy, survives a `git clone`):**
+**As a dependency of a JS project** (pins the copy, survives a `git clone`):
 
 ```bash
 cd ~/dev/my-app
-npm install --save-dev file:../feature-ledger
+npm install --save-dev feature-ledger
 npx ledger --help
-```
-
-**As a tarball (pins an exact build — good for CI):**
-
-```bash
-cd ~/dev/feature-ledger && npm pack        # → feature-ledger-0.1.0.tgz
-npm install -g ~/dev/feature-ledger/feature-ledger-0.1.0.tgz
-```
-
-**Without installing anything at all** — every command works when invoked by
-path, which is handy for a one-off or a container:
-
-```bash
-node ~/dev/feature-ledger/bin/ledger.mjs list
 ```
 
 ### In a project with no `package.json` (Python, Go, Rust…)
 
-`npm link` above already covers you — `ledger` is on your PATH and doesn't
+The global install already covers you — `ledger` is on your PATH and doesn't
 care what the project is written in. If you'd rather not depend on a global,
 commit a two-line wrapper so the whole team (and every agent) gets the same
-entry point:
+entry point, pinned to one version:
 
 ```bash
 # tools/ledger  — chmod +x, committed
 #!/usr/bin/env bash
-exec node "${LEDGER_HOME:-$HOME/dev/feature-ledger}/bin/ledger.mjs" "$@"
+exec npx --yes feature-ledger@0.1.0 "$@"
 ```
 
-Then it's `./tools/ledger list`, and `LEDGER_HOME` lets anyone point at their
-own checkout. Whichever form you choose, use the same one in the agent
-instructions (below), so the agent's commands always work.
+Then it's `./tools/ledger list`, on the same version for everyone. Whichever
+form you choose, use the same one in the agent instructions (below), so the
+agent's commands always work.
+
+### From a local checkout
+
+For working on the tool itself, or running something that isn't released yet:
+
+```bash
+git clone git@github.com:netizer/feature-ledger.git
+cd feature-ledger
+npm install
+npm link                 # puts `ledger` on your PATH, symlinked to this checkout
+```
+
+Edits to the source are then live everywhere; `npm unlink -g feature-ledger`
+undoes it. Nothing has to be installed at all if you'd rather invoke it by
+path — `node ~/dev/feature-ledger/bin/ledger.mjs list`.
 
 ---
 
@@ -306,6 +302,7 @@ the stanza into `CLAUDE.md`. That's the whole of "make Claude aware of it" —
     "allow": [
       "Bash(ledger:*)",
       "Bash(npx ledger:*)",
+      "Bash(npx feature-ledger:*)",
       "Bash(./tools/ledger:*)"
     ]
   }
