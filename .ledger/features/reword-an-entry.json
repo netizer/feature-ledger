@@ -6,7 +6,7 @@
   "history": [
     {
       "version": 1,
-      "name": "Better words for the same thing",
+      "name": "Rewording an entry",
       "description": "The command ledger reword replaces the words of an entry in place. Nothing is recorded against the release and the entry is not marked as changed, so the improved wording reads as though it had always been there. It reaches back to fix the wording of an edition already printed, and the same command exists for a sub-section's heading and overview.",
       "changes": null,
       "dev_notes": "src/commands/write.mjs cmdReword and rewordSubcategory. It can improve a `changes` bullet but not add or drop one — the bullet count has to match, since changing it is `ledger update`'s job."

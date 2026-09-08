@@ -44,6 +44,23 @@ description says something you cannot verify, keep it as it is and tell me.
 You also cannot add or remove a `changes` bullet through a reword. Rewording
 improves the words of a bullet that is already there.
 
+**The names carry the document.** Most readers go down the contents list and
+stop there, so a retone is the moment to fix a name that was never really a
+name. The test: cover the descriptions, read only the names in order, and see
+whether someone could still say what {product} does. Anything that leaves them
+saying "I'd have to read that one" gets rewritten.
+
+A name states the capability — a short noun phrase, or the action someone
+takes — in the words the people who use {product} use for their own work. Not
+a caption (*The codebase, checked against the record* → *The ledger audit*),
+not a comment on it (*Better words for the same thing* → *Rewording an
+entry*), not the mechanism (*One-command setup in any codebase* → *Setting up
+a ledger*), not a question (*What moved since the last edition* → *New and
+changed highlighting*). Two to six words is usual.
+
+This is still only the words: renaming the *thing* is `ledger rename`, and
+that is a change to the product, not a retone.
+
 **Work in this order.**
 
 1. Run `ledger style` and read it properly. It is the whole brief.
@@ -52,7 +69,9 @@ improves the words of a bullet that is already there.
 3. For each area, run `ledger list --category "<area>"`, then `ledger show
    <id>` for each entry in it.
 4. Rewrite each entry's name, description, and any dev notes and change
-   bullets. Apply each with `ledger reword`.
+   bullets. Apply each with `ledger reword`. Do the names first and hold them
+   to the test above — they are the part of the area a reader is most likely
+   to be left with.
 5. Run `ledger status`, then stop and show me the area you just did before
    moving on.
 

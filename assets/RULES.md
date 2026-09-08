@@ -58,6 +58,54 @@ deserves recording has a home: `dev_notes` for the team's detail, `dev`
 features for internal capabilities, `ledger other-change` for a tweak that
 spans the product.
 
+## Naming an entry
+
+The names *are* the document. Most people read down the contents list and stop
+there; a description is for someone who wants to dig into one entry, or who is
+surprised the capability exists at all. So the name has to carry the whole
+weight on its own, and the test is:
+
+> **Cover every description. Can a reader still say what the product does?**
+
+Any name that leaves them saying "I'd have to read that one" isn't finished.
+
+Name the capability — a short noun phrase, or the action a person takes — in
+the words the people who use the product use for their own work:
+
+```
+Daily calendar        Deposit refunds        Cutting a release
+Saved baskets         Renaming a feature     Branding it for a client
+```
+
+It has to work in the contents list, where it sits next to entries from every
+other area with nothing underneath it, and it has to be tellable apart from
+its neighbours: if two names in one area could swap places without a reader
+noticing, neither is doing its job.
+
+**What goes wrong.** Most of these are real names from this tool's own ledger
+that had to be fixed:
+
+- *Better words for the same thing* → **Rewording an entry.** It commented on
+  the capability instead of naming it.
+- *The codebase, checked against the record* → **The ledger audit.** An
+  inverted phrase reads as a caption under a picture, not as a name in a list.
+- *Reading the ledger without opening it* → **Listing and reading entries.**
+  How it works belongs in the description. The name says what it is.
+- *What moved since the last edition* → **New and changed highlighting.** A
+  question isn't a name.
+- *Areas, and the order they read in* → **Grouping features into areas.** Two
+  ideas joined with "and": one half is nearly always the description, and
+  sometimes it's a sign the entry is really two entries.
+- *Booking*, under an area called Bookings → **Guided booking wizard.**
+  Restating the area tells the reader nothing they didn't have.
+
+Two to six words is usual. Longer and it's turning into the description;
+shorter and it's usually the area's name again.
+
+A name is wording, so improving one is `ledger reword <id>`, which changes
+nothing about the release. `ledger rename` is for when the *product* renamed
+something and the client needs telling.
+
 ## Recording a change
 
 ### A new feature

@@ -73,11 +73,40 @@ description is two or three sentences, so a capability has room to mention the
 guardrail that makes it trustworthy without that guardrail becoming its own
 line in the contents.
 
+## The names
+
+The names *are* the document. Most readers go down the contents list and stop
+there; a description is for someone digging into one entry, or surprised it
+exists at all. Before you finish a batch, apply this test:
+
+> **Cover the descriptions. Can someone still say what {product} does?**
+
+Any name that leaves them saying "I'd have to read that one" isn't finished.
+
+Name the capability — a short noun phrase, or the action someone takes — in
+the words the people who use {product} use for their own work: *Daily
+calendar*, *Deposit refunds*, *Saved baskets*, *Guided booking wizard*.
+
+Not a caption (*The codebase, checked against the record*), not a comment on
+the capability (*Better words for the same thing*), not the mechanism
+(*One-command setup in any codebase*), not a question (*What moved since the
+last edition*), and not two ideas joined with "and" — that last one usually
+means half of it is the description, or that the entry is really two entries.
+Don't restate the area either: under *Bookings*, an entry called *Booking* has
+told the reader nothing.
+
+Two to six words is usual. It has to work in the contents list, where it sits
+next to entries from every other area with nothing underneath it, and two
+names in one area that could swap places without a reader noticing are both
+doing the job badly.
+
 ## Step 1 — the capabilities
 
 Survey the codebase and list the capabilities that clear the bar. One line
 each: a working name and a phrase saying what someone can do. No areas yet, no
-ids, no sizes — just the list.
+ids, no sizes — just the list. The names are working titles at this stage, but
+write them as though they were final — a placeholder written now is what ends
+up in the document later.
 
 This is the step that decides whether the finished document is worth reading,
 so do it twice: go back over your own list and merge anything where two lines
@@ -120,7 +149,9 @@ yourself.
 
 1. Read the code behind each capability before writing about it.
 2. `ledger add <id>` with the payload. Ids are stable and kebab-case. Leave
-   `category` out entirely when the ledger has no areas.
+   `category` out entirely when the ledger has no areas. Hold every `name` to
+   **The names** above before you move on: it is the part of the entry most
+   readers will ever actually read.
 3. Size each entry — **Big** for a capability the product is chosen for,
    **Medium** for a capability in its own right inside a bigger one, **Small**
    for one narrow enough to describe in a line. The scale ranks entries within
@@ -162,6 +193,12 @@ work that was already there. From the next release onward, every edition
 highlights only what actually moved.
 
 ## Step 5 — hand it back
+
+Before you write the note, run `ledger list` and read only the names, in
+order, ignoring everything else on each line. That is what most people will
+read of this document. Anything you can't tell apart from its neighbours, or
+that you'd have to open the description to understand, gets one more pass with
+`ledger reword <id>` — which changes the words and nothing about the release.
 
 Finish with a short note for me, and nothing else to do:
 

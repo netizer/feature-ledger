@@ -326,6 +326,12 @@ function brief(flags) {
   p("to, or in as `dev`, or as `ledger other-change` — never as an entry of their own.");
   p("Never read or edit the JSON under .ledger/; use `ledger list` and `ledger show`.");
   p("");
+  p("Give the same care to the names. Most readers go down the contents list and");
+  p("stop there, so a name has to state the capability on its own — a short noun");
+  p("phrase, or the action someone takes, in the words the people who use the");
+  p("product use for their own work. Not a caption, not a comment on the thing, not");
+  p("the mechanism. `ledger rules` has the test and the worked examples.");
+  p("");
   p("## The one judgement specific to an audit");
   p("");
   p(previous
