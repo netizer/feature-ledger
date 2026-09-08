@@ -20,27 +20,34 @@ live in one file every agent can read, and every operation is a CLI command).
 | **Corpus** | `.ledger/` — one JSON file per feature, plus the release timeline. Committed. |
 | **Generated** | `FEATURES.md`, `FEATURES_EXTENDED.md`, `DEV_FEATURES.md` — gitignored build output — and a PDF per release, which a project can keep or regenerate. |
 | **Editions** | [`docs/client/`](docs/client) — this repo keeps its own, so you can open the document the tool actually produces. |
-| **Interface** | `ledger` — read, write, status, build. Nothing hand-edits the JSON. |
+| **Interface** | `ledger` — read, write, status, build. What it records goes through the CLI; how it's worded is a text edit. |
 
 ---
 
 ## Why a CLI instead of "just edit the JSON"
 
-Because the corpus grows past what's cheap to read. A mature ledger is 100+
-features and 150–200 KB — around 45,000 tokens. An agent that opens it to
-change one description pays that on every edit, and re-emits a large chunk of
-it, and sometimes reformats the rest.
+Because the corpus grows past what's cheap to **read**. A mature ledger is
+100+ features and 150–200 KB — around 45,000 tokens. An agent that opens all
+of it to change one description pays that on every edit, and re-emits a large
+chunk of it, and sometimes reformats the rest.
 
-With the CLI, the same edit is `ledger list` (~2k tokens, and only if it
-doesn't already know the id) plus `ledger show <id>` (~250) plus the new
-prose. That's the whole design brief: **the agent never reads the corpus and
-never writes JSON by hand.**
+With the CLI, the same lookup is `ledger list` (~2k tokens, and only if it
+doesn't already know the id) plus `ledger show <id>` (~250). That's the design
+brief: **nothing reads the corpus whole.**
 
-Everything else follows from that. The CLI owns file formatting (so diffs stay
-small), resolves which release an edit belongs to, and refuses the mistakes
-that are expensive to find later — a changed feature with no explanation, a
-sub-section with two features in it, an accent colour that collides with the
-"this changed" highlight.
+And because some writes are expensive to get wrong. `ledger add`, `update` and
+`remove` resolve which release an edit belongs to — a fact that isn't visible
+from inside a file, and the one every New/Changed tag is computed from — and
+refuse the mistakes you'd find much later: a changed feature with no
+explanation, an audit stamp with no sweep behind it, an accent colour that
+collides with the "this changed" highlight.
+
+Neither of those is an argument about **wording**, and that's the other half
+of the design: once an entry exists, its prose is a 2 KB text file you open
+and edit. See [Editing the ledger by hand](#editing-the-ledger-by-hand). A
+ledger drafted by a coding agent is a first draft, and a first draft that can
+only be revised through a command interface stays in the voice the agent wrote
+it in.
 
 ---
 
@@ -193,9 +200,10 @@ against it. `ledger bootstrap --no-audit` leaves it out.
 Attempted in one pass the survey runs out of context and starts inventing; in
 batches it's reliable — so the prompt batches, but the agent moves between
 batches on its own rather than checking in. Editing is deliberately after the
-fact: it finishes by listing the entries it was least sure about, and
-`ledger reword`, `ledger update` and `ledger remove` fix anything that reads
-wrong. The output of `ledger bootstrap` is two parts, an explanation for you
+fact: it finishes by listing the entries it was least sure about, and the
+baseline it hands you is a draft. Rewrite the wording straight in
+`.ledger/features/<id>.json`; `ledger update` and `ledger remove` are for
+anything where the product itself has moved. The output of `ledger bootstrap` is two parts, an explanation for you
 and then the prompt itself: everything below the rule is what gets pasted, and
 there's nothing after it.
 
@@ -269,10 +277,148 @@ freely — what's refused is one sharing a date *and* a commit with the release
 before it, since then nothing tells the two editions apart. `--force` covers a
 deliberate re-issue, `--commit <sha>` cuts retrospectively at a known point,
 and `ledger release list` prints the timeline with each commit against it.
+A ledger that predates all this fills its history in with
+`ledger release amend <version> --commit <sha>`.
+
+And when a description just reads wrong — the wrong word for the client, a
+sentence the agent invented, a detail they shouldn't be seeing — you open the
+file and fix it. That's the next section, and it isn't an escape hatch: it's
+half of how the ledger works.
 
 Run `ledger rules` for the full authoring rules — the entry bar, sizing, the
 `user`/`dev` split, areas, sub-sections, removals, and where everything that
 *isn't* an entry goes instead.
+
+---
+
+## Editing the ledger by hand
+
+The corpus is JSON in your repository, and the prose in it is yours. Open the
+file and change it:
+
+```bash
+$EDITOR .ledger/features/saved-baskets.json
+```
+
+```json
+{
+  "id": "saved-baskets",
+  "audience": "user",
+  "category": "Ordering",
+  "size": "Medium",
+  "history": [
+    {
+      "version": 4,
+      "name": "Saved baskets",
+      "description": "A customer keeps more than one basket — the weekly shop, the party order — and switches between them without either losing its contents.",
+      "changes": null,
+      "dev_notes": "app/models/basket.rb; the switch is a session swap, not a copy."
+    }
+  ]
+}
+```
+
+This is not a fallback for when the CLI won't do what you want. **It is how
+the wording gets adopted for the client**, and it's expected to happen every
+cycle — most usefully with the last edition open next to you. Three things
+you're doing when you're in there:
+
+- **Changing** the words. The draft says "users"; this client says "guests".
+  A sentence is true but reads like a commit message. A name came out as a
+  caption rather than a name. Rewrite them.
+- **Adding** what the coding agent couldn't find. A survey reads code, and
+  part of what a capability is *for* only ever existed in someone's head. If a
+  description is missing the sentence that makes it make sense, write that
+  sentence in.
+- **Deleting** what the client shouldn't be reading. An internal detail that
+  drifted into a description, a `dev_notes` line that says more than you want
+  said, a change bullet about something they never asked for and won't thank
+  you for explaining. Cut it.
+
+None of that lands on a release and none of it tags anything as changed —
+which is right, because the product didn't move. The improved wording reads as
+though it had always been there, including in editions already printed: an
+entry is worded once, and every document that shows it picks the change up on
+the next `ledger build`.
+
+Then run `ledger status`. It loads and validates every file, so a trailing
+comma, a description that went missing or a history entry that lost its name
+comes back as a message rather than as a broken build. `ledger show <id>`
+prints the entry as the documents will read it.
+
+### What's yours
+
+On any entry in a feature's `history`:
+
+| | |
+| --- | --- |
+| `name` | What the feature is called. The one on the newest entry is what it currently goes by; every document footnotes the previous one on its own. |
+| `description` | The whole present-tense text. |
+| `dev_notes` | The team's detail. Delete the key to drop it entirely. |
+| `changes` | The wording of a bullet — or the bullet, if the client is better off not reading it. |
+
+And at the top of the same file, where the entry lives rather than one moment
+in its history:
+
+| | |
+| --- | --- |
+| `size` | `Big`, `Medium` or `Small`. |
+| `category`, `subcategory` | Must name one that already exists — `ledger status` refuses a typo rather than quietly inventing an area. |
+| `id` | **Don't.** It's the filename as well as the identity that carries history across renames, and it's what `index.json` orders by — change it in the file only and the entry drops to the end of its size band. |
+
+And elsewhere in `.ledger/`:
+
+| | |
+| --- | --- |
+| `subcategories.json` | A sub-section's `name` and `intro`. |
+| `config.json` | Product name, tagline, and the `docs` block that overrides document titles and intros. |
+| `other-changes.json` | The `description` of a product-wide note. |
+| `STYLE.md`, `theme.css` | Prose and CSS. They were always yours. |
+
+Renaming an **area** is the exception, because the name is repeated on every
+feature filed under it: `ledger categories rename "Old" "New"` carries them
+all across.
+
+### What stays with the CLI
+
+Not much, and it's where a hand-edit would be either invisible or wrong.
+
+- **Adding, dropping or re-dating an entry in `history`.** Which release an
+  edit lands on is what every New/Changed tag is computed from, and which
+  release is open isn't visible from inside the file. That's `ledger add`,
+  `ledger update` and `ledger remove` — and `ledger update` is also what
+  refuses a change that never says *why*, the rule that makes the document
+  worth reading rather than a diff.
+- **`releases.json`, and the audit stamp in `audits.json`.** A timeline edited
+  by hand stops matching the editions already handed over, and a stamp set
+  without the sweep behind it makes a gap permanently invisible.
+- **Keeping `index.json` complete.** Every write adds a new id and prunes one
+  whose file is gone, so the index can't rot. Only that half is the CLI's: the
+  **order** in the list is the deliberate reading order within a size band, and
+  reordering it by hand is exactly how you're meant to change it.
+
+The test, when you can't tell which side of the line you're on:
+
+> **Would the client want to be told?** If they would, it's a change — it goes
+> through `ledger update`, dated and explained. If it's the same thing said
+> better, said more, or said less, it's an edit.
+
+Renaming a feature falls on both sides, which is why there's no one command
+for it. A name that was simply chosen badly is wording: change `name` in the
+file. A name the *product* changed is news:
+
+```bash
+ledger update saved-baskets --name "Saved baskets" \
+  --description "…the full current-state text…" \
+  --change "Was “Basket list”, which described the screen rather than the thing customers were actually keeping."
+```
+
+### A whole ledger at once
+
+`ledger style rewrite` prints a brief for a coding agent to take the corpus
+one area at a time, holding it to changing the words rather than the meaning.
+That's the tool for adopting a new tone across a hundred entries; for the
+handful you noticed while reading the last edition, just open the files.
 
 ---
 
@@ -357,10 +503,11 @@ one, that's an edit they make deliberately.
 after the fact — which is a problem, because the person who knew why may be
 long gone. So an audit takes the reason from the commit message and marks it
 `--reason-inferred`. Those entries show up in `ledger status` until someone
-vouches for the sentence (`ledger audit confirm <id>`) or rewrites it
-(`ledger reword <id>`). The audit writes first and asks afterwards, so an
-unattended run still lands its work, and the questions outlive the terminal it
-ran in.
+vouches for the sentence — `ledger audit confirm <id>` takes it as it stands,
+and rewriting the bullet yourself does the same thing more strongly (edit it in
+the feature's file and delete that entry's `"reason_inferred"` line). The audit
+writes first and asks afterwards, so an unattended run still lands its work,
+and the questions outlive the terminal it ran in.
 
 None of that reaches the client document. It's a note to the team.
 
@@ -382,9 +529,10 @@ ledger init --agents none               # wire nothing
 
 The stanza is a **pointer**, not a copy: it says the ledger exists, that a
 feature change isn't finished until the ledger records it, lists the six
-commands, names the project's tone, and tells the agent to run
-`ledger rules` before its first edit. One source of truth, cheap in every
-session, and the full text is only pulled when an edit is actually happening.
+commands, draws the line between recording a change and rewording an entry,
+names the project's tone, and tells the agent to run `ledger rules` before its
+first edit. One source of truth, cheap in every session, and the full text is
+only pulled when an edit is actually happening.
 
 `ledger style set` rewrites that stanza in every agent file, so the tone the
 agent reads is always the one the project is on.
@@ -518,19 +666,14 @@ project has left.
 
 ### Moving an existing ledger to a new tone
 
-`ledger reword <id>` fixes the words of an entry without recording a change:
-it edits the text in place, so nothing lands on the open release and no reader
-is told that something moved. `ledger subcategory reword <id>` does the same
-for a sub-section's heading and overview.
+Entry by entry it's a text edit — see [Editing the ledger by
+hand](#editing-the-ledger-by-hand). Nothing lands on the open release and no
+reader is told that something moved, which is right: the product didn't.
 
-`ledger style rewrite` prints a brief for a coding agent to do that across the
-whole ledger, one area at a time, holding it to changing the words rather than
-the meaning. A corpus written years ago in another voice comes over without a
-single feature reading as new work.
-
-Rewording can improve a `changes` bullet but not add or remove one — adding a
-bullet is recording a change, and belongs in `ledger update` where it will be
-dated.
+For a whole corpus at once, `ledger style rewrite` prints a brief for a coding
+agent to work through it one area at a time, holding it to changing the words
+rather than the meaning. A ledger written years ago in another voice comes over
+without a single feature reading as new work.
 
 ---
 
@@ -678,20 +821,26 @@ Reading
 
 Writing            (JSON payload on stdin or --file; --dry-run previews)
   ledger add <id>
-  ledger update <id>
-  ledger reword <id> [--version N]    better words, same thing; no history entry
-  ledger rename <id> "New name" --why "…"
+  ledger update <id>                  --name here is a rename the client is told about
   ledger remove <id> --reason "…"
       …add, update and remove all take --backfilled: the product didn't move
       this cycle, the record did. See `ledger audit`.
   ledger other-change --audience user --description "…"
   ledger categories [list | add "Name" [--after "Other" | --before "Other"]
                           | rename "Old" "New" | remove "Name"]
-  ledger subcategory [list | add | reword <id>]
+  ledger subcategory [list | add]
+
+Wording            (no command — see Editing the ledger by hand)
+  .ledger/features/<id>.json          names, descriptions, dev notes, the text
+                                      of a change bullet
+  .ledger/subcategories.json          sub-section headings and overviews
+  .ledger/config.json                 product name, document titles
+  .ledger/other-changes.json          the product-wide notes
 
 Releases
   ledger release list
-  ledger release cut --name "…" [--date YYYY-MM-DD] [--force]
+  ledger release cut --name "…" [--date YYYY-MM-DD] [--commit SHA] [--force]
+  ledger release amend <version> --commit SHA
 
 Auditing            (the periodic sweep of the codebase against the record)
   ledger audit [--full] [--since SHA]     the brief, for a coding agent
@@ -739,9 +888,14 @@ STYLE.md             optional, the project's own tone as prose
 theme.css            optional, appended last to the PDF stylesheet
 ```
 
+Everything here is committed. The words in `features/`, `subcategories.json`,
+`other-changes.json` and `config.json` are yours to edit directly, as is the
+order of `index.json`; `releases.json` and `audits.json` are the CLI's. See
+[Editing the ledger by hand](#editing-the-ledger-by-hand).
+
 One file per feature is a deliberate change from the single-file original: a
-2 KB file is what an agent edits, git diffs stay readable, and two branches
-adding features stop conflicting.
+2 KB file is what an agent — or a person — opens and edits, git diffs stay
+readable, and two branches adding features stop conflicting.
 
 ---
 
@@ -753,7 +907,8 @@ node test/smoke.mjs      # builds a project from nothing, exercises every guardr
 ```
 
 `examples/northwind/` is a small worked corpus — two releases, a change, a
-rename, a removal, a global change and a sub-section. `cd examples/northwind
+rename, a removal, a global change and a sub-section, and a good place to open
+a feature file and see what one looks like. `cd examples/northwind
 && ledger build --version all` prints both editions.
 
 Fonts: see `assets/fonts/README.md`. The short version is that they're

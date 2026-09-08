@@ -1,0 +1,15 @@
+{
+  "id": "editing-by-hand",
+  "audience": "user",
+  "category": "Recording what the product does",
+  "size": "Big",
+  "history": [
+    {
+      "version": 2,
+      "name": "Editing the ledger by hand",
+      "description": "The corpus is JSON in the repository, one small file per feature, and the prose in it is meant to be opened and rewritten. You change how an entry is worded, add the sentence a coding agent had no way of knowing, or cut a detail the client is better off not reading — a name, a description, a dev note or the text of a change bullet. Nothing is recorded against a release and nothing is marked as changed, because the product did not move: the improved wording reads as though it had always been there, in the editions already printed as well as the next one. The command ledger status revalidates every file afterwards, so a description that went missing comes back as a message rather than as a broken build. What the product did keeps going through the CLI, which is what resolves the release an entry lands on and refuses a change that never says why it happened.",
+      "changes": null,
+      "dev_notes": "There is no command, deliberately: `ledger reword`, `ledger rename` and `ledger subcategory reword` were removed, and src/cli.mjs RETIRED points each one at the file to edit. Validation on load is what makes hand-editing safe — src/model/feature.mjs Feature#validate runs for every file the store opens, so `ledger status` is the check. `ledger categories rename` stays a command because an area's name is repeated on every feature filed under it."
+    }
+  ]
+}

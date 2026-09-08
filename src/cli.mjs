@@ -21,8 +21,6 @@ const COMMANDS = {
 
   add: write.cmdAdd,
   update: write.cmdUpdate,
-  reword: write.cmdReword,
-  rename: write.cmdRename,
   remove: write.cmdRemove,
   "other-change": write.cmdOtherChange,
   categories: write.cmdCategories,
@@ -37,15 +35,35 @@ const COMMANDS = {
 /** Commands that used to exist. `check` (is the corpus sound?), `doctor` (is
  *  the setup sound?) and `status` (what has this release collected?) were
  *  three ways of asking one question, and whichever one you hadn't run was
- *  where the problem was. They are now all `status`. */
+ *  where the problem was. They are now all `status`.
+ *
+ *  `reword` and `rename` were the two commands that only ever changed words.
+ *  They earned their keep while nothing was supposed to touch the JSON, but
+ *  the words are the part of this corpus a person most wants their hands on —
+ *  the client's own vocabulary, a sentence the survey invented, a detail they
+ *  shouldn't be reading — and putting a CLI in front of that made a text edit
+ *  feel like a schema change, which is how a ledger ends up in the tone the
+ *  agent wrote it in. Wording is a hand-edit now. The CLI keeps the parts that
+ *  are expensive to get wrong: which release an edit lands on, whether a
+ *  change was explained, and the audit stamp. */
 const RETIRED = {
   check: "`ledger status` — it validates the corpus and still exits 1 on a problem, so a commit hook keeps working (`ledger status --quiet`)",
   doctor: "`ledger status` — the resolved setup is one of its sections",
+  reword: `a hand-edit. Open .ledger/features/<id>.json and change the words in place: nothing lands on the
+release and nothing is tagged, which was the whole point of the command. Run \`ledger status\`
+afterwards — it validates every file. Sub-section headings live in subcategories.json, and document
+titles in config.json. \`ledger rules\` has the section on editing by hand.`,
+  rename: `two different things, and the one command never told them apart:
+  the name was badly chosen      → edit "name" in .ledger/features/<id>.json. A wording fix;
+                                   nothing is recorded and no reader is told anything moved.
+  the product renamed the thing  → \`ledger update <id> --name "New name" --description "…" --change "…"\`
+                                   The client is told, on this release, with the reason. Every
+                                   document footnotes the old name on its own, as it always did.`,
 };
 
 const HELP = `ledger — a versioned feature ledger for any codebase
 
-  Reading (cheap; never open the JSON by hand)
+  Reading (cheap; don't read the corpus by hand — it's big)
     ledger list [--category C] [--audience user|dev] [--size S] [--changed] [--json]
     ledger show <id> [--history] [--json]
     ledger status [--json] [--quiet]    the release, the corpus and the setup, checked
@@ -56,18 +74,19 @@ const HELP = `ledger — a versioned feature ledger for any codebase
   Writing (payload as JSON on stdin, or --file f.json; add --dry-run to preview)
     ledger add <id>                     { audience, size, name, description, category?, dev_notes? }
     ledger update <id>                  { description, changes[], name?, size?, dev_notes?, add_changes[]? }
-    ledger reword <id> [--version N]    fix the wording, not the thing (no history entry)
-    ledger rename <id> "New name"       [--description "..."] [--why "..."]
+                                        (--name here is a rename the client is told about)
     ledger remove <id> --reason "..."
     ledger other-change --audience user --description "..."
     ledger categories [list | add "Name" [--after "Other"] | rename "Old" "New" | remove "Name"]
-    ledger subcategory [list | add | reword <id>]   { id, category, name, intro }
+    ledger subcategory [list | add]     { id, category, name, intro }
     ledger add/update/remove --backfilled            the product did not move this cycle,
                                                      the record did — see \`ledger audit\`
 
   Releases
     ledger release list
     ledger release cut --name "..." [--date YYYY-MM-DD] [--commit SHA] [--force]
+    ledger release amend <version> --commit SHA     fill in the commit on a release
+                                                    cut before commits were recorded
                                         records the commit it was cut at, so two
                                         editions on one day stay tellable apart
 
@@ -86,6 +105,16 @@ const HELP = `ledger — a versioned feature ledger for any codebase
     ledger bootstrap [--no-audit]       prints the baseline-survey prompt for your coding agent
                                         (the survey is a full sweep, so the prompt ends by
                                         recording one; --no-audit leaves that out)
+
+  Editing the words (no command — the corpus is yours to edit)
+    .ledger/features/<id>.json          a name, a description, dev notes, the text of a change
+                                        bullet. Edit in place, then run \`ledger status\`.
+    .ledger/subcategories.json          sub-section headings and their overviews
+    .ledger/config.json                 product name, tagline, document titles
+                                        (an area's name: \`ledger categories rename\`)
+    .ledger/other-changes.json          the product-wide notes
+                                        Adding, dropping or re-dating a history *entry* stays with
+                                        the CLI. \`ledger rules\` draws the line.
 
   Global: --dir PATH (point at a .ledger directory), --json where offered.
   Full docs: the README in this package, or \`ledger rules\`.

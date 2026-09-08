@@ -272,7 +272,9 @@ function collectWarnings(project) {
       `${pending.length} change reason${pending.length === 1 ? "" : "s"} came from an audit reading a commit ` +
       `message rather than from whoever decided it, and nobody has confirmed ${pending.length === 1 ? "it" : "them"} ` +
       `yet: ${pending.map((x) => `${x.id} v${x.version}`).join(", ")}. ` +
-      "`ledger audit confirm <id>` vouches for one as it stands; `ledger reword <id>` rewrites the bullet.",
+      "`ledger audit confirm <id>` vouches for one as it stands. To rewrite the bullet instead, edit it in " +
+      ".ledger/features/<id>.json and delete the \"reason_inferred\" line on that entry — writing the sentence " +
+      "yourself is the stronger form of vouching for it.",
     );
   }
 

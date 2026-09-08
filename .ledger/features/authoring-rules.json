@@ -7,7 +7,7 @@
     {
       "version": 1,
       "name": "The authoring rules",
-      "description": "The command ledger rules prints the full rules for writing the ledger: what each field means, where the bar for an entry sits, and how to record a change, a rename or a removal. The project's tone is printed inside it, and a RULES.md in the ledger directory replaces the packaged text with your own house conventions.",
+      "description": "The command ledger rules prints the full rules for writing the ledger: what each field means, where the bar for an entry sits, how to record a change or a removal, and which parts of the corpus you edit by hand instead. The project's tone is printed inside it, and a RULES.md in the ledger directory replaces the packaged text with your own house conventions.",
       "changes": null,
       "dev_notes": "assets/RULES.md with a {style} placeholder; a project copy at .ledger/RULES.md wins. src/commands/read.mjs cmdRules."
     }

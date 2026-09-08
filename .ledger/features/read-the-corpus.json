@@ -9,7 +9,7 @@
       "name": "Listing and reading entries",
       "description": "The command ledger list prints the whole corpus, one short line per feature: its size, its id, its name, and whether it is new or changed in the release in progress. It filters by area, audience, size, or by what has moved this cycle. The command ledger show prints the single entry you are about to edit, and prints every version it has been through when you ask for its history.",
       "changes": null,
-      "dev_notes": "src/commands/read.mjs. Together they are a couple of thousand tokens instead of the whole corpus, which is why an agent is told never to open the JSON."
+      "dev_notes": "src/commands/read.mjs. Together they are a couple of thousand tokens instead of the whole corpus, which is why an agent is told to read through them rather than opening the corpus."
     }
   ]
 }

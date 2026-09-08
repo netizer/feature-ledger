@@ -21,28 +21,46 @@ that it reads as though it had always been written in one tone. There are
 
 {style}
 
-**The one command you need.** `ledger reword <id>` replaces the words of an
-entry in place. It records nothing against the release and marks nothing as
-changed, which is exactly right: the product did not move.
+**How you apply a rewrite.** By editing the file. Each entry is its own small
+JSON file at `.ledger/features/<id>.json`, and the words in it are yours to
+change:
 
-```
-ledger reword some-feature <<'JSON'
-{ "description": "The same feature, said in the new tone." }
-JSON
+```json
+{
+  "id": "some-feature",
+  "audience": "user",
+  "category": "…",
+  "size": "Medium",
+  "history": [
+    { "version": 1,
+      "name": "The same name, in the new tone",
+      "description": "The same feature, said in the new tone.",
+      "changes": null,
+      "dev_notes": "…" }
+  ]
+}
 ```
 
-It takes `name`, `description`, `dev_notes`, and `changes`. Pass only the
-fields you are rewriting. `--version N` reaches back to an older release's
-wording, and `ledger subcategory reword <id>` does the same for a
-sub-section's heading and overview.
+Change `name`, `description`, `dev_notes` and the text of any `changes`
+bullet, on whichever `history` entry carries them. Nothing else. There is no
+command for this and there should not be: nothing is being recorded, because
+the product did not move — so no release collects anything and nothing is
+marked as changed. A sub-section's heading and overview are the `name` and
+`intro` in `.ledger/subcategories.json`, and they work the same way.
+
+An entry whose text is spread over several `history` entries has been reworded
+at more than one version. Rewrite each of them: the older ones are what an
+already-printed edition reprints from.
 
 **What you must not change.** The meaning. Every entry states something that
 is true of the product, and a rewrite that makes a description clearer at the
 cost of making it slightly wrong is worse than the sentence it replaced. If a
 description says something you cannot verify, keep it as it is and tell me.
 
-You also cannot add or remove a `changes` bullet through a reword. Rewording
-improves the words of a bullet that is already there.
+Nor the structure. Do not add or remove a `history` entry, do not touch a
+`version`, and do not add or remove a `changes` bullet — every one of those
+says the product moved, and it did not. You are rewriting the words that are
+already there.
 
 **The names carry the document.** Most readers go down the contents list and
 stop there, so a retone is the moment to fix a name that was never really a
@@ -53,13 +71,14 @@ saying "I'd have to read that one" gets rewritten.
 A name states the capability — a short noun phrase, or the action someone
 takes — in the words the people who use {product} use for their own work. Not
 a caption (*The codebase, checked against the record* → *The ledger audit*),
-not a comment on it (*Better words for the same thing* → *Rewording an
-entry*), not the mechanism (*One-command setup in any codebase* → *Setting up
-a ledger*), not a question (*What moved since the last edition* → *New and
+not a comment on it (*The words are yours* → *Editing the ledger by hand*),
+not the mechanism (*One-command setup in any codebase* → *Setting up a
+ledger*), not a question (*What moved since the last edition* → *New and
 changed highlighting*). Two to six words is usual.
 
-This is still only the words: renaming the *thing* is `ledger rename`, and
-that is a change to the product, not a retone.
+This is still only the words. If the *product* renamed something, that is a
+change the client is told about (`ledger update <id> --name "…"` with a reason)
+and it is not part of a retone — tell me instead.
 
 **Work in this order.**
 
@@ -67,19 +86,23 @@ that is a change to the product, not a retone.
 2. Take one area at a time, in this order:
 {categories}
 3. For each area, run `ledger list --category "<area>"`, then `ledger show
-   <id>` for each entry in it.
+   <id>` for each entry in it. Read the entries through the commands rather
+   than by opening the corpus: the whole of `.ledger/` is far more than you
+   need in context at once.
 4. Rewrite each entry's name, description, and any dev notes and change
-   bullets. Apply each with `ledger reword`. Do the names first and hold them
-   to the test above — they are the part of the area a reader is most likely
-   to be left with.
-5. Run `ledger status`, then stop and show me the area you just did before
-   moving on.
+   bullets, editing `.ledger/features/<id>.json` in place. Do the names first
+   and hold them to the test above — they are the part of the area a reader is
+   most likely to be left with.
+5. Run `ledger status` — it revalidates every file you touched — then stop and
+   show me the area you just did before moving on.
 
 **Then the parts that are not features.** Sub-section headings and overviews
-(`ledger subcategory list`), and the product's one-line description in the
-settings, if it has one.
+(`ledger subcategory list`, edited in `.ledger/subcategories.json`), any
+product-wide notes in `.ledger/other-changes.json`, and the product's one-line
+description in `.ledger/config.json`, if it has one.
 
 **Then check your own work.** `ledger status` should be clean, and its release
 section should show the same contents it showed before you started. If a
-feature has appeared as new or changed, a `ledger update` was used where a
-`ledger reword` was meant, and that needs undoing.
+feature has appeared as new or changed, something was recorded that should
+only have been reworded — a `ledger update`, or a `history` entry that grew a
+version — and that needs undoing.

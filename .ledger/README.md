@@ -16,5 +16,29 @@ document handed over stays in the repo.
 | `other-changes.json` | Changes belonging to no single feature. |
 | `theme.css` | Optional. Appended last to the PDF's stylesheet, for a one-off nudge. |
 
-**Don't hand-edit any of it.** Run `ledger rules` for how to write to it, and
-`ledger --help` for the commands.
+## Which of it you edit
+
+**The words are yours.** The prose in `features/<id>.json`, in
+`subcategories.json`, in `other-changes.json` and in the `docs` block of
+`config.json` is meant to be opened and rewritten — that is how the ledger
+comes to sound like something written for this client rather than by whatever
+drafted it. Change a name, a description, a dev note or the text of a change
+bullet; add the sentence the survey couldn't have known; cut what the client
+shouldn't be reading. Nothing is recorded against a release, because nothing
+about the product moved. Run `ledger status` afterwards — it validates every
+file.
+
+**What the product did goes through the CLI.** A new capability, a change to
+one, a withdrawal: `ledger add`, `ledger update`, `ledger remove`. They resolve
+which release the entry lands on, which is what every New/Changed tag in every
+document is computed from, and `ledger update` refuses a change that never
+says why it happened.
+
+**Leave `releases.json` and `audits.json` alone.** The timeline has to keep
+matching the editions already handed over, and an audit stamp set without the
+sweep behind it makes a gap permanently invisible. `index.json` is in between:
+every write keeps it complete, and the order in it is the deliberate reading
+order — reorder that freely.
+
+Run `ledger rules` for how to write, and `ledger --help` for the commands.
+

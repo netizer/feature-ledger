@@ -170,7 +170,9 @@ export async function cmdInit({ flags }) {
   out(`  1. npx ledger bootstrap        # prints a survey prompt to hand to your coding agent`);
   out(`  2. …the agent runs it to the end on its own: one entry per capability at v1 (areas`);
   out(`      only if the product needs them), then it cuts the baseline and builds the edition`);
-  out(`  3. read the result and edit it — \`ledger reword\`, \`ledger update\`, \`ledger remove\`, then \`ledger build\``);
+  out(`  3. read the result and edit it — the words are yours: open .ledger/features/<id>.json and`);
+  out(`      change, add to or cut anything that isn't how you'd say it to this client. \`ledger update\``);
+  out(`      and \`ledger remove\` for anything that actually moved, then \`ledger status\` and \`ledger build\``);
   out("");
   out("From then on the agent records each change against the open release, and `ledger release cut` mints the next edition.");
 }

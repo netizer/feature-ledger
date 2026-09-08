@@ -110,8 +110,11 @@ run(["update", "alpha"], {
 // A second edit in the same cycle merges rather than appending a second entry.
 run(["update", "alpha"], { stdin: feature({ add_changes: ["A second bullet, added later in the same cycle."] }) });
 
-run(["rename", "beta", "Beta prime"], { expect: "fail" });
-run(["rename", "beta", "Beta prime", "--why", "Was “Beta”, which named the release it arrived in rather than what it does."]);
+// A rename the client is told about is an ordinary change that happens to move
+// the name: `update` still refuses it without a reason.
+run(["update", "beta", "--name", "Beta prime", "--description", "Does the beta thing."], { expect: "fail" });
+run(["update", "beta", "--name", "Beta prime", "--description", "Does the beta thing.",
+  "--change", "Was “Beta”, which named the release it arrived in rather than what it does."]);
 run(["remove", "gamma", "--reason", "Superseded by the build pipeline."]);
 run(["other-change", "--audience", "user", "--description", "A global wording pass."]);
 
@@ -139,6 +142,36 @@ for (const id of ["c1", "c2", "c3", "c4"]) {
 run(["status"]);
 run(["check"], { expect: "fail" });   // merged into `status`, and says so
 run(["doctor"], { expect: "fail" });
+// Wording is a hand-edit now, and the retired commands say where to go.
+for (const [gone, points] of [
+  [["reword", "alpha"], ".ledger/features/"],
+  [["rename", "alpha", "Alpha prime"], ".ledger/features/"],
+  [["subcategory", "reword", "cluster"], "subcategories.json"],
+]) {
+  assert(`\`ledger ${gone.join(" ")}\` points at the file to edit`, run(gone, { expect: "fail" }).includes(points));
+}
+
+// The hand-edit itself: the words change, and nothing lands on the release.
+const releaseBefore = run(["status", "--json"]);
+const c1Path = path.join(dir, ".ledger/features/c1.json");
+const c1 = JSON.parse(fs.readFileSync(c1Path, "utf8"));
+c1.history[0].name = "Cluster one";
+c1.history[0].description = "The first part of the cluster, said the way the client says it.";
+fs.writeFileSync(c1Path, `${JSON.stringify(c1, null, 2)}\n`);
+assert("a hand-edited entry still validates", run(["status", "--quiet"]).trim() === "");
+assert("the new wording is what `show` prints", run(["show", "c1"]).includes("said the way the client says it"));
+assert(
+  "rewording by hand records nothing against the release",
+  JSON.stringify(JSON.parse(run(["status", "--json"])).release) ===
+    JSON.stringify(JSON.parse(releaseBefore).release),
+);
+
+// …and a hand-edit that breaks the shape comes back as a message, not a build.
+fs.writeFileSync(c1Path, JSON.stringify({ ...c1, history: [{ version: 1, name: "Cluster one" }] }, null, 2));
+assert("a description deleted by hand is reported", run(["status"], { expect: "fail" }).includes("needs a description"));
+c1.history[0].description = "The c1 part of the cluster.";
+c1.history[0].name = "Cluster c1";
+fs.writeFileSync(c1Path, `${JSON.stringify(c1, null, 2)}\n`);
 
 const list = run(["list"]);
 assert("list marks this release's work", list.includes("changed v2") && list.includes("new v2"));
@@ -330,6 +363,15 @@ assert("…but not when the day and the code are both the same",
 assert("…which --force still allows, as a deliberate re-issue",
   run(["release", "cut", "--name", "Again", "--date", "2026-02-01", "--force"], { cwd: repo }).includes("cut v4"));
 assert("the timeline lists each release's commit", /[0-9a-f]{7}  Same day, later/.test(run(["release", "list"], { cwd: repo })));
+// Every ledger that predates commits has a timeline of nulls, so they have to
+// be fillable in after the fact — otherwise the field only ever works forward.
+const head = spawnSync("git", ["-C", repo, "rev-parse", "HEAD"], { encoding: "utf8" }).stdout.trim();
+run(["release", "amend", "1", "--commit", head], { cwd: repo });
+assert("a release cut before commits were recorded can be filled in",
+  cutJson()[0].commit === head);
+// The in-progress release has no commit because it hasn't happened yet.
+run(["release", "amend", "5", "--commit", head], { cwd: repo, expect: "fail" });
+run(["release", "amend", "1", "--commit", "0".repeat(40)], { cwd: repo, expect: "fail" });
 
 fs.rmSync(repo, { recursive: true, force: true });
 

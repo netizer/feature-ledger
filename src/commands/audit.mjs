@@ -213,8 +213,9 @@ function log(flags) {
 /* ---- audit confirm ----------------------------------------------------- */
 
 /** Confirming an inferred reason: the sentence stands, and someone has now
- *  vouched for it. `ledger reword` on the same entry does this too, since
- *  rewriting the bullet yourself is a stronger form of the same act. */
+ *  vouched for it. Rewriting the bullet by hand is the stronger form of the
+ *  same act, and clears the flag the same way — delete the `reason_inferred`
+ *  line while you're in the file. */
 function confirm(flags, rest) {
   const project = openProject(flags);
   const id = rest[0];
@@ -342,7 +343,7 @@ function brief(flags) {
   p("");
   if (previous) {
     p(`  During v${version}          → record it as you normally would:`);
-    p("                        `ledger add` / `update` / `rename` / `remove`.");
+    p("                        `ledger add` / `update` / `remove`.");
     p("");
     p("  Before the cutoff   → the same command, plus `--backfilled`.");
     p("");
@@ -398,7 +399,9 @@ function brief(flags) {
   if (renamed.length || deleted.length) {
     p("## Renames and deletions");
     p("");
-    p("These map to `ledger rename` and `ledger remove`, not to `ledger update`.");
+    p("A capability that was renamed or withdrawn, not one that changed. A rename is");
+    p("`ledger update <id> --name \"New name\"` with a bullet saying what it was called and");
+    p("why; a withdrawal is `ledger remove <id> --reason \"…\"`.");
     p("");
     for (const c of renamed) p(`  renamed  ${c.from} → ${c.path}`);
     for (const c of deleted) p(`  deleted  ${c.path}`);
@@ -415,9 +418,10 @@ function brief(flags) {
   p("   Leave out everything you did not have to infer — the list is for someone to");
   p("   check quickly, so anything already certain is noise in it.");
   p("4. Ask them to confirm or correct each one, and tell them that");
-  p("   `ledger audit confirm <id>` accepts a reason as it stands and");
-  p("   `ledger reword <id>` rewrites the bullet. Until then `ledger status` and");
-  p("   `ledger release cut` will both keep reporting them as unconfirmed.");
+  p("   `ledger audit confirm <id>` accepts a reason as it stands, and that rewriting");
+  p("   the bullet by hand in .ledger/features/<id>.json does the same thing — delete");
+  p("   the entry's \"reason_inferred\" line once the sentence is theirs. Until then");
+  p("   `ledger status` and `ledger release cut` both keep reporting them as unconfirmed.");
 
   out(lines.join("\n"));
 }

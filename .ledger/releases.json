@@ -3,12 +3,14 @@
     "version": 1,
     "name": "Baseline",
     "date": "2026-09-08",
-    "status": "released"
+    "status": "released",
+    "commit": "45eb68fd1bb51e17ec50a6d15d23961da68fce20"
   },
   {
     "version": 2,
     "name": null,
     "date": null,
-    "status": "future"
+    "status": "future",
+    "commit": null
   }
 ]

@@ -10,6 +10,11 @@
       "description": "The command ledger rename changes what a feature is called, and every document footnotes the name it went by before. A feature that existed before this release needs a reason: one bullet saying what it was called and why the name moved.",
       "changes": null,
       "dev_notes": "src/commands/write.mjs cmdRename. The old name comes from Feature#stateAt's renamedFrom, computed from the named entries in the history rather than stored."
+    },
+    {
+      "version": 2,
+      "removed": true,
+      "reason": "Renaming a feature is no longer a command of its own. A name that was chosen badly is wording, and is edited in .ledger/features/<id>.json; a name the product actually changed is recorded with ledger update, which carries the reason the reader is given. Every document still footnotes the previous name."
     }
   ]
 }

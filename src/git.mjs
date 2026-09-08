@@ -78,9 +78,10 @@ export function countCommits(root, from, to = "HEAD") {
 }
 
 /**
- * Changed paths over the range, with renames and deletes kept apart — those map
- * to `ledger rename` and `ledger remove` rather than to `update`, and an agent
- * handed a flat list of paths would have to infer that from the diff.
+ * Changed paths over the range, with renames and deletes kept apart — a
+ * renamed or deleted path is a capability that was renamed or withdrawn rather
+ * than one that changed, and an agent handed a flat list of paths would have
+ * to infer that from the diff.
  */
 export function changes(root, from, to = "HEAD") {
   const out = git(root, ["diff", "--name-status", "-M", `${from}..${to}`]);

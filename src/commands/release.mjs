@@ -9,7 +9,8 @@ export async function cmdRelease({ flags, positional }) {
   const sub = positional[0] ?? "list";
   if (sub === "list") return list(flags);
   if (sub === "cut") return cut(flags);
-  fail("usage: ledger release [list | cut --name \"…\" [--date YYYY-MM-DD]]");
+  if (sub === "amend") return amend(flags, positional.slice(1));
+  fail('usage: ledger release [list | cut --name "…" [--date YYYY-MM-DD] | amend <version> --commit <sha>]');
 }
 
 function list(flags) {
@@ -22,6 +23,63 @@ function list(flags) {
     const at = r.commit ? `  ${git.shortSha(r.commit)}` : "";
     out(`v${String(r.version).padStart(2)}  ${(when ?? "").padEnd(20)}${at.padEnd(10)} ${r.name ?? "(unnamed)"}  · ${touched} entr${touched === 1 ? "y" : "ies"}`);
   }
+}
+
+/**
+ * Filling in the commit on a release that was cut before commits were
+ * recorded — which is every release in every ledger that predates them, this
+ * one included. Without this the field could only ever be set going forward,
+ * and a timeline would stay half blank for the life of the project.
+ *
+ * The in-progress release is refused on purpose: it has no commit because it
+ * has not happened yet, and `ledger release cut` is what gives it one.
+ */
+function amend(flags, rest) {
+  const project = openProject(flags);
+  const version = Number(rest[0]);
+  if (!Number.isInteger(version)) fail('usage: ledger release amend <version> --commit <sha>');
+
+  const release = project.releases.at(version);
+  if (release.future) {
+    fail(
+      `v${version} is the release in progress, so it has no commit yet — it gets one when ` +
+      "`ledger release cut` turns it into a real moment.",
+    );
+  }
+  if (isBlank(flags.commit) || flags.commit === true) {
+    fail(`amending a release needs --commit <sha> — the commit v${version} was cut at`);
+  }
+  if (!git.available(project.root)) fail("--commit needs a git repository; this project has none");
+
+  const sha = git.resolve(project.root, String(flags.commit));
+  if (!sha) fail(`no commit ${flags.commit} in this repository`);
+  if (!git.isAncestor(project.root, sha)) {
+    fail(`${git.shortSha(sha)} isn't an ancestor of HEAD, so v${version} can't have been cut at it`);
+  }
+
+  // The same thing `cut` refuses: two editions standing for one moment.
+  const clash = project.releases.releases.find(
+    (r) => r.version !== version && r.released && r.date === release.date && r.commit === sha,
+  );
+  if (clash && !flags.force) {
+    fail(
+      `v${clash.version} (${clash.name}) already stands for ${release.date} at ${git.shortSha(sha)}, so the two ` +
+      "editions would be indistinguishable. Pass --force if that is really what happened.",
+    );
+  }
+
+  const had = release.commit;
+  release.commit = sha;
+
+  if (flags["dry-run"]) {
+    out(JSON.stringify(project.releases.toJSON(), null, 2));
+    out("(--dry-run: nothing written)");
+    return;
+  }
+  project.releases.validate();
+  project.saveReleases();
+  out(`v${version} — ${release.name} (${release.date}) was cut at ${git.shortSha(sha)}` +
+    (had ? `, was ${git.shortSha(had)}` : ""));
 }
 
 /**

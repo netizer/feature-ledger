@@ -211,6 +211,15 @@ export async function cmdUpdate({ flags, positional }) {
     entry.description = data.description;
   }
 
+  // A rename the client is told about: `name` on this release's entry, with a
+  // `changes` bullet like any other change. The generators footnote the
+  // previous name on their own, from the named entries in the history.
+  //
+  // A name that was simply *chosen badly* is not this. That is wording, and
+  // wording is a hand-edit: change `name` on the entry where it was set, in
+  // .ledger/features/<id>.json, and nothing lands on the release. There used
+  // to be a `ledger rename` covering both, which is why it kept getting used
+  // for the first when the second was meant.
   if (data.name) entry.name = data.name;
   if (data.dev_notes !== undefined) {
     if (isBlank(data.dev_notes)) delete entry.dev_notes;
@@ -242,109 +251,6 @@ export async function cmdUpdate({ flags, positional }) {
 
   const rebuilt = new Feature(feature.toJSON());
   report(project, rebuilt, { dryRun: flags["dry-run"], verb: "updated" });
-}
-
-/**
- * Rewording: the same feature, said better.
- *
- * `update` records that the product moved, which is why it insists on a
- * `changes` bullet and tags the feature as Changed in the edition. A copy fix
- * is not that. The product did not move, so nothing should appear in the
- * release, and the improved wording should read as though it had always been
- * there.
- *
- * So this edits the text of an existing history entry in place. It is what a
- * project needs after adopting a style guide, when a corpus written in an
- * older voice has to be brought over without every entry lighting up as new
- * work.
- */
-export async function cmdReword({ flags, positional }) {
-  const project = openProject(flags);
-  const id = positional[0];
-  if (!id) fail("usage: ledger reword <id>  (with the new wording as JSON on stdin)");
-  const feature = project.featureSet.find(id);
-
-  const data = await payload(flags, { allow: ["name", "description", "dev_notes", "changes"] });
-  if (!Object.keys(data).length) fail(`nothing to reword — pass at least one of: name, description, dev_notes, changes`);
-
-  // Default to the entry whose text is the one on show today; --version
-  // reaches back to fix an older edition's wording.
-  const asked = flags.version !== undefined && flags.version !== true ? Number(flags.version) : null;
-  const target = asked ?? feature.stateAt(project.releases.latestVersion)?.version;
-  if (target === undefined || target === null) fail(`${id} doesn't exist yet at v${project.releases.latestVersion}`);
-
-  const entry = feature.entryAt(target);
-  if (!entry) fail(`${id} has no history entry at v${target} — it has ${feature.history.map((h) => `v${h.version}`).join(", ")}`);
-  if (entry.removed) fail(`${id} v${target} is a removal; reword its reason with \`ledger reword ${id} --version <earlier>\` or fix the removal itself`);
-
-  const touched = [];
-  if (!isBlank(data.name)) { entry.name = data.name; touched.push("name"); }
-  if (!isBlank(data.description)) { entry.description = data.description; touched.push("description"); }
-  if (data.dev_notes !== undefined) {
-    if (isBlank(data.dev_notes)) delete entry.dev_notes;
-    else entry.dev_notes = data.dev_notes;
-    touched.push("dev_notes");
-  }
-  if (data.changes !== undefined) {
-    // Rewording can improve a bullet but not add or drop one: adding a bullet
-    // is recording a change, and that belongs in `update` where it will be
-    // tagged and dated.
-    const existing = entry.changes ?? [];
-    if (!Array.isArray(data.changes)) fail(`"changes" must be a list of strings`);
-    if (data.changes.length !== existing.length) {
-      fail(
-        `${id} v${target} has ${existing.length} change bullet(s) and the reword gives ${data.changes.length}. ` +
-        "Rewording can improve a bullet, never add or remove one — use `ledger update` for that.",
-      );
-    }
-    entry.changes = data.changes;
-    // Writing the bullet yourself is a stronger form of confirming it than
-    // `ledger audit confirm`, so an inferred reason stops being inferred here.
-    if (entry.reason_inferred) delete entry.reason_inferred;
-    touched.push("changes");
-  }
-
-  const rebuilt = new Feature(feature.toJSON());
-  if (flags["dry-run"]) {
-    out(JSON.stringify(rebuilt.toJSON(), null, 2));
-    out("(--dry-run: nothing written)");
-    return;
-  }
-  project.saveFeature(rebuilt);
-  out(`reworded ${id} v${target} (${touched.join(", ")}) — wording only, no history entry`);
-}
-
-/**
- * A rename is a change like any other — the generators footnote the old name
- * automatically, but a reader still deserves to know why it moved, so a
- * feature that already existed can't be renamed silently.
- */
-export async function cmdRename({ flags, positional }) {
-  const project = openProject(flags);
-  const version = project.workingVersion;
-  const [id, newName] = positional;
-  if (!id || !newName) fail('usage: ledger rename <id> "New name" --why "…"');
-
-  const feature = project.featureSet.find(id);
-  const existedBefore = feature.firstVersion < version;
-  const why = flags.why;
-  if (existedBefore && isBlank(why)) {
-    fail(`renaming ${id} needs --why "…": one bullet saying what it was called before and why the name moved`);
-  }
-
-  const prev = feature.history.filter((h) => h.version < version).pop();
-  let entry = feature.entryAt(version);
-  if (!entry) {
-    entry = { version, description: flags.description ?? prev.description, changes: [] };
-    if (prev?.dev_notes) entry.dev_notes = prev.dev_notes;
-    feature.history.push(entry);
-    feature.history.sort((a, b) => a.version - b.version);
-  }
-  entry.name = newName;
-  if (flags.description) entry.description = flags.description;
-  if (existedBefore) entry.changes = [...(entry.changes ?? []), why];
-
-  report(project, new Feature(feature.toJSON()), { dryRun: flags["dry-run"], verb: "renamed" });
 }
 
 export async function cmdRemove({ flags, positional }) {
@@ -522,8 +428,14 @@ export async function cmdSubcategory({ flags, positional }) {
     }
     return;
   }
-  if (sub === "reword") return rewordSubcategory(project, flags, positional.slice(1));
-  if (sub !== "add") fail("usage: ledger subcategory [list | add | reword <id>]  (add and reword take JSON on stdin)");
+  if (sub === "reword") {
+    fail(
+      "`ledger subcategory reword` is now a hand-edit: change \"name\" or \"intro\" in " +
+      ".ledger/subcategories.json. A heading and its overview are client-facing prose like any entry, " +
+      "and rewording them records nothing against the release either way. `ledger status` checks the file.",
+    );
+  }
+  if (sub !== "add") fail("usage: ledger subcategory [list | add]  (add takes JSON on stdin; the wording of an existing one is edited in .ledger/subcategories.json)");
 
   const data = await payload(flags, { allow: ["id", "category", "name", "intro"] });
   if (flags.id) data.id = flags.id;
@@ -544,33 +456,4 @@ export async function cmdSubcategory({ flags, positional }) {
   project.subcategories.push(entry);
   writeJson(project.subcategoriesPath, project.subcategories);
   out(`added sub-section ${data.id} under ${data.category} — assign features to it with \`ledger update <id> --subcategory ${data.id}\``);
-}
-
-/**
- * A sub-section's heading and intro are client-facing prose like any entry,
- * so they need the same in-place fix. Nothing about the product moved, so
- * this records nothing against the release.
- */
-async function rewordSubcategory(project, flags, args) {
-  const id = args[0];
-  if (!id) fail("usage: ledger subcategory reword <id>  (with { name?, intro? } as JSON on stdin)");
-  const entry = project.subcategories.find((s) => s.id === id);
-  if (!entry) {
-    fail(`unknown sub-section ${JSON.stringify(id)} — the ones declared are: ${project.subcategories.map((s) => s.id).join(", ") || "(none)"}`);
-  }
-
-  const data = await payload(flags, { allow: ["name", "intro"] });
-  if (flags.intro) data.intro = flags.intro;
-  const touched = [];
-  if (!isBlank(data.name)) { entry.name = data.name; touched.push("name"); }
-  if (!isBlank(data.intro)) { entry.intro = data.intro; touched.push("intro"); }
-  if (!touched.length) fail("nothing to reword — pass a name, an intro, or both");
-
-  if (flags["dry-run"]) {
-    out(JSON.stringify(entry, null, 2));
-    out("(--dry-run: nothing written)");
-    return;
-  }
-  writeJson(project.subcategoriesPath, project.subcategories);
-  out(`reworded sub-section ${id} (${touched.join(", ")}) — wording only, nothing recorded against the release`);
 }

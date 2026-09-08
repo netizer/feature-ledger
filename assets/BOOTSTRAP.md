@@ -6,11 +6,14 @@ runs it.
 
 It runs start to finish on its own. The agent surveys, decides the areas,
 writes every entry, cuts the baseline and prints it — without stopping to ask
-you anything. Editing comes after: you read the finished document, then fix
-whatever reads wrong (`ledger reword <id>` for the words, `ledger update <id>`
-for the substance, `ledger remove <id> --reason "…"` for something that
-shouldn't be there). The agent finishes by listing the entries it was least
-sure about, so you know where to look first.
+you anything. Editing comes after, and what you get back is a **draft**: read
+the finished document, then open `.ledger/features/<id>.json` and rewrite
+anything that isn't how you'd say it to this client — the wrong word, a
+sentence it invented, a detail they shouldn't be reading, or the sentence it
+had no way of knowing. That records nothing and marks nothing as changed.
+`ledger update <id>` and `ledger remove <id> --reason "…"` are for anything
+where the product itself has moved since. The agent finishes by listing the
+entries it was least sure about, so you know where to look first.
 
 The prompt itself is everything under the rule below. Copy it whole, from
 there to the end of this output, into a fresh agent session in the project
@@ -197,8 +200,9 @@ highlights only what actually moved.
 Before you write the note, run `ledger list` and read only the names, in
 order, ignoring everything else on each line. That is what most people will
 read of this document. Anything you can't tell apart from its neighbours, or
-that you'd have to open the description to understand, gets one more pass with
-`ledger reword <id>` — which changes the words and nothing about the release.
+that you'd have to open the description to understand, gets one more pass:
+edit `name` in `.ledger/features/<id>.json`, which changes the words and
+nothing about the release, and re-run `ledger status`.
 
 Finish with a short note for me, and nothing else to do:
 
@@ -211,6 +215,7 @@ Finish with a short note for me, and nothing else to do:
 - Anything you found and deliberately left out, if a reasonable person might
   have expected it in the document.
 
-Then stop. Any correction I want is `ledger reword <id>` for the wording,
-`ledger update <id>` for the substance, or `ledger remove <id> --reason "…"`,
-and rebuilding is `ledger build`.
+Then stop. What you hand me is a draft: I'll rewrite the wording myself in
+`.ledger/features/<id>.json`, and `ledger update <id>` and
+`ledger remove <id> --reason "…"` cover anything that has actually moved.
+Rebuilding is `ledger build`.
