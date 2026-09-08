@@ -5,6 +5,8 @@ import { resolveBrand, accentCollides } from "../render/brand.mjs";
 import { fontFaceCss } from "../render/fonts.mjs";
 import { probeBrowser } from "../render/pdf.mjs";
 import { resolveStyle, styleTitle } from "../style.mjs";
+import { unauditedReport, unauditedLine, unconfirmedReasons } from "./audit.mjs";
+import { shortSha } from "../git.mjs";
 
 const out = (s) => process.stdout.write(`${s}\n`);
 const field = (k, v) => out(`  ${k.padEnd(11)} ${v}`);
@@ -32,11 +34,12 @@ export async function cmdStatus({ flags }) {
   const warnings = collectWarnings(project);
   const release = releaseReport(project);
   const corpus = corpusReport(project);
+  const audit = auditReport(project);
 
   if (flags.json) {
     const setup = setupReport(project);
     setup.browser = await browserLine();
-    out(JSON.stringify({ ...release, corpus, setup, warnings }, null, 2));
+    out(JSON.stringify({ ...release, corpus, audit, setup, warnings }, null, 2));
     return;
   }
 
@@ -70,6 +73,8 @@ export async function cmdStatus({ flags }) {
     ? "none yet — the first feature opens one"
     : `${corpus.areas}${corpus.largest ? `, largest is “${corpus.largest.category}” with ${corpus.largest.count}` : ""}`);
   field("releases", `${corpus.releases}, \`ledger build\` prints the v${corpus.prints} edition`);
+  field("audited", audit.line);
+  if (audit.full_line) field("full sweep", audit.full_line);
 
   out("");
   out("Setup");
@@ -117,6 +122,45 @@ function releaseReport(project) {
     removed: removed.map((f) => f.id),
     other_changes: other.length,
     nothing: !touched.length && !other.length,
+  };
+}
+
+/**
+ * When the codebase was last checked against the record, and how much has
+ * landed since.
+ *
+ * The last FULL sweep is reported separately because only a full one can find a
+ * capability the baseline survey missed — an incremental range moves past it
+ * permanently — so "we audit every sprint" and "we have never swept the whole
+ * thing" are different facts, and a single date would hide the second.
+ */
+function auditReport(project) {
+  const last = project.lastAudit;
+  const full = project.lastFullAudit;
+  const unaudited = unauditedReport(project);
+  const pending = unconfirmedReasons(project);
+
+  let line;
+  if (!last) line = "never — `ledger audit` prints the brief";
+  else {
+    const at = last.commit ? ` at ${shortSha(last.commit)}` : "";
+    line = `${last.date}${at} (${last.mode})`;
+    line += unaudited.ok ? ", nothing unaudited since" : `, then ${unauditedLine(unaudited)}`;
+  }
+
+  // Only worth its own line when it says something the line above didn't: the
+  // last audit already names its own mode.
+  let fullLine = null;
+  if (last && !full) fullLine = "never — only a full sweep corrects a baseline the survey got wrong";
+  else if (full && full !== last) fullLine = `${full.date}${full.commit ? ` at ${shortSha(full.commit)}` : ""}`;
+
+  return {
+    last,
+    last_full: full,
+    unaudited,
+    unconfirmed_reasons: pending,
+    line,
+    full_line: fullLine,
   };
 }
 
@@ -212,6 +256,24 @@ function collectWarnings(project) {
   // an area with twenty entries in it, and an area opened today for work
   // starting tomorrow has one. Neither is a defect, and a warning that says
   // otherwise just teaches people to even out a shape that was already true.
+
+  const unaudited = unauditedReport(project);
+  if (!unaudited.ok) {
+    warnings.push(
+      `${unauditedLine(unaudited)}. Until they are swept, an edition cut now may be missing capabilities the ` +
+      "client already has. `ledger audit` prints the brief; `ledger release cut --force` overrides.",
+    );
+  }
+
+  const pending = unconfirmedReasons(project);
+  if (pending.length) {
+    warnings.push(
+      `${pending.length} change reason${pending.length === 1 ? "" : "s"} came from an audit reading a commit ` +
+      `message rather than from whoever decided it, and nobody has confirmed ${pending.length === 1 ? "it" : "them"} ` +
+      `yet: ${pending.map((x) => `${x.id} v${x.version}`).join(", ")}. ` +
+      "`ledger audit confirm <id>` vouches for one as it stands; `ledger reword <id>` rewrites the bullet.",
+    );
+  }
 
   const indexed = new Set(project.index);
   const unindexed = set.features().filter((f) => !indexed.has(f.id));

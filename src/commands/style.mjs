@@ -6,7 +6,7 @@ import {
   STYLES, STYLE_FILENAME, DEFAULT_STYLE_ID, CUSTOM_STYLE_ID,
   resolveStyle, styleSection, styleTitle,
 } from "../style.mjs";
-import { fail, readJson, writeJson, exists } from "../util.mjs";
+import { fail, readJson, writeJson, exists, COPY_RULE } from "../util.mjs";
 import { refreshAgents } from "./init.mjs";
 
 const PKG_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -113,7 +113,8 @@ function rewrite(flags) {
       .replaceAll("{product}", project.config.product)
       .replaceAll("{style}", styleSection(style, { withFooter: false }))
       .replaceAll("{count}", String(project.featureSet.features().length))
-      .replaceAll("{categories}", categories.length ? categories.map((c) => `  - ${c}`).join("\n") : "  (none yet)"),
+      .replaceAll("{categories}", categories.length ? categories.map((c) => `  - ${c}`).join("\n") : "  (none yet)")
+      .replaceAll("{copy_rule}", COPY_RULE),
   );
 }
 

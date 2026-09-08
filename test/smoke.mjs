@@ -162,6 +162,57 @@ if (pdf.includes("wrote")) {
   assert("the PDF edition is a real PDF", fs.existsSync(file) && fs.readFileSync(file).subarray(0, 4).toString() === "%PDF");
 }
 
+// ---- The third register ----
+// Everything an audit finds still lands on the OPEN release — "new" in a client
+// edition means new to the reader, and this is the first document to mention it
+// — so nothing is ever written into a past release and an already-issued
+// edition reprints exactly as it was.
+const v1Path = path.join(dir, "docs/generated/client/Testbed-Feature-Ledger_1.html");
+run(["build", "--pdf", "--html", "--version", "1"]);
+const v1Before = fs.readFileSync(v1Path, "utf8");
+
+run(["add", "always-there", "--backfilled"], {
+  stdin: feature({
+    audience: "user", category: "First area", size: "Medium", name: "Always there",
+    description: "Something the product could always do.",
+  }),
+});
+run(["update", "beta", "--backfilled", "--reason-inferred"], {
+  stdin: feature({
+    description: "Does the beta thing, over a wider window.",
+    changes: ["The window was narrower. Taken from the commit subject; why it widened is not recorded."],
+  }),
+});
+run(["remove", "solo", "--backfilled", "--reason", "No longer part of the product."]);
+// backfilled is written by an audit and only ever true; an explicit false is a
+// third state every renderer would have to reason about.
+fs.writeFileSync(
+  path.join(dir, ".ledger/features/bad.json"),
+  JSON.stringify({ id: "bad", audience: "user", category: "First area", size: "Small",
+    history: [{ version: 1, name: "Bad", description: "x", changes: null, backfilled: false }] }),
+);
+run(["status", "--quiet"], { expect: "fail" });
+fs.rmSync(path.join(dir, ".ledger/features/bad.json"));
+
+run(["build", "--pdf", "--html", "--version", "1"]);
+assert("a backfilled entry leaves an already-issued edition untouched", fs.readFileSync(v1Path, "utf8") === v1Before);
+
+run(["build", "--pdf", "--html"]);
+run(["build", "--md"]);
+const v2 = fs.readFileSync(path.join(dir, "docs/generated/client/Testbed-Feature-Ledger_2.html"), "utf8");
+assert("the third register draws in its own colour", v2.includes("tag-backfilled") && v2.includes("ALREADY IN PLACE"));
+assert("…and never puts the internal key in front of a client", !v2.includes(">BACKFILLED<"));
+assert("a removal found late is reported, apart from this cycle's news", v2.includes("No longer present"));
+const md2 = fs.readFileSync(path.join(dir, "docs/generated/FEATURES.md"), "utf8");
+assert("the living docs use the same words", md2.includes("Already in place]"));
+assert(
+  "an inferred reason is reported until somebody vouches for it",
+  run(["status", "--quiet"]).includes("nobody has confirmed"),
+);
+run(["audit", "confirm", "beta"]);
+assert("…and stops being reported once confirmed", !run(["status", "--quiet"]).includes("nobody has confirmed"));
+fs.rmSync(path.join(dir, "docs/generated"), { recursive: true, force: true });
+
 // The other output shape: a project that keeps its client editions. The
 // Markdown docs stay build output either way; only the PDFs move, out of the
 // one directory `init` gitignores.
@@ -183,6 +234,73 @@ assert(
   fs.existsSync(path.join(kept, "docs/client/Kept-Feature-Ledger_1.html")),
 );
 fs.rmSync(kept, { recursive: true, force: true });
+
+// Every printed brief draws the boundary between "for you" and "paste this"
+// the same way. Someone is going to select from that line to the end of the
+// output, and three briefs marking it three ways teach them to look for three
+// different things.
+const RULE = "═════════════════════  COPY EVERYTHING BELOW THIS LINE  ═════════════════════";
+for (const brief of [["bootstrap"], ["style", "rewrite"], ["audit"]]) {
+  assert(`\`ledger ${brief.join(" ")}\` marks where the prompt starts, the same way`,
+    run(brief, { cwd: dir }).includes(RULE));
+}
+
+// ---- The audit itself, which needs a real repository ----
+// The range IS the signal: no per-feature map of source paths to keep true,
+// just what has landed since the last time anyone looked.
+const repo = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-audit-"));
+const git = (...args) => spawnSync("git", ["-C", repo, ...args], { encoding: "utf8" });
+git("init", "-q", ".");
+git("config", "user.email", "smoke@example.com");
+git("config", "user.name", "Smoke");
+fs.mkdirSync(path.join(repo, "src"), { recursive: true });
+fs.writeFileSync(path.join(repo, "src/app.js"), "one\n");
+git("add", "-A");
+git("commit", "-qm", "Initial import");
+
+run(["init", "--product", "Audited", "--agents", "none"], { cwd: repo });
+run(["add", "one"], {
+  cwd: repo,
+  stdin: feature({ audience: "user", size: "Medium", name: "One", description: "Does the one thing." }),
+});
+
+// The baseline survey IS a full sweep of the codebase, so the prompt it prints
+// ends by recording one — otherwise a freshly bootstrapped project reports as
+// never audited and the cut gate stays silent until somebody runs it by hand.
+const boot = run(["bootstrap"], { cwd: repo });
+assert(
+  "the baseline survey ends by recording itself as a full sweep",
+  /ledger audit complete --full --commit [0-9a-f]{40}/.test(boot),
+);
+assert(
+  "…and it is stamped before the cut, so it logs against the release the entries went into",
+  boot.indexOf("audit complete") < boot.indexOf("release cut"),
+);
+assert("…and --no-audit leaves it out", !run(["bootstrap", "--no-audit"], { cwd: repo }).includes("audit complete"));
+
+assert("with nothing to measure from, the brief sweeps everything", run(["audit"], { cwd: repo }).includes("full sweep"));
+run(["audit", "complete", "--full"], { cwd: repo });
+assert("the audit is logged with the mode it ran in", run(["audit", "log"], { cwd: repo }).includes("full"));
+// The one field that makes a gap permanently invisible if it is set without the
+// work being done, so a commit this history has never seen is refused.
+run(["audit", "complete", "--commit", "0".repeat(40)], { cwd: repo, expect: "fail" });
+
+run(["release", "cut", "--name", "Baseline", "--date", "2026-01-15"], { cwd: repo });
+fs.writeFileSync(path.join(repo, "src/app.js"), "one\ntwo\n");
+git("add", "-A");
+git("commit", "-qm", "Add the two thing");
+
+assert(
+  "once source has landed unswept, the cut refuses and says how much",
+  run(["release", "cut", "--name", "Next"], { cwd: repo, expect: "fail" }).includes("since the last audit"),
+);
+assert(
+  "…and --force still gets through",
+  run(["release", "cut", "--name", "Next", "--date", "2026-02-01", "--force"], { cwd: repo }).includes("cut v2"),
+);
+const incremental = run(["audit"], { cwd: repo });
+assert("the brief then reads as a range, not a sweep", incremental.includes("incremental") && incremental.includes("Add the two thing"));
+fs.rmSync(repo, { recursive: true, force: true });
 
 log("");
 if (failures) {

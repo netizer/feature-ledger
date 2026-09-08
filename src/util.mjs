@@ -15,6 +15,16 @@ export const fail = (msg) => {
   throw new UserError(msg);
 };
 
+/**
+ * The line every printed brief puts between the part addressed to the person
+ * running the command and the part meant to be pasted into a coding agent.
+ *
+ * Shared rather than repeated because it is load-bearing: someone is going to
+ * select from it to the end of the output, and three briefs that draw the
+ * boundary three different ways teach them to look for three different things.
+ */
+export const COPY_RULE = "═════════════════════  COPY EVERYTHING BELOW THIS LINE  ═════════════════════";
+
 export function readJson(file) {
   let raw;
   try {

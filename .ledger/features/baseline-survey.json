@@ -10,6 +10,14 @@
       "description": "The command ledger bootstrap prints a brief you paste into a coding agent, which then reads the codebase and records what it already does as version 1. The brief carries the entry bar, the project's tone, and five steps: list the capabilities, decide the areas, write the entries, cut the baseline from the date of the first commit, and hand back the entries it was least sure of. The agent runs it start to finish without stopping to ask you anything.",
       "changes": null,
       "dev_notes": "src/commands/init.mjs cmdBootstrap prints assets/BOOTSTRAP.md with {product} and {style_line} filled in."
+    },
+    {
+      "version": 2,
+      "description": "The command ledger bootstrap prints a brief you paste into a coding agent, which then reads the codebase and records what it already does as version 1. The brief carries the entry bar, the project's tone, and five steps: list the capabilities, decide the areas, write the entries, cut the baseline from the date of the first commit, and hand back the entries it was least sure of. Because reading the whole codebase against the record is exactly what an audit does, the brief also records the survey as a full sweep, which is what gives the release gate something to measure against from the first day. The agent runs it start to finish without stopping to ask you anything.",
+      "changes": [
+        "The survey ended at the baseline edition, so a freshly bootstrapped project reported its codebase as never checked and the release gate stayed quiet until somebody ran an audit by hand. The survey had in fact just swept everything, so the brief now records that before cutting — the one moment when what the ledger holds and what the codebase does are known to agree. Pass --no-audit for a survey that is deliberately partial."
+      ],
+      "dev_notes": "src/commands/init.mjs cmdBootstrap prints assets/BOOTSTRAP.md with {product}, {style_line} and {audit_block} filled in. The stamp carries HEAD as of the moment the prompt was printed, not whatever HEAD has become when a long survey finishes, and is placed before `release cut` so the audit logs against the release the entries went into rather than the empty one the cut opens."
     }
   ]
 }

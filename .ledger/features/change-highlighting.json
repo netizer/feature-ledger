@@ -10,6 +10,14 @@
       "description": "Every edition marks its own changes against the edition before it: a green stripe for a feature that is new, a blue stripe and a \"What changed\" note for one that was reworked, and no stripe for an entry that stands as it did. The front page counts how many of each. A first edition has nothing behind it to compare against, so it prints as a plain inventory with no stripes anywhere on it.",
       "changes": null,
       "dev_notes": "Two semantics on purpose: the PDF always diffs against its own predecessor, however old, while the Markdown docs tag New and Changed only while the target release is still in progress, so a shipped release's docs read as a clean present-tense list. Nothing is tagged by hand."
+    },
+    {
+      "version": 2,
+      "description": "Every edition marks its own changes against the edition before it: a green stripe for a feature that is new, a blue stripe and a \"What changed\" note for one that was reworked, a grey stripe for one that was already part of the product and is only now listed, and no stripe for an entry that stands as it did. The front page counts how many of each. A first edition has nothing behind it to compare against, so it prints as a plain inventory with no stripes anywhere on it.",
+      "changes": [
+        "There were two stripes, and an entry an audit turned up had to print as one of them. A capability that had been in the product for two years then read as this sprint's work, which is the one thing a client would take issue with. The third stripe says what is actually true: the product did not move this cycle, the record did. It is a neutral grey rather than a fourth hue because green and blue are already spoken for, an accent in that band is refused for the same reason, and a fifth hue would leave a brand only reds, oranges, purples and browns to choose from."
+      ],
+      "dev_notes": "Two semantics on purpose: the PDF always diffs against its own predecessor, however old, while the Markdown docs tag New and Changed only while the target release is still in progress, so a shipped release's docs read as a clean present-tense list. Nothing is tagged by hand. The third register is the `backfilled` flag on a history entry, set by --backfilled on add/update/remove; it wins over new and updated in the badge derivation, and its wording is overridable under docs.tags in config.json. Nothing is ever written into a past release, so an already-issued edition still reprints unchanged."
     }
   ]
 }

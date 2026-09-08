@@ -68,9 +68,15 @@ class LedgerHtml {
         // a stack of identical NEW cards. Only the *drawing* moves: `badge`
         // itself is left alone, since the front-matter tallies and the
         // contents dots still have to count eight new features as eight.
-        const wholeThingNew = this.predecessor && rows.every((r) => r.badge === "new");
-        if (wholeThingNew) rows.forEach((r) => { r.showBadge = false; });
-        groups.push([{ name: sub.name, intro: sub.intro, badge: wholeThingNew ? "new" : null }, rows]);
+        // A sub-section arriving all at once is one card, not a stack of
+        // identical chips — and a sub-section the audit found all at once is
+        // the same shape of statement, so it collapses the same way. Only
+        // "updated" never collapses: a column of reworked entries each has
+        // its own reason, which is the part worth reading.
+        const uniform = ["new", "backfilled"].find((b) => rows.every((r) => r.badge === b)) ?? null;
+        const whole = this.predecessor ? uniform : null;
+        if (whole) rows.forEach((r) => { r.showBadge = false; });
+        groups.push([{ name: sub.name, intro: sub.intro, badge: whole }, rows]);
       }
 
       const live = groups.filter(([, rows]) => rows.length);
@@ -89,7 +95,16 @@ class LedgerHtml {
     for (const f of feats) {
       const state = f.stateAt(this.version);
       if (!state || state.removed) continue;
-      let badge = state.version === this.version ? (state.changes === null ? "new" : "updated") : null;
+      // Three registers, not two. Green and blue say the product moved at
+      // this version; grey says the product did not — the record did, because
+      // an audit found this late. `backfilled` therefore wins over both: an
+      // entry an audit recorded has a `changes` list like any other, and
+      // drawing it blue would tell the client it was reworked this cycle.
+      let badge = null;
+      if (state.version === this.version) {
+        if (state.backfilled) badge = "backfilled";
+        else badge = state.changes === null ? "new" : "updated";
+      }
       if (!this.predecessor) badge = null; // nothing to diff a first edition against
       rows.push({ feature: f, state, badge, showBadge: true, noLine: false });
     }
@@ -132,6 +147,7 @@ class LedgerHtml {
       small: count((r) => r.feature.size === "Small"),
       new: count((r) => r.badge === "new"),
       updated: count((r) => r.badge === "updated"),
+      backfilled: count((r) => r.badge === "backfilled"),
       unchanged: count((r) => r.badge === null),
     };
   }
@@ -144,7 +160,26 @@ class LedgerHtml {
     return total === 0 ? 0 : Math.round((this.stats[key] * 10000) / total) / 100;
   }
 
+  /** Withdrawn in the cycle this edition covers — announced as this
+   *  edition's news. */
   get removedThisVersion() {
+    return this.removals.filter(([, s]) => !s.backfilled);
+  }
+
+  /**
+   * Withdrawn at some point before the last cutoff, and never recorded until
+   * an audit found it. Still reported — a capability that is gone and was
+   * never mentioned is precisely what a reader needs to know, and a tool that
+   * decided on its own to withhold it would be worth less than one that
+   * reports everything. Drawn apart from the news, and worded so it claims no
+   * date: the audit deliberately does no archaeology, so the document does
+   * not know which release it went in.
+   */
+  get backfilledRemovals() {
+    return this.removals.filter(([, s]) => s.backfilled);
+  }
+
+  get removals() {
     if (!this.predecessor) return [];
     return this.set
       .features({ audience: "user" })
@@ -162,10 +197,11 @@ class LedgerHtml {
     return String(i + 1).padStart(2, "0");
   }
 
-  catHead(category, index, count, nNew, nUpd) {
+  catHead(category, index, count, nNew, nUpd, nBack) {
     let meta = `${count} ${count === 1 ? "feature" : "features"}`;
     if (nNew > 0) meta += ` · <em>${nNew} new</em>`;
     if (nUpd > 0) meta += ` · <i>${nUpd} updated</i>`;
+    if (nBack > 0) meta += ` · <b>${nBack} already in place</b>`;
     return `<div class="cat-head"><span class="num">${this.categoryNumber(index)}</span>` +
       `<h2>${h(category)}</h2><span class="meta">${meta}</span></div>`;
   }
@@ -206,6 +242,17 @@ class LedgerHtml {
     return `<div class="changes"><span class="label">What changed</span><ul>${items}</ul></div>`;
   }
 
+  /**
+   * The word printed on a row's chip. "new" and "updated" happen to be the
+   * label as well as the key; the third register does not, and printing the key
+   * would put an internal term in front of a client. It comes from the
+   * overridable wording instead, so a project can pick its own phrasing.
+   */
+  badgeLabel(badge) {
+    if (badge === "backfilled") return this.words.tags.backfilled.toUpperCase();
+    return badge.toUpperCase();
+  }
+
   /** One ledger row. Shared by the "first row, glued to its section heading
    *  so the heading can never be orphaned at the foot of a page" case and by
    *  every row after it, so the two can't drift apart. */
@@ -215,7 +262,7 @@ class LedgerHtml {
     const badge = this.displayBadge(row);
     const classes = ["feature", badge, row.noLine ? "no-line" : null].filter(Boolean).join(" ");
     const was = s.renamedFrom ? `<span class="was">previously &ldquo;${h(s.renamedFrom)}&rdquo;</span>` : "";
-    const tag = badge ? `<span class="tag tag-${badge}">${badge.toUpperCase()}</span>` : "";
+    const tag = badge ? `<span class="tag tag-${badge}">${h(this.badgeLabel(badge))}</span>` : "";
 
     return `<div class="${classes}"><div class="content">` +
       `<div class="badges">${this.sizeChip(f.size)}${tag}</div>` +
@@ -246,6 +293,7 @@ class LedgerHtml {
     const body = this.categoryRows.map(([category, rows, groups], i) => {
       const nNew = rows.filter((r) => r.badge === "new").length;
       const nUpd = rows.filter((r) => r.badge === "updated").length;
+      const nBack = rows.filter((r) => r.badge === "backfilled").length;
 
       // Every heading is glued to its own first row, so neither a category
       // head nor a sub-section head can be stranded at the foot of a page.
@@ -254,7 +302,7 @@ class LedgerHtml {
       // An undivided ledger prints no area heading at all: one heading above
       // the only list in the document is a structure the reader has to read
       // past to get to the product.
-      const head = this.set.unstructured ? "" : this.catHead(category, i, rows.length, nNew, nUpd);
+      const head = this.set.unstructured ? "" : this.catHead(category, i, rows.length, nNew, nUpd, nBack);
 
       const inner = groups.map(([sub, grows], gi) => {
         if (sub === null) {
@@ -262,7 +310,7 @@ class LedgerHtml {
             grows.slice(1).map((r) => this.featureRow(r)).join("");
         }
         const alone = gi === 0 && head ? `<div class="cat-open cat-alone">${head}</div>` : "";
-        return `${alone}<div class="subsection${sub.badge === "new" ? " new" : ""}"><div class="sub-body">` +
+        return `${alone}<div class="subsection${sub.badge ? ` ${sub.badge}` : ""}"><div class="sub-body">` +
           `<div class="sub-open">${this.subHead(sub)}${this.featureRow(grows[0])}</div>` +
           grows.slice(1).map((r) => this.featureRow(r)).join("") +
           "</div></div>";
@@ -274,7 +322,10 @@ class LedgerHtml {
     const contents = this.categoryRows.map(([category, rows], i) => {
       const nNew = rows.filter((r) => r.badge === "new").length;
       const nUpd = rows.filter((r) => r.badge === "updated").length;
-      const flags = '<i class="dot-new"></i>'.repeat(nNew) + '<i class="dot-updated"></i>'.repeat(nUpd);
+      const nBack = rows.filter((r) => r.badge === "backfilled").length;
+      const flags = '<i class="dot-new"></i>'.repeat(nNew)
+        + '<i class="dot-updated"></i>'.repeat(nUpd)
+        + '<i class="dot-backfilled"></i>'.repeat(nBack);
       return `<li><span class="num">${this.categoryNumber(i)}</span><span class="nm">${h(category)}</span>` +
         `<span class="flags">${flags}</span><span class="ct">${rows.length}</span></li>`;
     }).join("");
@@ -284,6 +335,9 @@ class LedgerHtml {
       <div class="since">
         <div class="item is-new"><span class="n">${stats.new}</span><span class="l">New</span></div>
         <div class="item is-updated"><span class="n">${stats.updated}</span><span class="l">Updated</span></div>
+        ${stats.backfilled > 0
+          ? `<div class="item is-backfilled"><span class="n">${stats.backfilled}</span><span class="l">Already in place</span></div>`
+          : ""}
         <div class="item is-same"><span class="n">${stats.unchanged}</span><span class="l">Unchanged</span></div>
       </div>` : "";
 
@@ -292,19 +346,36 @@ class LedgerHtml {
         <b>What's changed since the last edition${predDateLabel ? ` (${predDateLabel})` : ""}:</b>
         every entry below is highlighted to show what's different. A green stripe marks a brand-new feature;
         a blue stripe marks an existing feature that was materially reworked, with its own
-        <b>What changed</b> note. Anything without a stripe hasn't changed.
+        <b>What changed</b> note.${stats.backfilled > 0 ? ` A grey stripe marks a capability that was already
+        part of ${h(this.brand.name)} and is listed here for the first time, rather than something built this
+        time.` : ""} Anything without a stripe hasn't changed.
         <div class="legend">
           <span><i class="dot-new"></i> New feature</span>
           <span><i class="dot-updated"></i> Updated feature</span>
+          ${stats.backfilled > 0 ? `<span><i class="dot-backfilled"></i> ${h(this.words.tags.backfilled)}</span>` : ""}
         </div>
       </div></div>` : "";
+
+    const removedBox = ([f, s], cls = "") =>
+      `<div class="removed-box${cls}"><div class="removed-box-content">` +
+      `<span class="name">${h(f.currentName)}</span> &mdash; ${h(s.reason)}</div></div>`;
 
     const removed = this.removedThisVersion;
     const removedBlock = removed.length ? `
       <div class="category">
         <div class="cat-head"><span class="num">&mdash;</span><h2>No longer available as of this edition</h2></div>
-        ${removed.map(([f, s]) => `<div class="removed-box"><div class="removed-box-content">` +
-          `<span class="name">${h(f.currentName)}</span> &mdash; ${h(s.reason)}</div></div>`).join("")}
+        ${removed.map((r) => removedBox(r)).join("")}
+      </div>` : "";
+
+    // Deliberately its own block, and deliberately vague about timing: these
+    // went before the last cutoff, and since the audit does no archaeology the
+    // document cannot honestly name the release they went in.
+    const goneEarlier = this.backfilledRemovals;
+    const goneEarlierBlock = goneEarlier.length ? `
+      <div class="category">
+        <div class="cat-head"><span class="num">&mdash;</span><h2>${h(this.words.tags.backfilled_removed)}</h2>
+          <span class="meta">recorded here for the first time</span></div>
+        ${goneEarlier.map((r) => removedBox(r, " backfilled")).join("")}
       </div>` : "";
 
     const other = this.otherChanges;
@@ -373,6 +444,7 @@ ${this.project.themeCss()}
 
   ${body}
   ${removedBlock}
+  ${goneEarlierBlock}
   ${otherBlock}
 
   <div class="colophon">
@@ -395,6 +467,16 @@ ${this.project.themeCss()}
 
     --green: #12744a; --green-deep: #0b5233; --green-soft: #e7f4ed; --green-line: #cfe6d9;
     --blue: #2a51c8; --blue-deep: #1c3c99; --blue-soft: #eaf0fd;
+
+    /* The third register. Deliberately not a fourth hue: green and blue are
+       already spoken for, and brand.json forbids an accent in the green/blue
+       band precisely so those two keep their meaning — a fifth hue would
+       squeeze every brand into reds, oranges, purples and browns. It is also
+       not the same KIND of fact. Green and blue say the software moved; this
+       says the document caught up. Neutral grey is the one family a brand
+       accent never occupies, so it is safe against every palette, and it
+       recedes, which is the point. */
+    --slate: #6b7280; --slate-deep: #414753; --slate-soft: #edeff2; --slate-line: #dfe2e7;
 
     --font-display: '${b.fonts.display}', Georgia, 'Times New Roman', serif;
     --font-body: '${b.fonts.body}', 'Helvetica Neue', Arial, sans-serif;
@@ -491,6 +573,7 @@ const STYLES = `
   .callout .legend i { width: 4px; height: 13px; border-radius: 2px; display: inline-block; }
   .dot-new { background: var(--green); }
   .dot-updated { background: var(--blue); }
+  .dot-backfilled { background: var(--slate); }
 
   /* ---- At a glance ----
      The total reads as a sentence, and the size split is drawn as one bar cut
@@ -531,6 +614,7 @@ const STYLES = `
   .since .l { font-size: 8pt; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
   .since .is-new .n { color: var(--green-deep); } .since .is-new .l { color: var(--green-deep); }
   .since .is-updated .n { color: var(--blue-deep); } .since .is-updated .l { color: var(--blue-deep); }
+  .since .is-backfilled .n { color: var(--slate-deep); } .since .is-backfilled .l { color: var(--slate-deep); }
   .since .is-same .n { color: var(--ink-ghost); } .since .is-same .l { color: var(--ink-faint); }
 
   /* ---- Contents ---- */
@@ -563,6 +647,7 @@ const STYLES = `
   .cat-head .meta { font-size: 8pt; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-faint); white-space: nowrap; }
   .cat-head .meta em { font-style: normal; color: var(--green-deep); }
   .cat-head .meta i { font-style: normal; color: var(--blue-deep); }
+  .cat-head .meta b { font-weight: 700; color: var(--slate-deep); }
 
   /* ---- Sub-sections ----
      One area inside a category that got big enough to swamp its neighbours.
@@ -606,6 +691,15 @@ const STYLES = `
      than a rule, so separators inside the card are a green of their own. */
   .subsection.new .feature { border-bottom-color: var(--green-line); }
 
+  /* Same card, quieter register — a sub-section the audit found all at once. */
+  .subsection.backfilled { background: var(--slate); border-radius: 7px; overflow: hidden; margin: 16px 0 6px; }
+  .subsection.backfilled > .sub-body { background: var(--slate-soft); margin-left: 5px; }
+  .subsection.backfilled .sub-head { border-top: none; padding: 15px 15px 0; margin-bottom: 0; }
+  .subsection.backfilled .sub-name { color: var(--slate-deep); }
+  .subsection.backfilled .sub-intro { color: var(--ink); }
+  .subsection.backfilled .feature .content { margin-left: 0; }
+  .subsection.backfilled .feature { border-bottom-color: var(--slate-line); }
+
   /* The coloured accent strip on a flagged row is not a separately-rounded
      bar sitting next to a separately-rounded box — two independent curves
      never line up exactly, they only get close. Instead: .feature itself
@@ -632,11 +726,13 @@ const STYLES = `
      markSeams(), not by :last-child, which can only see a row's wrapper. */
   .feature.no-line { border-bottom: none; }
 
-  .feature.new, .feature.updated { border-radius: 7px; overflow: hidden; margin: 3px 0; }
+  .feature.new, .feature.updated, .feature.backfilled { border-radius: 7px; overflow: hidden; margin: 3px 0; }
   .feature.new { background: var(--green); }
   .feature.new .content { background: var(--green-soft); padding-top: 15px; padding-bottom: 15px; }
   .feature.updated { background: var(--blue); }
   .feature.updated .content { background: var(--blue-soft); padding-top: 15px; padding-bottom: 15px; }
+  .feature.backfilled { background: var(--slate); }
+  .feature.backfilled .content { background: var(--slate-soft); padding-top: 15px; padding-bottom: 15px; }
 
   .badges { flex: 0 0 98px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
 
@@ -672,6 +768,10 @@ const STYLES = `
   }
   .tag-new { background: var(--green); }
   .tag-updated { background: var(--blue); }
+  .tag-backfilled {
+    background: var(--slate);
+    white-space: normal; max-width: 98px; line-height: 1.3;
+  }
 
   .feature .body { flex: 1; min-width: 0; }
   .feature .name { font-family: var(--font-display); font-weight: 700; font-size: 12pt; letter-spacing: -.005em; }
@@ -704,10 +804,18 @@ const STYLES = `
     content: ""; position: absolute; left: 0; top: .55em; width: 6px; height: 6px;
     border-radius: 1.5px; background: var(--blue);
   }
+  /* The blue on the label and the bullets identifies the list as this cycle's
+     news. On a backfilled row it isn't news, so it takes the row's own hue —
+     otherwise the one blue thing on a grey card reads as a stray highlight. */
+  .feature.backfilled .changes .label { color: var(--slate-deep); }
+  .feature.backfilled .changes li::before { background: var(--slate); }
 
   .removed-box { margin-top: 12px; background: var(--accent-deep); border-radius: 7px; overflow: hidden; break-inside: avoid; }
   .removed-box-content { background: var(--accent-pale); margin-left: 5px; padding: 13px 16px; font-size: 9.5pt; }
   .removed-box .name { font-family: var(--font-display); font-weight: 700; font-size: 11pt; color: var(--accent-deep); }
+  .removed-box.backfilled { background: var(--slate); }
+  .removed-box.backfilled .removed-box-content { background: var(--slate-soft); }
+  .removed-box.backfilled .name { color: var(--slate-deep); }
 
   .other-changes { margin-top: 30px; padding-top: 14px; border-top: 2px solid var(--accent); break-inside: avoid; }
   .other-changes h2 { font-family: var(--font-display); font-size: 15pt; font-weight: 700; }

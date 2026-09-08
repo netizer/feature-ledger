@@ -46,7 +46,10 @@ export class Feature {
 
     const current = entries[entries.length - 1];
     if (current.removed) {
-      return { version: current.version, removed: true, reason: current.reason };
+      return {
+        version: current.version, removed: true, reason: current.reason,
+        backfilled: current.backfilled === true,
+      };
     }
 
     const names = entries.map((h) => h.name).filter(Boolean);
@@ -59,6 +62,10 @@ export class Feature {
       dev_notes: current.dev_notes ?? null,
       changes: current.changes ?? null,
       removed: false,
+      // Set when this entry records something the audit found late: the
+      // product did not move at this version, the record did. The renderers
+      // draw it in a third, quieter register — see src/render/ledger-html.mjs.
+      backfilled: current.backfilled === true,
       renamedFrom,
     };
   }
@@ -83,12 +90,19 @@ export class Feature {
     if (this.subcategory) out.subcategory = this.subcategory;
     out.size = this.size;
     out.history = this.history.map((h) => {
-      if (h.removed) return { version: h.version, removed: true, reason: h.reason };
+      if (h.removed) {
+        const r = { version: h.version, removed: true, reason: h.reason };
+        if (h.backfilled) r.backfilled = true;
+        if (h.reason_inferred) r.reason_inferred = true;
+        return r;
+      }
       const e = { version: h.version };
       if (h.name) e.name = h.name;
       e.description = h.description;
       e.changes = h.changes ?? null;
       if (h.dev_notes) e.dev_notes = h.dev_notes;
+      if (h.backfilled) e.backfilled = true;
+      if (h.reason_inferred) e.reason_inferred = true;
       return e;
     });
     return out;
@@ -119,6 +133,24 @@ export class Feature {
 
     for (const h of this.history) {
       if (!Number.isInteger(h.version)) fail(`feature ${this.id}: every history entry needs an integer "version"`);
+      // Written only by an audit, and only ever true — an explicit `false`
+      // would be a third state to reason about in every renderer.
+      if ("backfilled" in h && h.backfilled !== true) {
+        fail(
+          `feature ${this.id} v${h.version}: "backfilled" is either absent or true (got ${JSON.stringify(h.backfilled)}). ` +
+          "It marks an entry an audit recorded after the fact; leave it out for ordinary work.",
+        );
+      }
+      // Deliberately absent from #stateAt, so no renderer can put it in front
+      // of a client: it says the reason came from an audit reading a commit
+      // message rather than from whoever made the decision, which is a note to
+      // the team. `ledger status` lists them; `ledger audit confirm` clears one.
+      if ("reason_inferred" in h && h.reason_inferred !== true) {
+        fail(
+          `feature ${this.id} v${h.version}: "reason_inferred" is either absent or true ` +
+          `(got ${JSON.stringify(h.reason_inferred)}).`,
+        );
+      }
       if (h.removed) {
         if (isBlank(h.reason)) fail(`feature ${this.id} v${h.version}: a removal needs a "reason"`);
         continue;

@@ -21,6 +21,7 @@
     "pdf-edition",
     "markdown-docs",
     "change-highlighting",
-    "client-branding"
+    "client-branding",
+    "codebase-audit"
   ]
 }

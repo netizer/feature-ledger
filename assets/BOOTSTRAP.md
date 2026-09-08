@@ -17,7 +17,7 @@ there to the end of this output, into a fresh agent session in the project
 root. Nothing in it is specific to one tool, and there is nothing after it
 that you need.
 
-═════════════════════  COPY EVERYTHING BELOW THIS LINE  ═════════════════════
+{copy_rule}
 
 You are cataloguing what {product} already does, into a feature ledger. This
 is an inventory of an existing codebase, not a record of anything you or I
@@ -147,6 +147,11 @@ work on this codebase started:
 
 ```
 git log --reverse --format=%ad --date=short | head -1
+```
+
+{audit_block}Then cut the release and print it:
+
+```
 ledger release cut --name "Baseline" --date <that date, or today if there's no history>
 ledger build
 ```

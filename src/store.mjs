@@ -17,6 +17,7 @@ export const LEDGER_DIRNAME = ".ledger";
  *     releases.json        the version timeline
  *     subcategories.json   optional sub-section headings
  *     other-changes.json   changes belonging to no single feature
+ *     audits.json          every audit so far, and the commit each was run against
  *     index.json           the deliberate corpus order
  *     features/<id>.json   one file per feature
  *     STYLE.md             optional prose tone, when style is "custom"
@@ -121,6 +122,7 @@ export class Project {
     this.subcategoriesPath = path.join(ledgerDir, "subcategories.json");
     this.otherChangesPath = path.join(ledgerDir, "other-changes.json");
     this.indexPath = path.join(ledgerDir, "index.json");
+    this.auditsPath = path.join(ledgerDir, "audits.json");
     this.featuresDir = path.join(ledgerDir, "features");
     this.themeCssPath = path.join(ledgerDir, "theme.css");
     this.load();
@@ -135,6 +137,7 @@ export class Project {
     this.subcategories = readOptional(this.subcategoriesPath, []);
     this.otherChangesList = readOptional(this.otherChangesPath, []);
     this.index = readOptional(this.indexPath, { order: [] }).order ?? [];
+    this.audits = readOptional(this.auditsPath, { audits: [] }).audits ?? [];
 
     const files = exists(this.featuresDir)
       ? fs.readdirSync(this.featuresDir).filter((f) => f.endsWith(".json")).sort()
@@ -216,6 +219,30 @@ export class Project {
     if (exists(p)) fs.unlinkSync(p);
     this.index = this.index.filter((x) => x !== id);
     this.saveIndex();
+  }
+
+  /**
+   * The last audit, or null. Every audit is kept rather than one scalar
+   * being overwritten: a scalar answers "is the record stale" and nothing
+   * else, where the log also answers "when was the last FULL sweep" — which
+   * matters, because only a full sweep can correct a capability the baseline
+   * survey missed. It is also what lets an edition carry an audit stamp.
+   */
+  get lastAudit() {
+    return this.audits.length ? this.audits[this.audits.length - 1] : null;
+  }
+
+  get lastFullAudit() {
+    return [...this.audits].reverse().find((a) => a.mode === "full") ?? null;
+  }
+
+  recordAudit(entry) {
+    this.audits.push(entry);
+    this.saveAudits();
+  }
+
+  saveAudits() {
+    writeJson(this.auditsPath, { audits: this.audits });
   }
 
   saveIndex() {

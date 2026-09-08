@@ -175,14 +175,20 @@ The survey is agent work: only something that can read the codebase can say
 what it does. The prompt runs start to finish without asking you anything: the
 agent lists the capabilities first — against the bar above — then decides
 whether the product needs areas at all, then writes the entries a batch at a
-time, and finally cuts and prints the baseline itself — the last three
-commands it runs being:
+time, and finally cuts and prints the baseline itself — the last four commands
+it runs being:
 
 ```bash
 ledger status
+ledger audit complete --full --commit a1b3f9c            # the survey IS a full sweep
 ledger release cut --name "Baseline" --date 2026-03-02   # the first commit's date
 ledger build
 ```
+
+That third command is what makes [the audit](#keeping-it-honest) useful from
+day one: the survey has just read the whole codebase against the record, so it
+is recorded as a full sweep, and everything that lands afterwards is measured
+against it. `ledger bootstrap --no-audit` leaves it out.
 
 Attempted in one pass the survey runs out of context and starts inventing; in
 batches it's reliable — so the prompt batches, but the agent moves between
@@ -259,6 +265,96 @@ nothing to strip by hand.
 Run `ledger rules` for the full authoring rules — the entry bar, sizing, the
 `user`/`dev` split, areas, sub-sections, removals, and where everything that
 *isn't* an entry goes instead.
+
+---
+
+## Keeping it honest
+
+Everything above keeps the ledger current for work done **through a coding
+agent that read the stanza**. Nothing keeps it current for the rest. A
+developer who doesn't use one, or uses one that never saw the instructions,
+ships a capability and the corpus never hears about it — and `ledger status`
+in a commit hook can't help, because it catches a corpus that's been *broken*,
+not one that's out of *date*.
+
+`ledger audit` is the parallel track. It reads the codebase against the record
+and prints a brief for a coding agent:
+
+```bash
+ledger audit                    # what has landed since the last sweep
+ledger audit --full             # the whole codebase
+```
+
+The CLI does the cheap half first — resolves the range, clusters the changed
+paths into batches, collects the commit subjects — so the agent gets a worked
+checklist instead of a diff. The agent works the batches, records what it
+finds, and stamps the commit it audited:
+
+```bash
+ledger audit complete --commit a1b3f9c
+```
+
+That stamp is a command, never a hand-edit, because it's the one field that
+makes a gap permanently invisible if it's set without the work being done.
+
+From then on the tool knows how much of the repository has never been
+examined, and says so at the moment it matters:
+
+```
+$ ledger release cut --name "Sprint 6 demo"
+ledger: 23 commits since the last audit (a1b3f9c, 12 September 2026), touching
+41 files outside the ledger, so this edition may be missing capabilities the
+client has already been given. Run `ledger audit` to sweep them, or pass
+--force to cut anyway.
+```
+
+It refuses rather than warns, but only when there's something real to report —
+a gate that fires on every cut is one people learn to `--force` past without
+reading.
+
+### What an audit finds, and how it prints
+
+An audit turns up things that were already true. They still land on the open
+release — *new* in a client edition means new **to the reader**, and this is
+the first document that has ever mentioned them — but they must not print as
+this release's work. So every write takes `--backfilled`, which draws the
+entry in a third register:
+
+| | |
+| --- | --- |
+| **green** | built this cycle |
+| **blue** | reworked this cycle |
+| **grey** | already in the product; this is the first edition to list it |
+
+> **Grey means the product didn't move this cycle — the record did.**
+
+Nothing is ever written into a past release, so every already-issued edition
+still reprints exactly as it was. The third register is deliberately not a
+fourth *hue*: green and blue are spoken for, an accent in that band is already
+refused (see [Branding](#branding-it-for-a-new-client)), and a fifth hue would
+squeeze every brand into reds, oranges, purples and browns. It's also not the
+same kind of fact — green and blue say the software moved; grey says the
+document caught up.
+
+A capability the audit finds is **gone** is reported too, in the same register
+and worded so it claims no date. A client learning that something was
+withdrawn and never mentioned is the most valuable thing an audit produces for
+them; a tool that decided on its own to withhold it would be worth less than
+one that reports everything. If a team doesn't want to report a particular
+one, that's an edit they make deliberately.
+
+### Reasons an audit had to infer
+
+`ledger update` refuses a change with no reason, and that rule doesn't relax
+after the fact — which is a problem, because the person who knew why may be
+long gone. So an audit takes the reason from the commit message and marks it
+`--reason-inferred`. Those entries show up in `ledger status` until someone
+vouches for the sentence (`ledger audit confirm <id>`) or rewrites it
+(`ledger reword <id>`). The audit writes first and asks afterwards, so an
+unattended run still lands its work, and the questions outlive the terminal it
+ran in.
+
+None of that reaches the client document. It's a note to the team.
 
 ---
 
@@ -528,6 +624,12 @@ Smalls just because that's the order things got written down in. It says
 nothing about how far down an entry may go; that's the entry bar's job, and
 it's the same bar in every project.
 
+**Three registers, two of them about the product.** Green means built this
+cycle and blue means reworked this cycle; grey means the entry was already
+true and this is simply the first edition to say so. The first two are facts
+about the software, the third is a fact about the record — which is why it's a
+neutral rather than a fourth hue, and why it reads quieter than either.
+
 **Two highlight semantics, on purpose.** The living Markdown docs tag New and
 Changed only while the target release is still in progress, so a shipped
 release's docs read as a clean present-tense list. The archival PDF always
@@ -567,6 +669,8 @@ Writing            (JSON payload on stdin or --file; --dry-run previews)
   ledger reword <id> [--version N]    better words, same thing; no history entry
   ledger rename <id> "New name" --why "…"
   ledger remove <id> --reason "…"
+      …add, update and remove all take --backfilled: the product didn't move
+      this cycle, the record did. See `ledger audit`.
   ledger other-change --audience user --description "…"
   ledger categories [list | add "Name" [--after "Other" | --before "Other"]
                           | rename "Old" "New" | remove "Name"]
@@ -575,6 +679,12 @@ Writing            (JSON payload on stdin or --file; --dry-run previews)
 Releases
   ledger release list
   ledger release cut --name "…" [--date YYYY-MM-DD] [--force]
+
+Auditing            (the periodic sweep of the codebase against the record)
+  ledger audit [--full] [--since SHA]     the brief, for a coding agent
+  ledger audit complete [--commit SHA]    stamp the audited commit (default HEAD)
+  ledger audit confirm <id>               vouch for a reason an audit inferred
+  ledger audit log [--json]               every audit so far
 
 Output
   ledger build [--md] [--pdf] [--version N|all] [--out DIR] [--html]
@@ -611,6 +721,7 @@ features/<id>.json   one feature, with its full history
 index.json           the deliberate corpus order (ties within a size band)
 subcategories.json   sub-section headings
 other-changes.json   changes belonging to no single feature
+audits.json          every audit so far, and the commit each was run against
 STYLE.md             optional, the project's own tone as prose
 theme.css            optional, appended last to the PDF stylesheet
 ```

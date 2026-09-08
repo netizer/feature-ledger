@@ -33,7 +33,8 @@ export function wording(config) {
         "",
         "**Big** = a capability the product is chosen for. **Medium** = a capability in its own right," +
         " inside a bigger one. **Small** = a capability narrow enough to describe in a line." +
-        " **New** = added this release. **Changed** = meaningfully changed this release.",
+        " **New** = added this release. **Changed** = meaningfully changed this release." +
+        " **Already in place** = part of the product already, listed here for the first time.",
       ].join("\n"),
     },
     extended: {
@@ -47,6 +48,16 @@ export function wording(config) {
       intro:
         "Implementation notes on parts of the system a client never sees." +
         " For client-facing features and their implementation notes, read the extended feature list.",
+    },
+    // The two labels for the third register: an entry the audit found late,
+    // where the product did not move this cycle — the record did. Green and
+    // blue say the software changed; these say the document caught up. They
+    // are worded as reassurance rather than confession, because the reader is
+    // a client: "already in place" says *you have this*, where "not
+    // previously documented" says *we were sloppy*.
+    tags: {
+      backfilled: "Already in place",
+      backfilled_removed: "No longer present",
     },
     pdf: {
       // The <em> is the one word that takes the accent colour on the cover.

@@ -44,6 +44,8 @@ async function payload(flags, { allow }) {
     reason: flags.reason,
     changes: flags.change ? asList(flags.change) : undefined,
     add_changes: flags["add-change"] ? asList(flags["add-change"]) : undefined,
+    backfilled: flags.backfilled ? true : undefined,
+    reason_inferred: flags["reason-inferred"] ? true : undefined,
   };
   for (const [k, v] of Object.entries(fromFlags)) if (v !== undefined) data[k] = v;
 
@@ -98,7 +100,7 @@ export async function cmdAdd({ flags, positional }) {
   const project = openProject(flags);
   const version = project.workingVersion;
   const data = await payload(flags, {
-    allow: ["id", "audience", "category", "subcategory", "size", "name", "description", "dev_notes"],
+    allow: ["id", "audience", "category", "subcategory", "size", "name", "description", "dev_notes", "backfilled"],
   });
 
   const id = positional[0] ?? data.id;
@@ -146,6 +148,11 @@ export async function cmdAdd({ flags, positional }) {
       description: data.description,
       changes: null,
       ...(data.dev_notes ? { dev_notes: data.dev_notes } : {}),
+      // --backfilled: the capability was already in the product, and this is
+      // simply the first edition to list it. It still lands on the open
+      // release — "new" in a client edition means new to the reader — but it
+      // prints in the third register rather than as this cycle's work.
+      ...(data.backfilled ? { backfilled: true } : {}),
     }],
   });
 
@@ -160,7 +167,7 @@ export async function cmdUpdate({ flags, positional }) {
   const feature = project.featureSet.find(id);
 
   const data = await payload(flags, {
-    allow: ["description", "changes", "add_changes", "name", "size", "category", "subcategory", "dev_notes"],
+    allow: ["description", "changes", "add_changes", "name", "size", "category", "subcategory", "dev_notes", "backfilled", "reason_inferred"],
   });
 
   if (feature.entryAt(version)?.removed) {
@@ -212,6 +219,15 @@ export async function cmdUpdate({ flags, positional }) {
 
   if (data.changes !== undefined) entry.changes = data.changes;
   if (data.add_changes !== undefined) entry.changes = [...(entry.changes ?? []), ...asList(data.add_changes)];
+  // A change an audit found late still has to say what moved and why — the
+  // rule below is not relaxed for it. All --backfilled changes is the
+  // register it prints in: the product moved before the last cutoff, so the
+  // client should not read this as work from the cycle just shipped.
+  if (data.backfilled) entry.backfilled = true;
+  // Set when an audit took the reason from a commit message rather than from
+  // whoever made the decision. It stays on the entry until someone vouches for
+  // the sentence, so the question outlives the terminal the audit ran in.
+  if (data.reason_inferred) entry.reason_inferred = true;
 
   // The rule that makes the ledger worth reading rather than a diff: a
   // feature that already existed can't quietly acquire a new description.
@@ -282,6 +298,9 @@ export async function cmdReword({ flags, positional }) {
       );
     }
     entry.changes = data.changes;
+    // Writing the bullet yourself is a stronger form of confirming it than
+    // `ledger audit confirm`, so an inferred reason stops being inferred here.
+    if (entry.reason_inferred) delete entry.reason_inferred;
     touched.push("changes");
   }
 
@@ -344,7 +363,14 @@ export async function cmdRemove({ flags, positional }) {
   }
 
   feature.history = feature.history.filter((h) => h.version !== version);
-  feature.history.push({ version, removed: true, reason: flags.reason });
+  feature.history.push({
+    version, removed: true, reason: flags.reason,
+    // A withdrawal an audit found late. It is still reported to the client —
+    // a capability that is gone and was never mentioned is exactly what a
+    // reader needs to know — but not as something taken away this cycle.
+    ...(flags.backfilled ? { backfilled: true } : {}),
+    ...(flags["reason-inferred"] ? { reason_inferred: true } : {}),
+  });
   feature.history.sort((a, b) => a.version - b.version);
 
   report(project, new Feature(feature.toJSON()), { dryRun: flags["dry-run"], verb: "removed" });

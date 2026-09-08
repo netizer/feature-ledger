@@ -1,9 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { writeJson, exists, fail, isBlank } from "../util.mjs";
+import { writeJson, exists, fail, isBlank, COPY_RULE } from "../util.mjs";
 import { LEDGER_DIRNAME, DEFAULT_CONFIG, DEFAULT_BRAND, COMMITTED_CLIENT_DIR, pdfsAreCommitted } from "../store.mjs";
 import { resolveStyle, styleTitle, styleLine, STYLES, CUSTOM_STYLE_ID } from "../style.mjs";
+import * as git from "../git.mjs";
 
 const PKG_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const asset = (name) => fs.readFileSync(path.join(PKG_ROOT, "assets", name), "utf8");
@@ -226,12 +227,14 @@ export async function cmdBootstrap({ flags }) {
   let product = "the product";
   let config = DEFAULT_CONFIG;
   let ledgerDir = null;
+  let projectRoot = null;
   try {
     const { openProject } = await import("../store.mjs");
     const project = openProject(flags);
     product = project.config.product;
     config = project.config;
     ledgerDir = project.ledgerDir;
+    projectRoot = project.root;
   } catch {
     // Printing the prompt before `ledger init` is still useful.
   }
@@ -239,6 +242,38 @@ export async function cmdBootstrap({ flags }) {
   process.stdout.write(
     asset("BOOTSTRAP.md")
       .replaceAll("{product}", product)
-      .replaceAll("{style_line}", styleLine(style)),
+      .replaceAll("{style_line}", styleLine(style))
+      .replaceAll("{audit_block}", auditBlock(flags, projectRoot))
+      .replaceAll("{copy_rule}", COPY_RULE),
   );
+}
+
+/**
+ * The survey IS a full audit — the agent has just read the whole codebase
+ * against the record — so the prompt ends by recording one. Without this the
+ * tool has no point to measure drift from, `ledger status` reports the
+ * codebase as never checked, and the `release cut` gate stays silent until
+ * somebody runs `ledger audit` by hand.
+ *
+ * Recorded before the cut on purpose, so the audit is logged against the
+ * release the entries actually went into rather than the empty one the cut
+ * opens behind it. The commit is the one HEAD is at now, not whatever HEAD has
+ * become by the time a long survey finishes.
+ *
+ * `--no-audit` leaves it out, for a survey that is deliberately partial.
+ */
+function auditBlock(flags, root) {
+  if (flags.audit === false) return "";
+  const sha = root ? git.head(root) : null;
+  return [
+    "This survey **is** a full audit: you have just read the whole codebase",
+    "against the record. Record that before you cut, so the tool knows the sweep",
+    "happened and can tell later how much has landed since:",
+    "",
+    "```",
+    `ledger audit complete --full${sha ? ` --commit ${sha}` : ""}`,
+    "```",
+    "",
+    "",
+  ].join("\n");
 }

@@ -63,10 +63,10 @@ export class MarkdownRenderer {
       // and its features stay quiet — a column of identical "New"s says
       // nothing the heading hasn't already said, and it would drown out the
       // one genuinely changed entry the release after.
-      const wholeThingNew = this.inProgress && this.allNew(members);
+      const whole = this.inProgress ? this.uniformTag(members) : null;
       const label = number === null ? `${i + 1}.` : `${number}.${i + 1}`;
-      lines.push("", `### ${label} ${sub.name}${wholeThingNew ? " **[New]**" : ""}`, "", `*${sub.intro}*`, "");
-      this.renderFeatures(members, lines, removedThisCycle, { extended, tag: !wholeThingNew });
+      lines.push("", `### ${label} ${sub.name}${whole ? ` **[${whole}]**` : ""}`, "", `*${sub.intro}*`, "");
+      this.renderFeatures(members, lines, removedThisCycle, { extended, tag: !whole });
     });
 
     // This closes out the whole category, so once sub-sections exist it has to
@@ -75,20 +75,41 @@ export class MarkdownRenderer {
     // Categories without sub-sections keep the lighter form.
     const trailer = (text) => (subs.length ? `### ${text}` : `**${text}:**`);
 
-    if (removedThisCycle.length) {
+    const gone = removedThisCycle.filter(([, s]) => !s.backfilled);
+    const goneEarlier = removedThisCycle.filter(([, s]) => s.backfilled);
+
+    if (gone.length) {
       lines.push("", trailer("No longer available as of this release"), "");
-      for (const [f, state] of removedThisCycle) lines.push(`- **${f.currentName}**: ${state.reason}`);
+      for (const [f, state] of gone) lines.push(`- **${f.currentName}**: ${state.reason}`);
+    }
+    // Withdrawn before the last cutoff and only now recorded. Kept apart from
+    // this release's news, and worded so it claims no date — the audit does no
+    // archaeology, so the release it went in is not known.
+    if (goneEarlier.length) {
+      lines.push("", trailer(`${this.words.tags.backfilled_removed}, recorded here for the first time`), "");
+      for (const [f, state] of goneEarlier) lines.push(`- **${f.currentName}**: ${state.reason}`);
     }
 
     return `${lines.join("\n")}\n`;
   }
 
-  /** Every feature in the list is arriving for the first time this cycle (as
-   *  opposed to some of them merely changing) — the condition for the
-   *  sub-section heading, rather than each bullet, carrying the tag. */
-  allNew(feats) {
+  /**
+   * The one tag the whole list shares, or null — the condition for the
+   * sub-section heading, rather than each bullet, carrying it.
+   *
+   * Two cases qualify: every feature arriving for the first time this cycle,
+   * and every feature being one an audit found late. Both are a single
+   * statement about the section, so the heading can make it once. A list of
+   * merely-changed entries never collapses: each one carries its own reason,
+   * which is the part worth reading.
+   */
+  uniformTag(feats) {
     const states = feats.map((f) => f.stateAt(this.target)).filter(Boolean);
-    return states.length > 0 && states.every((s) => !s.removed && s.version === this.target && s.changes === null);
+    if (!states.length) return null;
+    if (!states.every((s) => !s.removed && s.version === this.target)) return null;
+    if (states.every((s) => s.backfilled)) return this.words.tags.backfilled;
+    if (states.every((s) => !s.backfilled && s.changes === null)) return "New";
+    return null;
   }
 
   renderFeatures(feats, lines, removedThisCycle, { extended, tag = true }) {
@@ -106,7 +127,13 @@ export class MarkdownRenderer {
   bullet(f, state, { extended, tag }) {
     const tags = [f.size].filter(Boolean);
     const touched = tag && this.inProgress && state.version === this.target;
-    if (touched) tags.push(state.changes === null ? "New" : "Changed");
+    // Backfilled wins over both: the entry has a `changes` list like any
+    // other, and tagging it "Changed" would say the product moved this cycle.
+    if (touched) {
+      tags.push(state.backfilled
+        ? this.words.tags.backfilled
+        : (state.changes === null ? "New" : "Changed"));
+    }
 
     const name = state.renamedFrom ? `${state.name} (previously “${state.renamedFrom}”)` : state.name;
     // A colon, not a dash: the style guides rule the dash out, and the whole

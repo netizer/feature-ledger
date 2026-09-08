@@ -1,5 +1,6 @@
 import { openProject } from "../store.mjs";
 import { fail, isBlank, today, longDate } from "../util.mjs";
+import { unauditedReport, unauditedLine, unconfirmedReasons } from "./audit.mjs";
 
 const out = (s) => process.stdout.write(`${s}\n`);
 
@@ -40,6 +41,24 @@ function cut(flags) {
   const date = flags.date === true || isBlank(flags.date) ? today() : String(flags.date);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) fail(`--date must be YYYY-MM-DD (got ${date})`);
 
+  // Cutting is the moment a client document gets minted, so it is the moment to
+  // say how much of the repository has never been checked against the record.
+  // It refuses rather than warns — the same shape as the empty-release guard
+  // below — but only when there is something real to report: a gate that fires
+  // on every cut, because the last commit is always the one you just made, is a
+  // gate people learn to --force past without reading.
+  //
+  // Ahead of the empty-release guard on purpose. When both are true they have
+  // one cause — work landed and the ledger never heard about it — and this is
+  // the message that names it and says which command fixes it.
+  const unaudited = unauditedReport(project);
+  if (!unaudited.ok && !flags.force) {
+    fail(
+      `${unauditedLine(unaudited)}, so this edition may be missing capabilities the client has already been ` +
+      "given. Run `ledger audit` to sweep them, or pass --force to cut anyway.",
+    );
+  }
+
   const touched = project.featureSet.features().filter((f) => f.touchedAt(current.version)).length;
   const other = project.featureSet.otherChanges({ version: current.version }).length;
 
@@ -74,5 +93,11 @@ function cut(flags) {
   project.saveReleases();
   out(`cut v${current.version} — ${current.name} (${date}), covering ${touched} feature entr${touched === 1 ? "y" : "ies"}${other ? ` and ${other} other change${other === 1 ? "" : "s"}` : ""}`);
   out(`v${current.version + 1} is now the in-progress release; new work records against it.`);
+  const pending = unconfirmedReasons(project);
+  if (pending.length) {
+    out(`! ${pending.length} reason${pending.length === 1 ? "" : "s"} in this edition came from an audit reading a ` +
+      "commit message and nobody has confirmed them yet: " +
+      `${pending.map((x) => x.id).join(", ")}. \`ledger audit confirm <id>\` vouches for one.`);
+  }
   out(`Next: \`ledger build\` — this is the moment the client gets a PDF edition for v${current.version}.`);
 }

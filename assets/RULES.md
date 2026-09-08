@@ -250,6 +250,58 @@ There is nothing to tag and nothing to strip. A feature is marked **New** or
 currently in progress. When that release is cut, every tag from the cycle goes
 quiet on its own.
 
+## Recording something that was already there
+
+Sometimes the product moved before anyone wrote it down — a feature shipped
+without the ledger hearing about it, and an audit found it later. That entry
+still lands on the open release, because *new* in a client edition means new
+to the reader: this is the first document that has ever mentioned it. But it
+must not print as this release's work. A capability that has been in the
+product for two years is not what you built this sprint.
+
+So every write takes `--backfilled`:
+
+```
+ledger add report-export --backfilled  < ...
+ledger update booking-window --backfilled  < ...
+ledger remove invoices --backfilled --reason "No longer part of the product."
+```
+
+That draws the entry in a third register — grey, beside green for *new this
+cycle* and blue for *reworked this cycle*. **Grey means the product didn't
+move this cycle; the record did.**
+
+Use it only when the thing you're recording happened before the last release
+was cut. Work from the cycle in progress is ordinary work and takes no flag.
+Never guess which release something shipped in: the only question is
+before-or-after the last cutoff.
+
+A removal found this way is still reported to the client. A capability that is
+gone and was never mentioned is exactly what a reader needs to know, and the
+wording deliberately claims no date, because the release it went in isn't
+known.
+
+### Reasons you didn't get from a person
+
+`ledger update` refuses a change with no `changes` bullet, and that doesn't
+relax for an audit. Where the reason came from a commit message or a
+pull-request title rather than from whoever made the decision, pass
+`--reason-inferred` alongside it:
+
+```
+ledger update booking-window --backfilled --reason-inferred  < ...
+```
+
+The entry then shows up in `ledger status` until somebody vouches for the
+sentence — `ledger audit confirm <id>` accepts it as it stands, and
+`ledger reword <id>` rewrites it. Nothing about this reaches the client
+document; it's a note to the team.
+
+Never write a plausible-sounding reason you found no evidence for. If a commit
+message says nothing usable, record the change, pass `--reason-inferred`, and
+say in the bullet that the reason isn't recorded. An honest gap is worth more
+than a confident invention.
+
 ## Releases
 
 All work records against the open (in-progress) release. When a release is
@@ -263,6 +315,31 @@ ledger build
 That mints the archival PDF edition for what was just shown, and opens the
 next release for the work that follows. The PDF for an old release always
 reproduces what was presented at that moment, however long ago.
+
+## Auditing
+
+The rules above keep the ledger current for work done through a coding agent
+that read them. Nothing keeps it current for the rest — a developer who ships a
+capability without one leaves no trace in the corpus at all.
+
+`ledger audit` is the periodic sweep that finds them. It prints a brief for a
+coding agent, batched by subsystem, carrying the commit subjects over the range
+since the last sweep:
+
+```
+ledger audit                 what has landed since the last audit
+ledger audit --full          the whole codebase; the only mode that can
+                             correct a capability the baseline survey missed
+ledger audit complete --commit <sha>    stamp what was audited
+ledger audit log             every audit so far
+```
+
+The commit is stamped by the command, never written into the JSON by hand: it
+is the one field that makes a gap permanently invisible if it's set without the
+work being done.
+
+`ledger release cut` refuses when source has landed since the last audit and
+says how much; `--force` overrides it.
 
 ## Generating
 

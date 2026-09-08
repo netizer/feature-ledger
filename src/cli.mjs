@@ -6,6 +6,7 @@ import * as release from "./commands/release.mjs";
 import * as build from "./commands/build.mjs";
 import * as status from "./commands/status.mjs";
 import * as style from "./commands/style.mjs";
+import * as audit from "./commands/audit.mjs";
 
 const COMMANDS = {
   init: init.cmdInit,
@@ -28,6 +29,7 @@ const COMMANDS = {
   subcategory: write.cmdSubcategory,
 
   release: release.cmdRelease,
+  audit: audit.cmdAudit,
 
   build: build.cmdBuild,
 };
@@ -60,10 +62,18 @@ const HELP = `ledger — a versioned feature ledger for any codebase
     ledger other-change --audience user --description "..."
     ledger categories [list | add "Name" [--after "Other"] | rename "Old" "New" | remove "Name"]
     ledger subcategory [list | add | reword <id>]   { id, category, name, intro }
+    ledger add/update/remove --backfilled            the product did not move this cycle,
+                                                     the record did — see \`ledger audit\`
 
   Releases
     ledger release list
-    ledger release cut --name "..." [--date YYYY-MM-DD]
+    ledger release cut --name "..." [--date YYYY-MM-DD] [--force]
+
+  Auditing (the periodic sweep of the codebase against the record)
+    ledger audit [--full] [--since <sha>]     print the audit brief for a coding agent
+    ledger audit complete [--commit <sha>]    stamp the audited commit (default: HEAD)
+    ledger audit confirm <id>                 vouch for a reason an audit inferred
+    ledger audit log [--json]                 every audit so far
 
   Output
     ledger build [--md] [--pdf] [--version N|all] [--out DIR]
@@ -71,7 +81,9 @@ const HELP = `ledger — a versioned feature ledger for any codebase
   Setup
     ledger init [--product "Name"] [--accent "#hex"] [--logo path] [--agents auto|none|claude,agents,...]
                 [--style google|govuk|plain-language|ste] [--commit-pdfs]
-    ledger bootstrap                    prints the baseline-survey prompt for your coding agent
+    ledger bootstrap [--no-audit]       prints the baseline-survey prompt for your coding agent
+                                        (the survey is a full sweep, so the prompt ends by
+                                        recording one; --no-audit leaves that out)
 
   Global: --dir PATH (point at a .ledger directory), --json where offered.
   Full docs: the README in this package, or \`ledger rules\`.
@@ -98,7 +110,8 @@ export async function main(argv) {
   if (!fn) fail(`unknown command "${first}" — run \`ledger --help\``);
 
   const { flags, positional } = parseArgs(argv.slice(1), {
-    booleans: ["dry-run", "json", "history", "changed", "md", "pdf", "force", "quiet", "commit-pdfs"],
+    booleans: ["dry-run", "json", "history", "changed", "md", "pdf", "force", "quiet", "commit-pdfs",
+      "backfilled", "reason-inferred", "full"],
   });
   await fn({ flags, positional });
 }

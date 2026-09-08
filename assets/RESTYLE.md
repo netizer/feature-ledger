@@ -13,7 +13,7 @@ there to the end of this output, into a fresh agent session in the project
 root. Nothing in it is specific to one tool, and there is nothing after it
 that you need.
 
-═════════════════════  COPY EVERYTHING BELOW THIS LINE  ═════════════════════
+{copy_rule}
 
 You are rewriting the wording of an existing feature ledger for {product}, so
 that it reads as though it had always been written in one tone. There are
