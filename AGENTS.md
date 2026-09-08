@@ -33,6 +33,7 @@ states something a reader could confirm by using the product.
 A `changes` bullet says what the feature was before, and why it moved. Never
 invent a reason: ask.
 
-Do not run `ledger build` as part of an ordinary change. The generated docs are
-build output and are gitignored.
+Do not run `ledger build` as part of an ordinary change. The Markdown docs are
+gitignored build output; the client PDFs in `docs/client/` are committed, and
+are minted when a release is cut.
 <!-- /feature-ledger -->

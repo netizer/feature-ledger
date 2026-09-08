@@ -12,7 +12,7 @@
   "style": "google",
   "output": {
     "dir": "docs/generated",
-    "client_dir": "docs/generated/client",
+    "client_dir": "docs/client",
     "pdf_name": "{slug}-Feature-Ledger_{version}.pdf",
     "features": "FEATURES.md",
     "extended": "FEATURES_EXTENDED.md",

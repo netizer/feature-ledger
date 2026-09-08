@@ -1,7 +1,9 @@
 # .ledger
 
-The source of truth for this product's feature ledger. Commit all of it; the
-documents it generates are build output and are not committed.
+The source of truth for this product's feature ledger. Commit all of it.
+The Markdown documents it generates (`docs/generated/`) are build output and
+are not committed; the client editions in `docs/client/` are, so every
+document handed over stays in the repo.
 
 | File | What it is |
 | --- | --- |

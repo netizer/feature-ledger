@@ -18,7 +18,8 @@ live in one file every agent can read, and every operation is a CLI command).
 |  |  |
 | --- | --- |
 | **Corpus** | `.ledger/` — one JSON file per feature, plus the release timeline. Committed. |
-| **Generated** | `FEATURES.md`, `FEATURES_EXTENDED.md`, `DEV_FEATURES.md`, and a PDF per release. Gitignored build output. |
+| **Generated** | `FEATURES.md`, `FEATURES_EXTENDED.md`, `DEV_FEATURES.md` — gitignored build output — and a PDF per release, which a project can keep or regenerate. |
+| **Editions** | [`docs/client/`](docs/client) — this repo keeps its own, so you can open the document the tool actually produces. |
 | **Interface** | `ledger` — read, write, status, build. Nothing hand-edits the JSON. |
 
 ---
@@ -165,7 +166,10 @@ ledger init --product "Acme Portal"
 ```
 
 That creates `.ledger/`, points your agent files at it, and adds the generated
-docs directory to `.gitignore`. Then:
+docs directory to `.gitignore`.
+
+Add `--commit-pdfs` if the client editions should live in the repo — see
+[Where the documents go](#where-the-documents-go) — then:
 
 ```bash
 ledger bootstrap        # prints a survey prompt — paste it into your coding agent
@@ -340,9 +344,9 @@ strongest:
   landing; a hook that fires on every turn becomes noise the model learns to
   skim.
 
-**4. Keep it out of context the rest of the time.** The generated docs are
-gitignored build output — don't commit them and don't point `CLAUDE.md` at
-them. `FEATURES_EXTENDED.md` is genuinely useful for a human reading in, but
+**4. Keep it out of context the rest of the time.** The generated Markdown
+docs are gitignored build output — don't commit them and don't point
+`CLAUDE.md` at them. `FEATURES_EXTENDED.md` is genuinely useful for a human reading in, but
 an agent should reach for `ledger list` / `ledger show` instead, which is the
 same information at a fraction of the cost.
 
@@ -468,6 +472,44 @@ fonts, the style guide in force, and which browser will print.
 
 ---
 
+## Where the documents go
+
+`ledger build` writes two kinds of thing, and they don't want the same
+treatment. The three Markdown docs are read in the repo, regenerated on every
+build, and would fill a diff with noise; they are always gitignored build
+output. The PDF is what a client was actually handed on a given day, which
+some teams want the repo to keep and others would rather mint on demand.
+
+So `ledger init` asks once:
+
+```bash
+ledger init --product "Acme Portal"                 # docs/generated/client/ — build output
+ledger init --product "Acme Portal" --commit-pdfs   # docs/client/         — kept in the repo
+```
+
+|  | Markdown docs | Client PDFs |
+| --- | --- | --- |
+| default | `docs/generated/` — gitignored | `docs/generated/client/` — gitignored |
+| `--commit-pdfs` | `docs/generated/` — gitignored | `docs/client/` — **committed** |
+
+The only line `init` adds to `.gitignore` is `docs/generated/`, so the choice
+is just whether the client directory sits inside it. Committing the editions
+costs about 100 KB per release and buys an answer to "what exactly did we show
+them in March" that doesn't depend on the corpus still rendering the same way.
+Leaving them out keeps the repo to text, and any edition can be reprinted at
+any time with `ledger build --version N`.
+
+Either way the paths are `output.dir` and `output.client_dir` in
+`.ledger/config.json`, and changing them later is an edit to those two fields
+plus a matching `.gitignore` line. `ledger status` prints the resolved pair,
+and says which shape is in force.
+
+This repo runs its own ledger on itself with the editions kept:
+[`docs/client/`](docs/client) holds the v1 PDF, printed by the tool from the
+corpus in `.ledger/`.
+
+---
+
 ## How the model works
 
 **A feature is its history.** A version only appears in a feature's history
@@ -542,7 +584,7 @@ Output
 
 Setup
   ledger init [--product "…"] [--accent "#hex"] [--logo PATH] [--agents …]
-              [--style google|govuk|plain-language|ste]
+              [--style google|govuk|plain-language|ste] [--commit-pdfs]
   ledger bootstrap
 ```
 

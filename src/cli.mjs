@@ -70,7 +70,7 @@ const HELP = `ledger — a versioned feature ledger for any codebase
 
   Setup
     ledger init [--product "Name"] [--accent "#hex"] [--logo path] [--agents auto|none|claude,agents,...]
-                [--style google|govuk|plain-language|ste]
+                [--style google|govuk|plain-language|ste] [--commit-pdfs]
     ledger bootstrap                    prints the baseline-survey prompt for your coding agent
 
   Global: --dir PATH (point at a .ledger directory), --json where offered.
@@ -98,7 +98,7 @@ export async function main(argv) {
   if (!fn) fail(`unknown command "${first}" — run \`ledger --help\``);
 
   const { flags, positional } = parseArgs(argv.slice(1), {
-    booleans: ["dry-run", "json", "history", "changed", "md", "pdf", "force", "quiet"],
+    booleans: ["dry-run", "json", "history", "changed", "md", "pdf", "force", "quiet", "commit-pdfs"],
   });
   await fn({ flags, positional });
 }

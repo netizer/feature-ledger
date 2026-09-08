@@ -19,8 +19,8 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-smoke-"));
 let failures = 0;
 const log = (s) => process.stdout.write(`${s}\n`);
 
-function run(args, { stdin = "", expect = "ok" } = {}) {
-  const r = spawnSync("node", [BIN, ...args], { cwd: dir, input: stdin, encoding: "utf8" });
+function run(args, { stdin = "", expect = "ok", cwd = dir } = {}) {
+  const r = spawnSync("node", [BIN, ...args], { cwd, input: stdin, encoding: "utf8" });
   const output = `${r.stdout}${r.stderr}`;
   const ok = r.status === 0;
   if ((expect === "ok") !== ok) {
@@ -161,6 +161,28 @@ if (pdf.includes("wrote")) {
   const file = path.join(dir, "docs/generated/client/Testbed-Feature-Ledger_2.pdf");
   assert("the PDF edition is a real PDF", fs.existsSync(file) && fs.readFileSync(file).subarray(0, 4).toString() === "%PDF");
 }
+
+// The other output shape: a project that keeps its client editions. The
+// Markdown docs stay build output either way; only the PDFs move, out of the
+// one directory `init` gitignores.
+const kept = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-kept-"));
+run(["init", "--product", "Kept", "--agents", "none", "--commit-pdfs"], { cwd: kept });
+const keptConfig = JSON.parse(fs.readFileSync(path.join(kept, ".ledger/config.json"), "utf8"));
+assert("--commit-pdfs puts the editions outside the gitignored directory", keptConfig.output.client_dir === "docs/client");
+assert(
+  "…and the ignored directory still covers only the Markdown docs",
+  fs.readFileSync(path.join(kept, ".gitignore"), "utf8").split("\n").filter(Boolean).join() === "docs/generated/",
+);
+run(["add", "kept-one"], {
+  cwd: kept,
+  stdin: feature({ audience: "user", size: "Medium", name: "Kept one", description: "Does the kept thing." }),
+});
+run(["build", "--pdf", "--html"], { cwd: kept });
+assert(
+  "…and `ledger build` prints the edition there",
+  fs.existsSync(path.join(kept, "docs/client/Kept-Feature-Ledger_1.html")),
+);
+fs.rmSync(kept, { recursive: true, force: true });
 
 log("");
 if (failures) {

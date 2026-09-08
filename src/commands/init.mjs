@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { writeJson, exists, fail, isBlank } from "../util.mjs";
-import { LEDGER_DIRNAME, DEFAULT_CONFIG, DEFAULT_BRAND } from "../store.mjs";
+import { LEDGER_DIRNAME, DEFAULT_CONFIG, DEFAULT_BRAND, COMMITTED_CLIENT_DIR, pdfsAreCommitted } from "../store.mjs";
 import { resolveStyle, styleTitle, styleLine, STYLES, CUSTOM_STYLE_ID } from "../style.mjs";
 
 const PKG_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -33,7 +33,20 @@ const END_MARKER = "<!-- /feature-ledger -->";
  *  than left one command away. */
 function stanzaFor(config, ledgerDir) {
   const style = resolveStyle(config, ledgerDir);
-  return asset("agent-pointer.md").replaceAll("{style_line}", styleLine(style));
+  return asset("agent-pointer.md")
+    .replaceAll("{style_line}", styleLine(style))
+    .replaceAll("{build_line}", buildLine(config));
+}
+
+function buildLine(config) {
+  const lead = "Do not run `ledger build` as part of an ordinary change.";
+  if (!pdfsAreCommitted(config)) {
+    return `${lead} The generated docs are\nbuild output and are gitignored.`;
+  }
+  const dir = String(config.output.client_dir).replace(/\/+$/, "");
+  return `${lead} The Markdown docs are\n` +
+    `gitignored build output; the client PDFs in \`${dir}/\` are committed, and\n` +
+    "are minted when a release is cut.";
 }
 
 /** Replace the marked block in every agent file that has one. Used when the
@@ -57,6 +70,18 @@ export function refreshAgents(root, config, ledgerDir) {
   return { updated, stale };
 }
 
+/** The one line in `.ledger/README.md` that depends on where the editions go. */
+function ledgerReadmeOutputLine(config) {
+  const dir = String(config.output.dir).replace(/\/+$/, "");
+  const clientDir = String(config.output.client_dir).replace(/\/+$/, "");
+  if (!pdfsAreCommitted(config)) {
+    return `The documents it generates (\`${dir}/\`) are build output and are not\ncommitted.`;
+  }
+  return `The Markdown documents it generates (\`${dir}/\`) are build output and\n` +
+    `are not committed; the client editions in \`${clientDir}/\` are, so every\n` +
+    "document handed over stays in the repo.";
+}
+
 function styleFlag(flags) {
   const id = flags.style && flags.style !== true ? String(flags.style) : DEFAULT_CONFIG.style;
   if (id !== CUSTOM_STYLE_ID && !STYLES[id]) {
@@ -77,6 +102,13 @@ export async function cmdInit({ flags }) {
     ? String(flags.product)
     : path.basename(root);
 
+  // Two shapes, one choice: the client editions are either build output
+  // alongside the Markdown docs (the default — regenerate them from the
+  // corpus whenever they're wanted), or a committed record of every document
+  // that has actually been handed over, which is what a project wants when
+  // "what did we show them in March" has to be answerable from the repo.
+  const commitPdfs = flags["commit-pdfs"] === true;
+
   const config = {
     ...DEFAULT_CONFIG,
     product,
@@ -87,6 +119,10 @@ export async function cmdInit({ flags }) {
     // survey of the codebase is what decides the areas.
     categories: [],
     style: styleFlag(flags),
+    output: {
+      ...DEFAULT_CONFIG.output,
+      client_dir: commitPdfs ? COMMITTED_CLIENT_DIR : DEFAULT_CONFIG.output.client_dir,
+    },
   };
 
   const brand = {
@@ -109,9 +145,15 @@ export async function cmdInit({ flags }) {
   if (!exists(path.join(ledgerDir, "subcategories.json"))) writeJson(path.join(ledgerDir, "subcategories.json"), []);
   if (!exists(path.join(ledgerDir, "other-changes.json"))) writeJson(path.join(ledgerDir, "other-changes.json"), []);
   if (!exists(path.join(ledgerDir, "index.json"))) writeJson(path.join(ledgerDir, "index.json"), { order: [] });
-  fs.writeFileSync(path.join(ledgerDir, "README.md"), asset("ledger-dir-README.md"));
+  fs.writeFileSync(
+    path.join(ledgerDir, "README.md"),
+    asset("ledger-dir-README.md").replaceAll("{output_line}", ledgerReadmeOutputLine(config)),
+  );
 
   out(`created ${path.relative(root, ledgerDir) || ledgerDir}/`);
+  out(commitPdfs
+    ? `client editions: ${config.output.client_dir}/ — committed, so every document handed over stays in the repo`
+    : `client editions: ${config.output.client_dir}/ — build output, regenerated from the corpus (\`ledger init --commit-pdfs\` keeps them in the repo instead)`);
 
   const written = wireAgents(root, flags.agents ?? "auto", config, ledgerDir);
   for (const f of written) out(`pointed ${f} at the ledger`);

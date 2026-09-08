@@ -60,6 +60,10 @@ export const DEFAULT_CONFIG = {
   style: "google",
   output: {
     dir: "docs/generated",
+    // Inside `dir`, so the default is that every generated document —
+    // Markdown and PDF alike — is build output the corpus can reproduce.
+    // `ledger init --commit-pdfs` moves this to COMMITTED_CLIENT_DIR, which
+    // sits outside the ignored directory on purpose.
     client_dir: "docs/generated/client",
     pdf_name: "{slug}-Feature-Ledger_{version}.pdf",
     features: "FEATURES.md",
@@ -68,6 +72,24 @@ export const DEFAULT_CONFIG = {
   },
   docs: {},
 };
+
+/** Where the client editions go when a project chooses to keep them. Outside
+ *  `output.dir`, so the one .gitignore line `ledger init` writes covers the
+ *  Markdown docs and leaves the PDFs alone. */
+export const COMMITTED_CLIENT_DIR = "docs/client";
+
+/** Which of the two shapes a project is in, read back off the paths rather
+ *  than stored as a second flag that could disagree with them: the editions
+ *  are kept if their directory sits outside the one line `init` gitignores.
+ *  The wording in the agent stanza, in `.ledger/README.md` and in
+ *  `ledger status` all comes from this, so a project that edits the paths by
+ *  hand still gets told the truth. */
+export function pdfsAreCommitted(config) {
+  const trim = (p) => String(p).replace(/\/+$/, "");
+  const dir = trim(config.output.dir);
+  const clientDir = trim(config.output.client_dir);
+  return clientDir !== dir && !clientDir.startsWith(`${dir}/`);
+}
 
 export const DEFAULT_BRAND = {
   name: null,          // falls back to config.product

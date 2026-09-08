@@ -10,6 +10,14 @@
       "description": "The command ledger init creates a .ledger directory holding the whole corpus: the product name, the accent colour and the style guide you chose, and version 1 open as the release in progress. Everything the tool needs sits in that one directory, so a Python, Go or Rails repo looks identical to it. Setup also adds the generated documents to .gitignore, because the corpus is the part you commit.",
       "changes": null,
       "dev_notes": "src/commands/init.mjs. Flags: --product, --accent, --logo, --agents, --style, --tagline, --prepared-for, --force, --no-gitignore. DEFAULT_CONFIG and DEFAULT_BRAND are in src/store.mjs; the categories list is deliberately empty at init."
+    },
+    {
+      "version": 2,
+      "description": "The command ledger init creates a .ledger directory holding the whole corpus: the product name, the accent colour and the style guide you chose, and version 1 open as the release in progress. Everything the tool needs sits in that one directory, so a Python, Go or Rails repo looks identical to it. Setup also settles where the generated documents go. The Markdown docs are build output and are added to .gitignore. The PDF editions for the client are build output too, unless you run ledger init --commit-pdfs, which keeps them in docs/client so every document handed over stays in the repo.",
+      "changes": [
+        "The client PDFs were written inside the gitignored output directory, with no way to keep them. A team that hands a printed edition to a client at each release wants the repo to hold what was handed over, so where the editions land is now a choice made once at setup."
+      ],
+      "dev_notes": "src/commands/init.mjs. Flags: --product, --accent, --logo, --agents, --style, --tagline, --prepared-for, --commit-pdfs, --force, --no-gitignore. DEFAULT_CONFIG, DEFAULT_BRAND and COMMITTED_CLIENT_DIR are in src/store.mjs; the categories list is deliberately empty at init. --commit-pdfs only moves output.client_dir out of output.dir, which is the single line added to .gitignore; pdfsAreCommitted() derives the shape from that pair and picks the wording for the agent stanza, .ledger/README.md and `ledger status`."
     }
   ]
 }

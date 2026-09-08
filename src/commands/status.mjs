@@ -1,5 +1,5 @@
 import path from "node:path";
-import { openProject } from "../store.mjs";
+import { openProject, pdfsAreCommitted } from "../store.mjs";
 import { exists } from "../util.mjs";
 import { resolveBrand, accentCollides } from "../render/brand.mjs";
 import { fontFaceCss } from "../render/fonts.mjs";
@@ -77,6 +77,7 @@ export async function cmdStatus({ flags }) {
   field("project", setup.project);
   field("ledger", setup.ledger_dir);
   field("style", setup.style);
+  field("output", setup.output);
   field("accent", setup.accent);
   field("masthead", setup.masthead);
   field("fonts", setup.fonts);
@@ -145,6 +146,8 @@ function setupReport(project) {
   return {
     project: project.root,
     ledger_dir: `${path.relative(project.root, project.ledgerDir)}/`,
+    output: `${project.config.output.dir}/ (docs) · ${project.config.output.client_dir}/ ` +
+      `(client editions, ${pdfsAreCommitted(project.config) ? "kept in the repo" : "build output"})`,
     style,
     accent: `${brand.accent} → deep ${brand.accent_deep} · quiet ${brand.accent_quiet} · mid ${brand.accent_mid} · pale ${brand.accent_pale}`,
     masthead: brand.logo ?? `wordmark “${brand.name}”`,

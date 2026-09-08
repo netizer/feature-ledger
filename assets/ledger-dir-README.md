@@ -1,7 +1,7 @@
 # .ledger
 
-The source of truth for this product's feature ledger. Commit all of it; the
-documents it generates are build output and are not committed.
+The source of truth for this product's feature ledger. Commit all of it.
+{output_line}
 
 | File | What it is |
 | --- | --- |

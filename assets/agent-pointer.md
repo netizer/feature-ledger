@@ -31,6 +31,5 @@ states something a reader could confirm by using the product.
 A `changes` bullet says what the feature was before, and why it moved. Never
 invent a reason: ask.
 
-Do not run `ledger build` as part of an ordinary change. The generated docs are
-build output and are gitignored.
+{build_line}
 <!-- /feature-ledger -->
