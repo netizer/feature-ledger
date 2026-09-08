@@ -19,7 +19,7 @@ live in one file every agent can read, and every operation is a CLI command).
 | --- | --- |
 | **Corpus** | `.ledger/` — one JSON file per feature, plus the release timeline. Committed. |
 | **Generated** | `FEATURES.md`, `FEATURES_EXTENDED.md`, `DEV_FEATURES.md` — gitignored build output — and a PDF per release, which a project can keep or regenerate. |
-| **Editions** | [`docs/client/`](docs/client) — this repo keeps its own, so you can open the document the tool actually produces. |
+| **Editions** | [`docs/client/`](docs/client) — this repo keeps its own, so you can open the document the tool actually produces. Start with [the v2 PDF](docs/client/feature-ledger-Feature-Ledger_2.pdf) to see what a client is handed. |
 | **Interface** | `ledger` — read, write, status, build. What it records goes through the CLI; how it's worded is a text edit. |
 
 ---
@@ -749,8 +749,10 @@ plus a matching `.gitignore` line. `ledger status` prints the resolved pair,
 and says which shape is in force.
 
 This repo runs its own ledger on itself with the editions kept:
-[`docs/client/`](docs/client) holds the v1 PDF, printed by the tool from the
-corpus in `.ledger/`.
+[`docs/client/`](docs/client) holds one PDF per release, printed by the tool
+from the corpus in `.ledger/`. The latest,
+[`feature-ledger-Feature-Ledger_2.pdf`](docs/client/feature-ledger-Feature-Ledger_2.pdf),
+is the clearest example of what this product produces.
 
 ---
 
