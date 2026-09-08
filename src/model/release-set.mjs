@@ -9,6 +9,13 @@ import { fail, isBlank } from "../util.mjs";
  * stands for work in progress and carries no date yet. Everything an agent
  * writes lands on that future release; `ledger release cut` is what turns it
  * into a real one and opens the next.
+ *
+ * A released one also records the commit it was cut at, wherever the project
+ * is in git. The date alone can't identify an edition — two demos in one day
+ * are ordinary — so the commit is what says which state of the product an
+ * edition was printed from, and what makes two same-day releases tellable
+ * apart. It is null for a release cut outside a repository, and for every
+ * release cut before this was recorded.
  */
 export class ReleaseSet {
   constructor(raw) {
@@ -47,7 +54,9 @@ export class ReleaseSet {
   }
 
   toJSON() {
-    return this.releases.map(({ version, name, date, status }) => ({ version, name, date, status }));
+    return this.releases.map(({ version, name, date, status, commit }) => ({
+      version, name, date, status, commit: commit ?? null,
+    }));
   }
 
   validate() {
@@ -64,6 +73,11 @@ export class ReleaseSet {
         fail(`release ${r.version}: status must be "released" or "future"`);
       }
       if (r.released && isBlank(r.date)) fail(`release ${r.version}: released releases need a date`);
+      // Not required: a project with no repository, and every release cut
+      // before commits were recorded, legitimately has none.
+      if (r.commit != null && !/^[0-9a-f]{7,40}$/.test(String(r.commit))) {
+        fail(`release ${r.version}: "commit" must be a git sha (got ${JSON.stringify(r.commit)})`);
+      }
       if (r.released && isBlank(r.name)) fail(`release ${r.version}: released releases need a name`);
     }
   }

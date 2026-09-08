@@ -117,6 +117,7 @@ function releaseReport(project) {
     version: target,
     status: rel.status,
     name: rel.name,
+    commit: rel.commit ?? null,
     added: added.map((f) => f.id),
     changed: changed.map((f) => f.id),
     removed: removed.map((f) => f.id),

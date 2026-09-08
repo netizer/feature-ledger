@@ -67,7 +67,9 @@ const HELP = `ledger — a versioned feature ledger for any codebase
 
   Releases
     ledger release list
-    ledger release cut --name "..." [--date YYYY-MM-DD] [--force]
+    ledger release cut --name "..." [--date YYYY-MM-DD] [--commit SHA] [--force]
+                                        records the commit it was cut at, so two
+                                        editions on one day stay tellable apart
 
   Auditing (the periodic sweep of the codebase against the record)
     ledger audit [--full] [--since <sha>]     print the audit brief for a coding agent

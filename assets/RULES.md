@@ -364,6 +364,17 @@ That mints the archival PDF edition for what was just shown, and opens the
 next release for the work that follows. The PDF for an old release always
 reproduces what was presented at that moment, however long ago.
 
+A cut also records the commit it happened at. The date is too coarse to name
+the moment on its own — two demos in one day are ordinary, and the document
+cut this morning is not the one cut this afternoon — so the commit is what
+says which state of the product an edition was printed from. Two releases can
+share a date freely; what's refused is one that shares a date *and* a commit
+with the release before it, because then there is nothing to tell the two
+editions apart. `--force` covers a deliberate re-issue, and `--commit <sha>`
+cuts a release retrospectively at a known point.
+
+`ledger release list` prints the timeline with each release's commit.
+
 ## Auditing
 
 The rules above keep the ledger current for work done through a coding agent

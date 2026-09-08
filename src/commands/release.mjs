@@ -1,6 +1,7 @@
 import { openProject } from "../store.mjs";
 import { fail, isBlank, today, longDate } from "../util.mjs";
 import { unauditedReport, unauditedLine, unconfirmedReasons } from "./audit.mjs";
+import * as git from "../git.mjs";
 
 const out = (s) => process.stdout.write(`${s}\n`);
 
@@ -16,8 +17,42 @@ function list(flags) {
   for (const r of project.releases.releases) {
     const touched = project.featureSet.features().filter((f) => f.touchedAt(r.version)).length;
     const when = r.future ? "in progress" : longDate(r.date);
-    out(`v${String(r.version).padStart(2)}  ${(when ?? "").padEnd(20)} ${r.name ?? "(unnamed)"}  · ${touched} entr${touched === 1 ? "y" : "ies"}`);
+    // The commit is what tells two editions cut on one day apart, so it goes
+    // in the listing rather than only in the file.
+    const at = r.commit ? `  ${git.shortSha(r.commit)}` : "";
+    out(`v${String(r.version).padStart(2)}  ${(when ?? "").padEnd(20)}${at.padEnd(10)} ${r.name ?? "(unnamed)"}  · ${touched} entr${touched === 1 ? "y" : "ies"}`);
   }
+}
+
+/**
+ * The commit this edition stands for.
+ *
+ * An edition is a snapshot of the product at a moment, and the date is too
+ * coarse to name that moment: two demos in one day are ordinary, and a
+ * document cut this morning and one cut this afternoon are two different
+ * products. The commit is what says which. `--commit` cuts a release
+ * retrospectively at a known point, verified the same way `ledger audit
+ * complete` verifies its own — a sha this history has never seen is a typo,
+ * not a release.
+ *
+ * Null outside a repository. That is a real project shape, not an error, and
+ * everything downstream treats a missing commit as "not recorded".
+ */
+function resolveCutCommit(project, flags) {
+  const root = project.root;
+  const asked = flags.commit && flags.commit !== true ? String(flags.commit) : null;
+  if (!git.available(root)) {
+    if (asked) fail("--commit needs a git repository; this project has none");
+    return null;
+  }
+  if (!asked) return git.head(root);
+
+  const sha = git.resolve(root, asked);
+  if (!sha) fail(`no commit ${asked} in this repository`);
+  if (!git.isAncestor(root, sha)) {
+    fail(`${git.shortSha(sha)} isn't an ancestor of HEAD, so this release can't have been cut at it`);
+  }
+  return sha;
 }
 
 /**
@@ -40,6 +75,23 @@ function cut(flags) {
 
   const date = flags.date === true || isBlank(flags.date) ? today() : String(flags.date);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) fail(`--date must be YYYY-MM-DD (got ${date})`);
+
+  const commit = resolveCutCommit(project, flags);
+
+  // Two releases on one day are ordinary — a morning demo and an afternoon one
+  // are two real moments — so the date alone was never the thing that
+  // identified an edition. What can't happen is a release that is
+  // indistinguishable from the one before it: same day, same code. That is a
+  // re-issue of an edition already printed, and --force is how you say you
+  // meant it.
+  const previous = project.releases.predecessorOf(current.version);
+  if (previous && !flags.force && previous.date === date && previous.commit && previous.commit === commit) {
+    fail(
+      `v${previous.version} (${previous.name}) was also cut on ${date} at ${git.shortSha(commit)}, so this ` +
+      "release would stand for the same day and the same code — there is nothing to tell the two editions " +
+      "apart. Cut it at a later commit, or pass --force if you really are re-issuing the same moment.",
+    );
+  }
 
   // Cutting is the moment a client document gets minted, so it is the moment to
   // say how much of the repository has never been checked against the record.
@@ -76,11 +128,13 @@ function cut(flags) {
 
   current.name = flags.name;
   current.date = date;
+  current.commit = commit;
   current.status = "released";
   current.future = false;
   current.released = true;
   project.releases.releases.push({
-    version: current.version + 1, name: null, date: null, status: "future", future: true, released: false,
+    version: current.version + 1, name: null, date: null, commit: null,
+    status: "future", future: true, released: false,
   });
 
   if (flags["dry-run"]) {
@@ -91,7 +145,8 @@ function cut(flags) {
 
   project.releases.validate();
   project.saveReleases();
-  out(`cut v${current.version} — ${current.name} (${date}), covering ${touched} feature entr${touched === 1 ? "y" : "ies"}${other ? ` and ${other} other change${other === 1 ? "" : "s"}` : ""}`);
+  out(`cut v${current.version} — ${current.name} (${date}${commit ? `, ${git.shortSha(commit)}` : ""}), covering ` +
+    `${touched} feature entr${touched === 1 ? "y" : "ies"}${other ? ` and ${other} other change${other === 1 ? "" : "s"}` : ""}`);
   out(`v${current.version + 1} is now the in-progress release; new work records against it.`);
   const pending = unconfirmedReasons(project);
   if (pending.length) {

@@ -300,6 +300,37 @@ assert(
 );
 const incremental = run(["audit"], { cwd: repo });
 assert("the brief then reads as a range, not a sweep", incremental.includes("incremental") && incremental.includes("Add the two thing"));
+// A release is a moment, and a date is too coarse to name one: two demos in a
+// day are ordinary. The commit says which state of the product an edition was
+// printed from, so two same-day releases stay tellable apart.
+const cutJson = () => JSON.parse(fs.readFileSync(path.join(repo, ".ledger/releases.json"), "utf8"));
+assert("a cut records the commit it happened at", /^[0-9a-f]{40}$/.test(cutJson()[0].commit ?? ""));
+
+fs.writeFileSync(path.join(repo, "src/app.js"), "one\ntwo\nthree\n");
+git("add", "-A");
+git("commit", "-qm", "Add the three thing");
+run(["add", "two"], {
+  cwd: repo,
+  stdin: feature({ audience: "user", size: "Small", name: "Two", description: "Does the two thing." }),
+});
+run(["audit", "complete"], { cwd: repo });
+// Same day as v2, but the code has moved — two real moments, two real editions.
+run(["release", "cut", "--name", "Same day, later", "--date", "2026-02-01"], { cwd: repo });
+const timeline = cutJson();
+assert("two releases can share a date when the code moved between them",
+  timeline[1].date === timeline[2].date && timeline[1].commit !== timeline[2].commit);
+// Same day AND same commit is a re-issue of an edition already printed.
+run(["add", "three"], {
+  cwd: repo,
+  stdin: feature({ audience: "user", size: "Small", name: "Three", description: "Does the third thing." }),
+});
+assert("…but not when the day and the code are both the same",
+  run(["release", "cut", "--name", "Again", "--date", "2026-02-01"], { cwd: repo, expect: "fail" })
+    .includes("nothing to tell the two editions apart"));
+assert("…which --force still allows, as a deliberate re-issue",
+  run(["release", "cut", "--name", "Again", "--date", "2026-02-01", "--force"], { cwd: repo }).includes("cut v4"));
+assert("the timeline lists each release's commit", /[0-9a-f]{7}  Same day, later/.test(run(["release", "list"], { cwd: repo })));
+
 fs.rmSync(repo, { recursive: true, force: true });
 
 log("");

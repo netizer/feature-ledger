@@ -10,6 +10,14 @@
       "description": "The command ledger release cut gives the release in progress its name and date and opens the next one behind it, which is where everything recorded from then on lands. The release just cut becomes an edition that never changes again, and ledger release list shows the timeline with the number of entries each release covers. Cutting a release with nothing recorded against it is refused, because the edition would be identical to the one before it.",
       "changes": null,
       "dev_notes": "src/commands/release.mjs; the timeline is .ledger/releases.json, validated as 1..N with at most one trailing future release. --force covers a deliberate re-issue."
+    },
+    {
+      "version": 2,
+      "description": "The command ledger release cut gives the release in progress its name and date and opens the next one behind it, which is where everything recorded from then on lands. It also records the commit the cut happened at, so an edition says which state of the product it was printed from rather than only which day, and two demos in one day stay two tellable-apart editions. The release just cut becomes an edition that never changes again, and ledger release list shows the timeline with each release's commit and the number of entries it covers. Cutting a release with nothing recorded against it is refused, as is one that would stand for the same day and the same commit as the release before it.",
+      "changes": [
+        "A release was a name and a date, and the date was doing work it could not do: two demos in one day are ordinary, and nothing said which of the two editions a reader was holding or which state of the code it came from. Every cut now records its commit. Sharing a date is still fine — sharing a date and a commit is refused, because at that point the two editions stand for the same moment, and --force covers a deliberate re-issue."
+      ],
+      "dev_notes": "src/commands/release.mjs. The commit comes from HEAD, or from --commit for a retrospective cut, verified as an ancestor of HEAD the same way `ledger audit complete` verifies its own. It is null outside a repository, which is a real project shape rather than an error, so releases.json carries it as nullable and ReleaseSet only type-checks it — an existing corpus has none, and failing to load one would be a breaking change. The duplicate guard lives in cut() rather than in validate() for the same reason."
     }
   ]
 }

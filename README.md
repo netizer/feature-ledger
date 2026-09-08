@@ -262,6 +262,14 @@ That mints the archival PDF for what was just shown, and opens the next
 release. Every New/Changed tag from the cycle goes quiet on its own; there's
 nothing to strip by hand.
 
+The cut also records the commit it happened at, because a date is too coarse
+to name the moment: two demos in one day are ordinary, and the document cut
+this morning isn't the one cut this afternoon. Two releases can share a date
+freely — what's refused is one sharing a date *and* a commit with the release
+before it, since then nothing tells the two editions apart. `--force` covers a
+deliberate re-issue, `--commit <sha>` cuts retrospectively at a known point,
+and `ledger release list` prints the timeline with each commit against it.
+
 Run `ledger rules` for the full authoring rules — the entry bar, sizing, the
 `user`/`dev` split, areas, sub-sections, removals, and where everything that
 *isn't* an entry goes instead.
@@ -605,6 +613,11 @@ corpus in `.ledger/`.
 
 ## How the model works
 
+**A release is a moment, named by a commit.** Every cut records the sha it
+happened at, so an edition says which state of the product it was printed
+from rather than only which day. That's what lets two demos in one day be two
+real releases.
+
 **A feature is its history.** A version only appears in a feature's history
 when something about it actually changed; absent versions mean "still whatever
 the last entry said". That's what makes "what did this look like at version
@@ -716,7 +729,7 @@ fast loop when you're tuning `theme.css`.
 ```
 config.json          product, the area list (= reading order; may be empty), tone, wording overrides
 brand.json           logo, accent, fonts
-releases.json        the version timeline; the trailing "future" one is in progress
+releases.json        the version timeline, each release with the commit it was cut at
 features/<id>.json   one feature, with its full history
 index.json           the deliberate corpus order (ties within a size band)
 subcategories.json   sub-section headings
