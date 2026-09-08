@@ -1,1 +1,7 @@
-[]
+[
+  {
+    "version": 2,
+    "audience": "user",
+    "description": "The tool is published on npm as feature-ledger. You install it once with `npm install -g feature-ledger` and run `ledger` in any project, add it to a JavaScript project with `npm install --save-dev feature-ledger`, or run any command through `npx feature-ledger` without installing anything. Using it no longer means keeping a checkout of the tool itself."
+  }
+]
