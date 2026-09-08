@@ -1,0 +1,15 @@
+{
+  "id": "init-a-ledger",
+  "audience": "user",
+  "category": "Setting up a ledger",
+  "size": "Big",
+  "history": [
+    {
+      "version": 1,
+      "name": "One-command setup in any codebase",
+      "description": "The command ledger init creates a .ledger directory holding the whole corpus: the product name, the accent colour and the style guide you chose, and version 1 open as the release in progress. Everything the tool needs sits in that one directory, so a Python, Go or Rails repo looks identical to it. Setup also adds the generated documents to .gitignore, because the corpus is the part you commit.",
+      "changes": null,
+      "dev_notes": "src/commands/init.mjs. Flags: --product, --accent, --logo, --agents, --style, --tagline, --prepared-for, --force, --no-gitignore. DEFAULT_CONFIG and DEFAULT_BRAND are in src/store.mjs; the categories list is deliberately empty at init."
+    }
+  ]
+}

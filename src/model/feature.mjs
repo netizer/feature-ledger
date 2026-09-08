@@ -103,7 +103,11 @@ export class Feature {
     if (!["user", "dev"].includes(this.audience)) fail(`feature ${this.id}: audience must be "user" or "dev"`);
     if (isBlank(this.category)) fail(`feature ${this.id}: category is blank`);
     if (this.size !== null && !["Big", "Medium", "Small"].includes(this.size)) {
-      fail(`feature ${this.id}: size must be "Big", "Medium" or "Small" (got ${JSON.stringify(this.size)})`);
+      fail(
+        `feature ${this.id}: size must be "Big", "Medium" or "Small" (got ${JSON.stringify(this.size)}). ` +
+        "The scale ranks capabilities within this product; it is not a licence to record something smaller " +
+        "than a capability — see `ledger rules`.",
+      );
     }
     if (this.history.length === 0) fail(`feature ${this.id}: history is empty`);
 

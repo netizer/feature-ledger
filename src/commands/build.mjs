@@ -1,78 +1,25 @@
 import fs from "node:fs";
 import path from "node:path";
 import { openProject } from "../store.mjs";
-import { fail, titleSlug, exists } from "../util.mjs";
+import { fail, titleSlug } from "../util.mjs";
 import { MarkdownRenderer } from "../render/markdown.mjs";
 import { renderLedgerHtml } from "../render/ledger-html.mjs";
-import { htmlToPdf, probeBrowser } from "../render/pdf.mjs";
-import { resolveBrand, accentCollides } from "../render/brand.mjs";
-import { fontFaceCss } from "../render/fonts.mjs";
+import { htmlToPdf } from "../render/pdf.mjs";
 
 const out = (s) => process.stdout.write(`${s}\n`);
 const warn = (s) => process.stdout.write(`  ! ${s}\n`);
 
 /**
- * Loading the project runs every structural validation there is, so `check`
- * is mostly about the things that are worth a warning rather than a failure:
- * a corpus can be perfectly valid and still be about to print badly.
+ * The three living Markdown docs and the archival PDF edition.
+ *
+ * Nothing here judges the shape of the corpus. Loading it has already refused
+ * anything that would make a document wrong — an entry with no description, a
+ * version that isn't a release, a feature filed under an area that doesn't
+ * exist. Everything past that is an editorial call, and a tool that blocked a
+ * build over one would only be teaching people to write around it.
  */
-export async function cmdCheck({ flags }) {
-  const project = openProject(flags); // throws on anything structurally wrong
-  const warnings = [];
-
-  // Shape rules are checked here rather than at load time, so a sub-section
-  // can be declared and then filled — but they're errors, not warnings: a
-  // corpus that breaks them prints badly.
-  const problems = project.featureSet.shapeProblems();
-  if (problems.length) {
-    fail(problems.join("\n"));
-  }
-
-  const brand = resolveBrand(project.brand);
-  if (accentCollides(brand.accent)) {
-    warnings.push(
-      `the brand accent ${brand.accent} sits in the green/blue band. Those two hues mean "new" and "updated" ` +
-      "in every edition — an accent in that range makes an unchanged row look like a changed one. Pick a warm hue.",
-    );
-  }
-  if (!fontFaceCss(brand).embedded) {
-    warnings.push(
-      `brand.json asks for fonts this package doesn't bundle (${brand.fonts.display} / ${brand.fonts.body}); ` +
-      "the PDF will print in whatever the machine has and may not copy cleanly.",
-    );
-  }
-  if (brand.logo && !exists(path.resolve(project.root, brand.logo))) {
-    warnings.push(`brand.json points at a logo that isn't there: ${brand.logo}`);
-  }
-
-  const unsized = project.featureSet.features().filter((f) => !f.size);
-  if (unsized.length) warnings.push(`${unsized.length} feature(s) have no size and will print without a chip: ${unsized.map((f) => f.id).join(", ")}`);
-
-  const empty = project.config.categories.filter(
-    (c) => !project.featureSet.features().some((f) => f.category === c),
-  );
-  if (empty.length) warnings.push(`${empty.length} categor${empty.length === 1 ? "y has" : "ies have"} no features and won't render: ${empty.join(", ")}`);
-
-  const indexed = new Set(project.index);
-  const unindexed = project.featureSet.features().filter((f) => !indexed.has(f.id));
-  if (unindexed.length) {
-    warnings.push(
-      `${unindexed.length} feature file(s) aren't in index.json, so they sort last within their size: ` +
-      `${unindexed.map((f) => f.id).join(", ")}. Any \`ledger\` write heals this.`,
-    );
-  }
-
-  const n = project.featureSet.features().length;
-  out(`OK — ${n} feature${n === 1 ? "" : "s"}, ${project.featureSet.categories().length} categories, ` +
-      `${project.releases.releases.length} releases, working version v${project.releases.latestVersion}, ` +
-      `\`build\` prints v${project.editionVersion}`);
-  for (const w of warnings) warn(w);
-}
-
 export async function cmdBuild({ flags }) {
   const project = openProject(flags);
-  const problems = project.featureSet.shapeProblems();
-  if (problems.length) fail(`${problems.join("\n")}\n(run \`ledger check\` for the full picture)`);
 
   const wantMd = flags.md || !flags.pdf;
   const wantPdf = flags.pdf || !flags.md;
@@ -131,26 +78,5 @@ export async function cmdBuild({ flags }) {
       await htmlToPdf(html, target);
       out(`wrote ${path.relative(process.cwd(), target)}`);
     }
-  }
-}
-
-export async function cmdDoctor({ flags }) {
-  const project = openProject(flags);
-  const brand = resolveBrand(project.brand);
-
-  out(`project      ${project.root}`);
-  out(`ledger dir   ${path.relative(project.root, project.ledgerDir)}/`);
-  out(`product      ${project.config.product}`);
-  out(`features     ${project.featureSet.features().length} (${project.featureSet.features({ audience: "user" }).length} user, ${project.featureSet.features({ audience: "dev" }).length} dev)`);
-  out(`releases     ${project.releases.releases.length}, working version v${project.releases.latestVersion}, build prints v${project.editionVersion}`);
-  out(`accent       ${brand.accent} → deep ${brand.accent_deep} · quiet ${brand.accent_quiet} · mid ${brand.accent_mid} · pale ${brand.accent_pale}`);
-  out(`masthead     ${brand.logo ?? `wordmark “${brand.name}”`}`);
-  out(`fonts        ${brand.fonts.display} / ${brand.fonts.body} — ${fontFaceCss(brand).embedded ? "embedded" : "NOT bundled, will fall back"}`);
-  out(`theme.css    ${exists(project.themeCssPath) ? "present" : "none"}`);
-
-  try {
-    out(`browser      ${await probeBrowser()}`);
-  } catch (e) {
-    out(`browser      unavailable — ${e.message.split("\n")[0]}`);
   }
 }

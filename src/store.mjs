@@ -12,13 +12,14 @@ export const LEDGER_DIRNAME = ".ledger";
  * so a Python, Go or Rails repo all look identical to this tool:
  *
  *   .ledger/
- *     config.json          what this product is, its categories, doc wording
+ *     config.json          what this product is, its categories, its tone, doc wording
  *     brand.json           logo + one accent colour; the client-swap surface
  *     releases.json        the version timeline
  *     subcategories.json   optional sub-section headings
  *     other-changes.json   changes belonging to no single feature
  *     index.json           the deliberate corpus order
  *     features/<id>.json   one file per feature
+ *     STYLE.md             optional prose tone, when style is "custom"
  *     theme.css            optional CSS appended last to the PDF
  */
 export function findLedgerDir(startDir = process.cwd(), explicit = null) {
@@ -48,7 +49,15 @@ export const DEFAULT_CONFIG = {
   tagline: "",
   prepared_for: "the client",
   categories: [],
-  min_subcategory_features: 4,
+  // The area a feature lands in when nobody has said otherwise. A product
+  // small enough to have no natural areas has one called "Features", and the
+  // generators print it without a heading — the alternative, forcing a
+  // taxonomy onto a product with four capabilities, invents a structure the
+  // reader then has to hold in their head for nothing.
+  default_category: "Features",
+  // The tone every entry is written in: one style-guide id, or "custom" for
+  // a tone written as prose in .ledger/STYLE.md. See src/style.mjs.
+  style: "google",
   output: {
     dir: "docs/generated",
     client_dir: "docs/generated/client",

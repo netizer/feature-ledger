@@ -12,7 +12,7 @@ import { escapeHtml, exists, hexToHsl, hslToHex } from "../util.mjs";
  *
  * Which is why the accent may not itself be green, blue or teal: a warm
  * accent can never be misread as one of the two "what's different" colours.
- * `ledger check` warns when a brand picks one that can.
+ * `ledger status` warns when a brand picks one that can.
  *
  * A client gives you one hex. The other four accent tints are derived from
  * it below by the same relationships the hand-tuned original used, so a

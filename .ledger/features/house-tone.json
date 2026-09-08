@@ -1,0 +1,15 @@
+{
+  "id": "house-tone",
+  "audience": "user",
+  "category": "Setting up a ledger",
+  "size": "Big",
+  "history": [
+    {
+      "version": 1,
+      "name": "The tone every entry is written in",
+      "description": "A ledger is written in one tone, chosen from four style guides: Google developer documentation, GOV.UK, Federal Plain Language, and ASD-STE100 Simplified Technical English. The command ledger style prints that tone as a sample paragraph of product prose and three feature descriptions written in it, which is the thing a writer or an agent matches. Running ledger style set moves the project to another guide, or to a tone you write as prose yourself in .ledger/STYLE.md.",
+      "changes": null,
+      "dev_notes": "src/style.mjs holds all four samples; they describe the same fictional product (examples/northwind) so the only difference between them is register. resolveStyle() throws for an unknown id or a missing STYLE.md."
+    }
+  ]
+}

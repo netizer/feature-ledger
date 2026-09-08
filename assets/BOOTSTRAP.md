@@ -1,69 +1,153 @@
 # Baseline survey — hand this to your coding agent
 
-Paste everything below the line into a fresh agent session in the project
-root. It's written to be run by any coding agent; nothing in it is specific to
-one tool.
+The survey is agent work: only something that can read the codebase can say
+what {product} does. So this prints the brief, and whichever agent you use
+runs it.
 
-Work through it in batches — one category per batch — and let the agent stop
-between them. A survey attempted in one pass will run out of context and start
-inventing.
+It runs start to finish on its own. The agent surveys, decides the areas,
+writes every entry, cuts the baseline and prints it — without stopping to ask
+you anything. Editing comes after: you read the finished document, then fix
+whatever reads wrong (`ledger reword <id>` for the words, `ledger update <id>`
+for the substance, `ledger remove <id> --reason "…"` for something that
+shouldn't be there). The agent finishes by listing the entries it was least
+sure about, so you know where to look first.
 
----
+The prompt itself is everything under the rule below. Copy it whole, from
+there to the end of this output, into a fresh agent session in the project
+root. Nothing in it is specific to one tool, and there is nothing after it
+that you need.
+
+═════════════════════  COPY EVERYTHING BELOW THIS LINE  ═════════════════════
 
 You are cataloguing what {product} already does, into a feature ledger. This
 is an inventory of an existing codebase, not a record of anything you or I
 built. Read `ledger rules` first — it defines every field and the house style.
 
-**Voice.** Every description is a present-tense statement of what the product
-does: "A guest can book without an account." Never authorship, never history —
-no "added", "we now support", "improved", "new". Someone reading the finished
-document must not be able to tell whether a given feature shipped last week or
-three years ago. This matters: the first edition is a snapshot of the product
-as it already stood.
+Work through every step below to the end, in one session, without stopping to
+ask me anything or waiting for my approval between steps. I will read the
+finished document and edit it myself. Where a judgement call comes up, make
+the most defensible call, write down that you made it, and keep going.
 
-**Step 1 — the map.** Survey the codebase and propose the category list: the
-6–15 top-level areas this product divides into, in the order a reader should
-meet them. Name them the way the people who use the product would (what the
-software is *for*), not the way the code is laid out. Show me the list and
-wait for my confirmation before writing anything.
+**Voice.** Write every entry in {style_line}
+Read the sample before you write the first entry, and keep matching it as you
+go. The sample is the brief; the name of the guide is only where it came from.
 
-Then, once I've confirmed:
+Each description is a present-tense statement of what the product does: "A
+guest can book without an account." Every sentence states something a reader
+could confirm by using the product. Never authorship, never history: no
+"added", "we now support", "improved", "new". Someone reading the finished
+document must not be able to tell whether a feature shipped last week or three
+years ago. The first edition is a snapshot of the product as it already
+stood.
+
+## The bar
+
+**One entry is one capability someone using {product} would name.** Something
+they could ask for, or would miss if it went away.
+
+Two tests, and an entry has to pass both:
+
+- **Could you demo it?** If showing it means pointing at a settings file or a
+  passing test rather than at the product doing something, it is not an entry.
+- **Would demoing it look different from demoing the entry next to it?** If
+  not, they are one capability described twice, and one entry says it better.
+
+This bar does not move with the size of the project. A codebase with four
+capabilities gets four entries; one with two hundred gets two hundred. What
+must not happen is a small project being written up in fine detail to make the
+document look substantial — the reader should come away understanding
+{product} at the same altitude either way.
+
+Below the bar, and therefore **not** entries:
+
+- Guardrails, refusals, validation and defaults. "It can't be submitted
+  twice", "the fields are checked before saving", "it's safe to run again".
+  These belong in the description of the capability they protect, if they are
+  worth a clause at all.
+- Internal plumbing, file layouts, config keys, scripts, build steps.
+- Polish: wording, colours, spacing, an error message that reads better.
+- Anything you can only describe as the absence of a problem.
+
+None of that is unimportant — it is just not what this document is for. A
+description is two or three sentences, so a capability has room to mention the
+guardrail that makes it trustworthy without that guardrail becoming its own
+line in the contents.
+
+## Step 1 — the capabilities
+
+Survey the codebase and list the capabilities that clear the bar. One line
+each: a working name and a phrase saying what someone can do. No areas yet, no
+ids, no sizes — just the list.
+
+This is the step that decides whether the finished document is worth reading,
+so do it twice: go back over your own list and merge anything where two lines
+would demo the same, and drop anything you couldn't demo at all. Review your
+own list against the bar rather than showing it to me — I will read it as the
+finished document, which is a better test of it than a list of working names.
+
+## Step 2 — areas, if the product has them
+
+Areas are a reading aid, not a required taxonomy. The question is not how long
+your list is. It is whether the product genuinely falls into parts that
+someone using it would recognise and name.
+
+- **If it does**, create those parts: named for what the software is *for*
+  rather than how the code is laid out, and ordered the way a reader should
+  meet them. Some areas will hold two entries and some twenty. That's the
+  shape of the product, not something to even out.
+- **If it doesn't** — the product is one coherent thing, or the only groupings
+  you can find are ones the code would recognise and a user wouldn't — leave
+  every entry unfiled. They land in one area called "Features", which prints
+  without a heading. When it's a close call, prefer no areas: adding them later
+  is one command per area, and a taxonomy nobody recognises is harder to undo
+  than it looks.
 
 ```
 ledger categories add "First area"
 ledger categories add "Second area" --after "First area"
 ```
 
-**Step 2 — one category at a time.** For each category, in order:
+If the product has grown parts since the last time, `ledger categories rename`
+and `ledger categories remove` move the structure without touching the
+entries.
 
-1. Read the code that implements that area.
-2. For each distinct capability, run `ledger add <id>` with a payload. Keep
-   ids stable and kebab-case.
-3. Size each one honestly — **Big** for a standalone capability, **Medium**
-   for a meaningful piece of a bigger area, **Small** for a specific behaviour
-   or guardrail. A category that is all Big is a category that hasn't been
-   looked at closely.
-4. Set `audience` to `dev` for anything a client would never knowingly
+## Step 3 — write the entries, a batch at a time
+
+Take them in reading order, a batch at a time — one area, or a dozen or so
+entries where there are no areas. Batching is how you keep the quality up over
+a long list, not a checkpoint: finish a batch, then start the next one
+yourself.
+
+1. Read the code behind each capability before writing about it.
+2. `ledger add <id>` with the payload. Ids are stable and kebab-case. Leave
+   `category` out entirely when the ledger has no areas.
+3. Size each entry — **Big** for a capability the product is chosen for,
+   **Medium** for a capability in its own right inside a bigger one, **Small**
+   for one narrow enough to describe in a line. The scale ranks entries within
+   this product; it is not permission to record something smaller than a
+   capability.
+4. Set `audience` to `dev` for a capability only the team would ever
    encounter, and put implementation detail in `dev_notes` rather than in the
    description.
-5. Run `ledger check`, then stop and show me what you added before moving on.
+5. Run `ledger status` at the end of each batch, fix anything it reports, and
+   move straight on to the next batch.
 
-**What not to list.** Purely mechanical form checks (required fields, valid
-email format), framework defaults, and anything you can only describe as the
-absence of a problem ("can't submit twice") — those are `dev` at best. If a
-capability has grown more than a handful of entries inside one category,
-propose a sub-section for it instead of listing them flat.
+Where you can't tell from the code what something is *for* — as opposed to
+what it does — write the reading the code best supports, and keep the entry's
+id on a list of open questions for Step 5. Don't ask me mid-run and don't
+invent a purpose to fill the gap: describe what you can actually see the
+product doing, and flag it. A guess in this document becomes a guess a client
+reads, so the flag is what stops it being one.
 
-**Where you're unsure.** If you can't tell from the code what something is
-*for* — as opposed to what it does — say so and ask. A guess in this document
-becomes a guess a client reads.
+## Step 4 — the baseline edition
 
----
-
-When the survey is done and `ledger check` is clean, cut the baseline:
+When every capability is recorded and `ledger status` is clean, date the
+baseline from the repository rather than asking me — the first commit is when
+work on this codebase started:
 
 ```
-ledger release cut --name "Baseline" --date <the date this codebase started, or today>
+git log --reverse --format=%ad --date=short | head -1
+ledger release cut --name "Baseline" --date <that date, or today if there's no history>
 ledger build
 ```
 
@@ -71,3 +155,20 @@ Version 1 has no predecessor, so its edition prints as a plain inventory with
 nothing flagged as new or changed — which is exactly right for a snapshot of
 work that was already there. From the next release onward, every edition
 highlights only what actually moved.
+
+## Step 5 — hand it back
+
+Finish with a short note for me, and nothing else to do:
+
+- How many entries you recorded, and the areas you settled on — or why you
+  left the ledger unfiled.
+- **The open questions**: every entry where you couldn't tell what something
+  was *for*, one line each, with the id and the reading you went with. This is
+  the list I'll work through first, so don't pad it with entries you're
+  confident about, and don't leave one off because it's probably fine.
+- Anything you found and deliberately left out, if a reasonable person might
+  have expected it in the document.
+
+Then stop. Any correction I want is `ledger reword <id>` for the wording,
+`ledger update <id>` for the substance, or `ledger remove <id> --reason "…"`,
+and rebuilding is `ledger build`.

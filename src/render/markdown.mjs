@@ -30,8 +30,12 @@ export class MarkdownRenderer {
 
   featureDoc({ title, intro, audience, extended }) {
     const categories = this.set.categories({ audience });
+    // A product whose whole ledger sits in the one default area has no areas,
+    // so it gets no area heading: "## 1. Features" above the only list in a
+    // document called Features is a structure the reader has to read past.
+    const numbered = !this.set.unstructured;
     const body = categories
-      .map((category, i) => this.category(category, { audience, extended, number: i + 1 }))
+      .map((category, i) => this.category(category, { audience, extended, number: numbered ? i + 1 : null }))
       .join("\n");
 
     // Changes that run across the whole product close the document, once —
@@ -49,7 +53,7 @@ export class MarkdownRenderer {
 
   category(category, { audience, extended, number }) {
     const { loose, subs } = this.set.sections({ category, audience });
-    const lines = [`## ${number}. ${category}`, ""];
+    const lines = number === null ? [] : [`## ${number}. ${category}`, ""];
     const removedThisCycle = [];
 
     this.renderFeatures(loose, lines, removedThisCycle, { extended });
@@ -60,7 +64,8 @@ export class MarkdownRenderer {
       // nothing the heading hasn't already said, and it would drown out the
       // one genuinely changed entry the release after.
       const wholeThingNew = this.inProgress && this.allNew(members);
-      lines.push("", `### ${number}.${i + 1} ${sub.name}${wholeThingNew ? " **[New]**" : ""}`, "", `*${sub.intro}*`, "");
+      const label = number === null ? `${i + 1}.` : `${number}.${i + 1}`;
+      lines.push("", `### ${label} ${sub.name}${wholeThingNew ? " **[New]**" : ""}`, "", `*${sub.intro}*`, "");
       this.renderFeatures(members, lines, removedThisCycle, { extended, tag: !wholeThingNew });
     });
 
@@ -72,7 +77,7 @@ export class MarkdownRenderer {
 
     if (removedThisCycle.length) {
       lines.push("", trailer("No longer available as of this release"), "");
-      for (const [f, state] of removedThisCycle) lines.push(`- **${f.currentName}** — ${state.reason}`);
+      for (const [f, state] of removedThisCycle) lines.push(`- **${f.currentName}**: ${state.reason}`);
     }
 
     return `${lines.join("\n")}\n`;
@@ -104,7 +109,9 @@ export class MarkdownRenderer {
     if (touched) tags.push(state.changes === null ? "New" : "Changed");
 
     const name = state.renamedFrom ? `${state.name} (previously “${state.renamedFrom}”)` : state.name;
-    let line = `- **[${tags.join(", ")}]** ${name} — ${state.description}`;
+    // A colon, not a dash: the style guides rule the dash out, and the whole
+    // document is meant to read as though written to one.
+    let line = `- **[${tags.join(", ")}]** ${name}: ${state.description}`;
     if (touched && state.changes?.length) {
       line += "\n\n  **What changed:**\n";
       line += state.changes.map((c) => `  - ${c}`).join("\n");

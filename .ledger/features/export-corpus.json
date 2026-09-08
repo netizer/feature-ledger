@@ -2,14 +2,14 @@
   "id": "export-corpus",
   "audience": "user",
   "category": "Reading the ledger",
-  "size": "Medium",
+  "size": "Small",
   "history": [
     {
       "version": 1,
-      "name": "The record as one portable document",
-      "description": "The whole record — product, timeline, areas, sub-sections, product-wide changes and every feature with its full history — can be written out as a single structured document, to print, to keep as a backup, or to hand to something that isn't this tool.",
+      "name": "The whole corpus as one document",
+      "description": "The command ledger export prints the entire corpus as a single JSON document: the release timeline, the areas, the sub-sections, the product-wide changes, and every feature with its full history. It writes to a file instead when you name one, for a backup, a migration, or handing the data to something that isn't this tool.",
       "changes": null,
-      "dev_notes": "cmdExport, versioned with schema_version: 1; --out writes to a file, otherwise it goes to standard output."
+      "dev_notes": "src/commands/read.mjs cmdExport, schema_version 1. Wired into the CLI but absent from `ledger --help`."
     }
   ]
 }

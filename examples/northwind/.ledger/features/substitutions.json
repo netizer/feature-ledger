@@ -7,7 +7,7 @@
     {
       "version": 2,
       "name": "Substitutions the customer chooses",
-      "description": "For each line in a basket the customer says whether a substitute is acceptable, and picks the one they would rather have, so a short-stocked line is resolved at the shelf instead of by a phone call.",
+      "description": "For each line in a basket, the customer says whether a substitute is acceptable and picks the one they would rather have. A short-stocked line is then resolved at the shelf instead of by a phone call.",
       "changes": null
     }
   ]

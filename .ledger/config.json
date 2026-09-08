@@ -1,21 +1,15 @@
 {
-  "product": "Feature Ledger",
+  "product": "feature-ledger",
   "tagline": "",
   "prepared_for": "the client",
   "categories": [
-    "Setting up a ledger in a project",
-    "What the ledger records",
-    "Recording what changed",
-    "The house rules it enforces",
+    "Setting up a ledger",
+    "Recording what the product does",
     "Reading the ledger",
-    "Working with coding agents",
-    "Releases and editions",
-    "The team's living documents",
-    "The client's printed edition",
-    "Branding and wording for each client",
-    "Running it anywhere"
+    "The documents it produces"
   ],
-  "min_subcategory_features": 4,
+  "default_category": "Features",
+  "style": "google",
   "output": {
     "dir": "docs/generated",
     "client_dir": "docs/generated/client",

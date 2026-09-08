@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { writeJson, exists, fail, isBlank } from "../util.mjs";
 import { LEDGER_DIRNAME, DEFAULT_CONFIG, DEFAULT_BRAND } from "../store.mjs";
+import { resolveStyle, styleTitle, styleLine, STYLES, CUSTOM_STYLE_ID } from "../style.mjs";
 
 const PKG_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const asset = (name) => fs.readFileSync(path.join(PKG_ROOT, "assets", name), "utf8");
@@ -25,6 +26,44 @@ const AGENT_FILES = {
 };
 
 const MARKER = "<!-- feature-ledger -->";
+const END_MARKER = "<!-- /feature-ledger -->";
+
+/** The stanza with this project's style guide named in it. An agent doing a
+ *  small edit often reads only this file, so the guide is stated here rather
+ *  than left one command away. */
+function stanzaFor(config, ledgerDir) {
+  const style = resolveStyle(config, ledgerDir);
+  return asset("agent-pointer.md").replaceAll("{style_line}", styleLine(style));
+}
+
+/** Replace the marked block in every agent file that has one. Used when the
+ *  style guide changes, so the pointer never names a guide the project has
+ *  moved off. */
+export function refreshAgents(root, config, ledgerDir) {
+  const stanza = stanzaFor(config, ledgerDir);
+  const updated = [];
+  const stale = [];
+  for (const rel of Object.values(AGENT_FILES)) {
+    const file = path.join(root, rel);
+    if (!exists(file)) continue;
+    const existing = fs.readFileSync(file, "utf8");
+    const start = existing.indexOf(MARKER);
+    if (start === -1) continue;
+    const end = existing.indexOf(END_MARKER, start);
+    if (end === -1) { stale.push(rel); continue; }
+    const next = existing.slice(0, start) + stanza.trim() + existing.slice(end + END_MARKER.length);
+    if (next !== existing) { fs.writeFileSync(file, next); updated.push(rel); }
+  }
+  return { updated, stale };
+}
+
+function styleFlag(flags) {
+  const id = flags.style && flags.style !== true ? String(flags.style) : DEFAULT_CONFIG.style;
+  if (id !== CUSTOM_STYLE_ID && !STYLES[id]) {
+    fail(`unknown style "${id}" — known: ${Object.keys(STYLES).join(", ")}, ${CUSTOM_STYLE_ID}`);
+  }
+  return id;
+}
 
 export async function cmdInit({ flags }) {
   const root = path.resolve(flags.root ?? process.cwd());
@@ -47,6 +86,7 @@ export async function cmdInit({ flags }) {
     // product and would quietly become the one nobody revisits; the first
     // survey of the codebase is what decides the areas.
     categories: [],
+    style: styleFlag(flags),
   };
 
   const brand = {
@@ -73,8 +113,9 @@ export async function cmdInit({ flags }) {
 
   out(`created ${path.relative(root, ledgerDir) || ledgerDir}/`);
 
-  const written = wireAgents(root, flags.agents ?? "auto");
+  const written = wireAgents(root, flags.agents ?? "auto", config, ledgerDir);
   for (const f of written) out(`pointed ${f} at the ledger`);
+  out(`tone: ${styleTitle(resolveStyle(config, ledgerDir))} (\`ledger style\` to read it, \`ledger style set\` to change it)`);
 
   if (flags.gitignore !== false) {
     const added = addGitignore(root, config.output.dir);
@@ -84,10 +125,9 @@ export async function cmdInit({ flags }) {
   out("");
   out("Next:");
   out(`  1. npx ledger bootstrap        # prints a survey prompt to hand to your coding agent`);
-  out(`  2. …the agent defines the categories and adds a feature per capability, at v1`);
-  out(`  3. npx ledger check`);
-  out(`  4. npx ledger release cut --name "Baseline" --date ${flags["baseline-date"] && flags["baseline-date"] !== true ? flags["baseline-date"] : "YYYY-MM-DD"}`);
-  out(`  5. npx ledger build            # the v1 edition: an inventory, nothing flagged as new`);
+  out(`  2. …the agent runs it to the end on its own: one entry per capability at v1 (areas`);
+  out(`      only if the product needs them), then it cuts the baseline and builds the edition`);
+  out(`  3. read the result and edit it — \`ledger reword\`, \`ledger update\`, \`ledger remove\`, then \`ledger build\``);
   out("");
   out("From then on the agent records each change against the open release, and `ledger release cut` mints the next edition.");
 }
@@ -95,9 +135,9 @@ export async function cmdInit({ flags }) {
 /** The one-command install into whichever agent files a project already has.
  *  Nothing is overwritten: the stanza is appended once, marked, and skipped
  *  on any later run. */
-function wireAgents(root, spec) {
+function wireAgents(root, spec, config, ledgerDir) {
   if (spec === "none" || spec === false) return [];
-  const stanza = asset("agent-pointer.md");
+  const stanza = stanzaFor(config, ledgerDir);
 
   let targets;
   if (spec === "auto" || spec === true) {
@@ -142,11 +182,21 @@ function addGitignore(root, dir) {
  */
 export async function cmdBootstrap({ flags }) {
   let product = "the product";
+  let config = DEFAULT_CONFIG;
+  let ledgerDir = null;
   try {
     const { openProject } = await import("../store.mjs");
-    product = openProject(flags).config.product;
+    const project = openProject(flags);
+    product = project.config.product;
+    config = project.config;
+    ledgerDir = project.ledgerDir;
   } catch {
     // Printing the prompt before `ledger init` is still useful.
   }
-  process.stdout.write(asset("BOOTSTRAP.md").replaceAll("{product}", product));
+  const style = resolveStyle(config, ledgerDir);
+  process.stdout.write(
+    asset("BOOTSTRAP.md")
+      .replaceAll("{product}", product)
+      .replaceAll("{style_line}", styleLine(style)),
+  );
 }

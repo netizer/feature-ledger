@@ -1,11 +1,17 @@
 import { fail, isBlank } from "../util.mjs";
 
 /**
- * Reading order inside every section and sub-section: the standalone
- * capabilities first, then the meaningful pieces, then the specific touches.
- * A reader skimming for what the product *does* gets it before the detail,
- * and a section can't bury a Big behind six Smalls just because that's the
- * order things happened to get written down in. Anything unsized sorts last.
+ * Reading order inside every section and sub-section: the capabilities the
+ * product would be described by first, then the ones inside them, then the
+ * narrow ones. A reader skimming for what the product *does* meets the
+ * headline capabilities before the rest, and a section can't bury a Big
+ * behind six Smalls just because that's the order things happened to get
+ * written down in. Anything unsized sorts last.
+ *
+ * Size is a ranking *within one product*, not a measure of detail: every
+ * entry, at every size, is a capability someone could ask for by name. What
+ * keeps a big product's ledger and a small one's at the same altitude is the
+ * bar for being an entry at all (see `ledger rules`), not this scale.
  */
 const SIZE_ORDER = { Big: 0, Medium: 1, Small: 2 };
 
@@ -23,7 +29,7 @@ export class FeatureSet {
     this.config = config;
     this.releaseSet = releaseSet;
     this.categoryOrder = config.categories;
-    this.minSubcategoryFeatures = config.min_subcategory_features ?? 4;
+    this.defaultCategory = config.default_category ?? "Features";
     this.subcategories = subcategories ?? [];
     this.otherChangesList = otherChanges ?? [];
     this.order = order ?? [];
@@ -60,6 +66,27 @@ export class FeatureSet {
   categories({ audience = null } = {}) {
     const present = new Set(this.features({ audience }).map((f) => f.category));
     return this.categoryOrder.filter((c) => present.has(c));
+  }
+
+  /**
+   * A product small enough that dividing it into areas would be inventing a
+   * structure it doesn't have: everything sits in the one default area. The
+   * generators drop the heading and the contents list in that case, so a
+   * two-feature ledger reads as a list of two features rather than as a
+   * chapter of one.
+   */
+  get unstructured() {
+    const cats = this.categories();
+    return cats.length === 1 && cats[0] === this.defaultCategory;
+  }
+
+  /** The fullest area, for the shape line in `ledger status`. */
+  largestArea() {
+    const counted = this.categories().map((category) => ({
+      category,
+      count: this.featureList.filter((f) => f.category === category).length,
+    }));
+    return counted.sort((a, b) => b.count - a.count)[0] ?? null;
   }
 
   /**
@@ -162,43 +189,17 @@ export class FeatureSet {
   }
 
   /**
-   * The two rules that keep sub-sections load-bearing rather than a third
-   * tier of taxonomy to maintain over a hundred features.
+   * Sub-sections whose overview is doing the same job twice: the heading and
+   * its intro already say what the whole area is, so a Big entry alongside
+   * them rebuilds the wall the sub-section was there to break up.
    *
-   * Deliberately NOT part of validate(): declaring a sub-section and then
-   * filing four features into it is a sequence, and a corpus that refused to
-   * load in the middle of it would make the level unusable. So these are
-   * reported by `ledger check` and enforced by `ledger build` — the two
-   * moments where the shape of the corpus is what's actually being judged.
-   *
-   * @returns {string[]} problems, empty when the corpus is well-shaped.
+   * An observation, not a refusal. Nothing here counts features either — a
+   * sub-section exists because an area has a real part inside it, and whether
+   * that part is two capabilities or twenty is a fact about the product.
    */
-  shapeProblems() {
-    const problems = [];
-
-    for (const s of this.subcategories) {
-      // Counted across both audiences: the bar is about how big the *area*
-      // is, not how much of it happens to be client-facing.
-      const n = this.featureList.filter((f) => f.subcategory === s.id).length;
-      if (n < this.minSubcategoryFeatures) {
-        problems.push(
-          `subcategory ${JSON.stringify(s.id)} has ${n} feature${n === 1 ? "" : "s"} — a sub-section needs at least ` +
-          `${this.minSubcategoryFeatures}, or its features belong loose in ${JSON.stringify(s.category)}`,
-        );
-      }
-
-      // The heading and its intro *are* the overview, so a lead Big entry
-      // alongside them just rebuilds the wall the sub-section was there to
-      // break up.
-      const big = this.featureList.filter((f) => f.subcategory === s.id && f.size === "Big");
-      if (big.length) {
-        problems.push(
-          `subcategory ${JSON.stringify(s.id)} contains a Big feature (${big.map((f) => f.id).join(", ")}) — ` +
-          "a sub-section's heading and intro are its overview, so its features are Medium and Small",
-        );
-      }
-    }
-
-    return problems;
+  subsectionsLedByBig() {
+    return this.subcategories
+      .map((sub) => ({ sub, big: this.featureList.filter((f) => f.subcategory === sub.id && f.size === "Big") }))
+      .filter(({ big }) => big.length);
   }
 }

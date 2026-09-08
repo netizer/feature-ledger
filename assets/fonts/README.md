@@ -44,4 +44,4 @@ Drop static WOFF files in here named `<FamilyNoSpaces>-<weight>.woff`, list
 them in `FONT_FACES` in `src/render/fonts.mjs`, re-run the coverage script,
 and point `.ledger/brand.json`'s `fonts` at the family names. Fonts named in
 `brand.json` that aren't bundled don't fail — the PDF prints in whatever the
-machine has, and `ledger check` warns that it will.
+machine has, and `ledger status` warns that it will.

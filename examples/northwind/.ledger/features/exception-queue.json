@@ -7,7 +7,7 @@
     {
       "version": 1,
       "name": "Exception queue",
-      "description": "Anything that cannot be picked as ordered — short stock, a damaged item, an address the van cannot reach — lands in one queue with the customer's contact details beside it.",
+      "description": "Anything that cannot be picked as ordered lands in one queue, with the customer's contact details beside it. That covers short stock, a damaged item, and an address the van cannot reach.",
       "changes": null
     }
   ]

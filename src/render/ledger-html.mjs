@@ -185,6 +185,9 @@ class LedgerHtml {
    * three tints deep, with a 3-segment meter showing how many steps up this
    * one sits. The meter is what makes the ranking legible to someone who
    * never read the legend on the front page.
+   *
+   * All three are capabilities; the scale ranks them within this product, and
+   * says nothing about how detailed an entry is allowed to be.
    */
   sizeChip(size) {
     const key = String(size ?? "").toLowerCase();
@@ -248,14 +251,17 @@ class LedgerHtml {
       // head nor a sub-section head can be stranded at the foot of a page.
       // The category head rides along with the first LOOSE row; a category
       // made only of sub-sections stands alone and leans on break-after.
+      // An undivided ledger prints no area heading at all: one heading above
+      // the only list in the document is a structure the reader has to read
+      // past to get to the product.
+      const head = this.set.unstructured ? "" : this.catHead(category, i, rows.length, nNew, nUpd);
+
       const inner = groups.map(([sub, grows], gi) => {
         if (sub === null) {
-          return `<div class="cat-open">${this.catHead(category, i, rows.length, nNew, nUpd)}${this.featureRow(grows[0])}</div>` +
+          return `<div class="cat-open">${head}${this.featureRow(grows[0])}</div>` +
             grows.slice(1).map((r) => this.featureRow(r)).join("");
         }
-        const alone = gi === 0
-          ? `<div class="cat-open cat-alone">${this.catHead(category, i, rows.length, nNew, nUpd)}</div>`
-          : "";
+        const alone = gi === 0 && head ? `<div class="cat-open cat-alone">${head}</div>` : "";
         return `${alone}<div class="subsection${sub.badge === "new" ? " new" : ""}"><div class="sub-body">` +
           `<div class="sub-open">${this.subHead(sub)}${this.featureRow(grows[0])}</div>` +
           grows.slice(1).map((r) => this.featureRow(r)).join("") +
@@ -338,37 +344,39 @@ ${this.project.themeCss()}
 
     <h1 class="title">${w.title_html}</h1>
     <div class="edition ${rel.future ? "is-draft" : "is-final"}">
-      Version ${this.version}${rel.name ? ` — ${h(rel.name)}` : ""}${rel.future ? " — draft, not yet presented" : ""}
+      Version ${this.version}${rel.name ? ` · ${h(rel.name)}` : ""}${rel.future ? " · draft, not yet presented" : ""}
     </div>
     <p class="intro">${h(w.intro)}</p>
     ${callout}
 
     <div class="panel">
       <div class="kicker">The ledger at a glance</div>
-      <div class="headline"><b>${stats.features}</b> features <span>across</span> <b>${stats.areas}</b> areas</div>
+      <div class="headline">${stats.areas > 1
+        ? `<b>${stats.features}</b> features <span>across</span> <b>${stats.areas}</b> areas`
+        : `<b>${stats.features}</b> feature${stats.features === 1 ? "" : "s"}`}</div>
 
       <div class="split-label">Every one of those ${stats.features}, by size</div>
       <div class="bar">${sizeBar}</div>
       <div class="bar-key">
-        <div class="row">${this.sizeChip("Big")} A standalone capability</div>
-        <div class="row">${this.sizeChip("Medium")} A meaningful piece of a bigger area</div>
-        <div class="row">${this.sizeChip("Small")} One specific behaviour or guardrail</div>
+        <div class="row">${this.sizeChip("Big")} A capability the product is chosen for</div>
+        <div class="row">${this.sizeChip("Medium")} A capability in its own right, inside a bigger one</div>
+        <div class="row">${this.sizeChip("Small")} A capability narrow enough to describe in a line</div>
       </div>
       ${sinceBlock}
     </div>
   </header>
 
-  <div class="contents">
+  ${this.set.unstructured ? "" : `<div class="contents">
     <div class="kicker">Contents</div>
     <ol>${contents}</ol>
-  </div>
+  </div>`}
 
   ${body}
   ${removedBlock}
   ${otherBlock}
 
   <div class="colophon">
-    ${h(this.brand.name)} — The Feature Ledger — Version ${this.version}${dateLabel ? ` · ${dateLabel}` : ""}.
+    ${h(this.brand.name)} · The Feature Ledger · Version ${this.version}${dateLabel ? ` · ${dateLabel}` : ""}.
     ${h(w.colophon)}
   </div>
 </body>

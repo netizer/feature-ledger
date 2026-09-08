@@ -54,7 +54,7 @@ async function launchBrowser() {
   );
 }
 
-/** Which browser `ledger doctor` would use, without printing anything. */
+/** Which browser `ledger status` reports, without printing anything. */
 export async function probeBrowser() {
   const { browser, how } = await launchBrowser();
   await browser.close();

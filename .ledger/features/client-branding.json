@@ -1,0 +1,15 @@
+{
+  "id": "client-branding",
+  "audience": "user",
+  "category": "The documents it produces",
+  "size": "Medium",
+  "history": [
+    {
+      "version": 1,
+      "name": "Branding it for a client",
+      "description": "One file, .ledger/brand.json, is the swap surface for a new client: a logo, one accent colour, and the two font families. The other four tints of the accent are derived from the hex you give it, and a ledger with no logo sets the product name as a serif wordmark on the front page. The accent cannot be green, blue or teal, because those hues already mean new and reworked in every edition, and ledger status warns when a brand picks one that collides.",
+      "changes": null,
+      "dev_notes": "src/render/brand.mjs derives accent_deep, accent_quiet, accent_mid and accent_pale in HSL; any of them can be pinned in brand.json. A logo is embedded as a data URI (PNG, JPG, SVG, WebP). .ledger/theme.css is appended last to the PDF stylesheet for a one-off nudge."
+    }
+  ]
+}

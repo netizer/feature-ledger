@@ -5,12 +5,12 @@ documents it generates are build output and are not committed.
 
 | File | What it is |
 | --- | --- |
-| `config.json` | Product name, the category list (which is the reading order of every document), and any wording overrides. |
+| `config.json` | Product name, the area list (which is the reading order of every document, and may be empty), and any wording overrides. |
 | `brand.json` | The client-swap surface: logo, one accent colour, fonts. |
 | `releases.json` | The version timeline. The last entry, `status: "future"`, is the release in progress — everything new records against it. |
 | `features/<id>.json` | One feature, with its full version history. |
 | `index.json` | The deliberate order of the corpus, which is what breaks ties within a size band. Maintained automatically. |
-| `subcategories.json` | Sub-section headings, for a category that grew too big to read as one list. |
+| `subcategories.json` | Sub-section headings, for an area that grew too big to read as one list. |
 | `other-changes.json` | Changes belonging to no single feature. |
 | `theme.css` | Optional. Appended last to the PDF's stylesheet, for a one-off nudge. |
 

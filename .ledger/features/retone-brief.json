@@ -1,0 +1,15 @@
+{
+  "id": "retone-brief",
+  "audience": "user",
+  "category": "Setting up a ledger",
+  "size": "Small",
+  "history": [
+    {
+      "version": 1,
+      "name": "Moving an existing ledger to a new tone",
+      "description": "The command ledger style rewrite prints a brief for rewriting a ledger that is already written into the tone the project has moved to. The agent works one area at a time and replaces the words in place, so nothing lands on the release and no entry is marked as changed.",
+      "changes": null,
+      "dev_notes": "assets/RESTYLE.md, filled with the product name, the style section, the entry count and the area list."
+    }
+  ]
+}

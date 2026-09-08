@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { openProject } from "../store.mjs";
 import { fail, exists, writeJson } from "../util.mjs";
+import { resolveStyle, styleSection } from "../style.mjs";
 
 const PKG_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const out = (s) => process.stdout.write(`${s}\n`);
@@ -107,66 +108,36 @@ export async function cmdShow({ flags, positional }) {
   }
 }
 
-/** What the in-progress release has collected so far — the thing to check
- *  before cutting it, and a cheap way for an agent to see whether the work it
- *  just did is already recorded. */
-export async function cmdStatus({ flags }) {
-  const project = openProject(flags);
-  const target = project.releases.latestVersion;
-  const rel = project.releases.at(target);
-
-  const touched = project.featureSet.features().filter((f) => f.touchedAt(target));
-  const added = touched.filter((f) => f.firstVersion === target);
-  const removed = touched.filter((f) => f.entryAt(target)?.removed);
-  const changed = touched.filter((f) => !added.includes(f) && !removed.includes(f));
-  const other = project.featureSet.otherChanges({ version: target });
-
-  if (flags.json) {
-    out(JSON.stringify({
-      version: target,
-      status: rel.status,
-      name: rel.name,
-      added: added.map((f) => f.id),
-      changed: changed.map((f) => f.id),
-      removed: removed.map((f) => f.id),
-      other_changes: other.length,
-      total_features: project.featureSet.features().length,
-    }, null, 2));
-    return;
-  }
-
-  out(`Release v${target}${rel.name ? ` — ${rel.name}` : ""} (${rel.future ? "in progress, not yet presented" : `shipped ${rel.date}`})`);
-  out(`Corpus: ${project.featureSet.features().length} features across ${project.featureSet.categories().length} categories`);
-  out("");
-  const section = (label, list) => {
-    if (!list.length) return;
-    out(`${label} (${list.length}):`);
-    for (const f of list) out(`  ${f.id.padEnd(34)} ${f.currentName}`);
-  };
-  section("Added this release", added);
-  section("Changed this release", changed);
-  section("Removed this release", removed);
-  if (other.length) out(`Other changes this release: ${other.length}`);
-  if (!added.length && !changed.length && !removed.length && !other.length) {
-    out("Nothing recorded against this release yet.");
-  }
-}
-
 /**
  * The authoring rules. A project copy in .ledger/RULES.md wins, so a team can
  * add house conventions; otherwise the packaged one is printed. Agents are
  * pointed here rather than being given the rules in every prompt.
+ *
+ * The `{style}` placeholder is filled from this project's configured style
+ * guide, so an agent that reads the rules gets the voice in the same breath
+ * as the mechanics, and a project that changes guides changes both at once.
  */
 export async function cmdRules({ flags }) {
   let file = path.join(PKG_ROOT, "assets", "RULES.md");
+  let config = {};
+  let ledgerDir = null;
   try {
     const project = openProject(flags);
+    config = project.config;
+    ledgerDir = project.ledgerDir;
     const local = path.join(project.ledgerDir, "RULES.md");
     if (exists(local)) file = local;
   } catch {
     // No project here — the packaged rules are still worth printing.
   }
-  process.stdout.write(fs.readFileSync(file, "utf8"));
+
+  let style;
+  try {
+    style = styleSection(resolveStyle(config, ledgerDir));
+  } catch (e) {
+    style = `## The tone to write in\n\n(not configured: ${e.message})`;
+  }
+  process.stdout.write(fs.readFileSync(file, "utf8").replace("{style}", style));
 }
 
 /** The whole corpus as one JSON document — for a backup, a migration, or

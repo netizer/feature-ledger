@@ -1,0 +1,15 @@
+{
+  "id": "rename-a-feature",
+  "audience": "user",
+  "category": "Recording what the product does",
+  "size": "Small",
+  "history": [
+    {
+      "version": 1,
+      "name": "Renaming a feature",
+      "description": "The command ledger rename changes what a feature is called, and every document footnotes the name it went by before. A feature that existed before this release needs a reason: one bullet saying what it was called and why the name moved.",
+      "changes": null,
+      "dev_notes": "src/commands/write.mjs cmdRename. The old name comes from Feature#stateAt's renamedFrom, computed from the named entries in the history rather than stored."
+    }
+  ]
+}

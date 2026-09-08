@@ -1,0 +1,15 @@
+{
+  "id": "status-check",
+  "audience": "user",
+  "category": "Reading the ledger",
+  "size": "Medium",
+  "history": [
+    {
+      "version": 1,
+      "name": "The state of the ledger, checked",
+      "description": "The command ledger status answers three questions at once: what the open release has collected so far, what the corpus holds, and how the setup resolves — the derived palette, the masthead, the fonts, the tone in force, and the browser that will print. Anything that is valid but would still print badly comes out as a warning at the end, such as an entry with no size or an area with nothing in it. It exits with an error when the corpus is broken and stays silent when there is nothing to say, so a commit hook can run it on every commit.",
+      "changes": null,
+      "dev_notes": "src/commands/status.mjs. It replaced three commands — status, check and doctor — because whichever of them you hadn't run was where the problem was; `ledger check` and `ledger doctor` now fail with a pointer to it."
+    }
+  ]
+}

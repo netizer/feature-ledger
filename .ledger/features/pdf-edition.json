@@ -1,15 +1,15 @@
 {
   "id": "pdf-edition",
   "audience": "user",
-  "category": "The client's printed edition",
+  "category": "The documents it produces",
   "size": "Big",
   "history": [
     {
       "version": 1,
-      "name": "A printed edition for the client",
-      "description": "Each release can be printed as a single self-contained document for the client: a covered, typeset catalogue of everything the product does, laid out area by area with each feature named, sized and described in plain language. It is a real designed document rather than a dump of the record — the thing that gets attached to an email or handed over at a presentation — and one is minted per release, so the client accumulates a shelf of editions rather than a file that keeps changing under them.",
+      "name": "The printed edition for the client",
+      "description": "The command ledger build prints a PDF of one release: a front page carrying the masthead, the feature count, a bar breaking those features down by size, and a note of what changed since the last edition, then every entry in reading order. The document is real HTML and CSS, printed through the Chrome or Edge already on the machine, with the two fonts embedded so text copies cleanly out of the finished file. Any edition can be reprinted at any time, and it reproduces exactly what was presented that day.",
       "changes": null,
-      "dev_notes": "src/render/ledger-html.mjs renders real HTML/CSS; src/render/pdf.mjs prints it through headless Chromium with printBackground on, exactly as a person would print a styled page."
+      "dev_notes": "src/render/ledger-html.mjs builds the document, src/render/pdf.mjs drives Chromium via playwright-core (channel chrome, msedge, chromium, or $LEDGER_CHROME). Fonts are static instances, not variable ones, or Chromium emits Type 3 glyphs that copy out shredded; checkGlyphs() fails the build on a character the bundled faces can't draw. `--version N|all` picks the edition, `--html` writes the page instead of printing it."
     }
   ]
 }

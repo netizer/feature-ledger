@@ -1,0 +1,15 @@
+{
+  "id": "retire-a-feature",
+  "audience": "user",
+  "category": "Recording what the product does",
+  "size": "Small",
+  "history": [
+    {
+      "version": 1,
+      "name": "Retiring a feature",
+      "description": "The command ledger remove marks a feature as gone from this release onward, with the reason you give it. It appears once, under the heading No longer available as of this edition, and every earlier edition still shows the feature as it stood at the time.",
+      "changes": null,
+      "dev_notes": "src/commands/write.mjs cmdRemove. Removing a feature added in the same open release is refused: delete the file instead, since a client never saw it."
+    }
+  ]
+}

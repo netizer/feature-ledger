@@ -12,10 +12,10 @@
     },
     {
       "version": 2,
-      "description": "The customer chooses a two-hour delivery window from the slots a van is genuinely free for, running to twenty-eight days out, and the list says why it stops early when the fleet is fully committed.",
+      "description": "The customer chooses a two-hour delivery window from the slots a van is genuinely free for, running to twenty-eight days out. The list says why it stops early when the fleet is fully committed.",
       "changes": [
-        "The booking horizon went from fourteen days to twenty-eight. Fourteen covered the weekly shop but not the customers who plan a month ahead around a delivery, and those are the orders least likely to be cancelled — so the longer horizon costs nothing to offer and holds the more valuable bookings.",
-        "A day with no free van used to simply show no slots, which read as a fault in the site. It now says the fleet is fully committed and offers the next day that isn't."
+        "The booking horizon went from fourteen days to twenty-eight. Fourteen covered the weekly shop but not the customers who plan a month ahead around a delivery. Those are the orders least likely to be cancelled, so the longer horizon costs nothing to offer and holds the more valuable bookings.",
+        "A day with no free van used to show no slots at all, which read as a fault in the site. It now says the fleet is fully committed, and offers the next day that is not."
       ]
     }
   ]

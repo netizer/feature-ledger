@@ -1,0 +1,15 @@
+{
+  "id": "record-a-change",
+  "audience": "user",
+  "category": "Recording what the product does",
+  "size": "Big",
+  "history": [
+    {
+      "version": 1,
+      "name": "Recording a change to a feature",
+      "description": "The command ledger update replaces a feature's description with its full current-state text, and takes a list of change bullets alongside it. Each bullet says what the feature was before and why it moved, which is the part a reader cannot get from the description. A feature that existed before this release cannot be updated without one, so an edition never carries a changed entry with no reason attached.",
+      "changes": null,
+      "dev_notes": "src/commands/write.mjs cmdUpdate. add_changes appends instead of replacing. Category, sub-section and size moves apply to the feature rather than to one moment in its history; dev_notes carry forward to a new history entry on their own."
+    }
+  ]
+}

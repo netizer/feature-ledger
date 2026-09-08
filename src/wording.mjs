@@ -2,13 +2,20 @@
  * Every line of standing prose the generators emit, in one place.
  *
  * All of it is overridable per project from `.ledger/config.json`'s `docs`
- * block — the defaults are written to be true of any product rather than
+ * block. The defaults are written to be true of any product rather than
  * generic-sounding, which is why they lean on `product` and the optional
- * one-line `tagline` instead of saying "this software".
+ * one-line `tagline` instead of saying "this software". They are also written
+ * to the same style guide the entries are: see `ledger style`.
  */
 
-const withTagline = (config, sentence) =>
-  config.tagline ? `${sentence.replace(/\.$/, "")} — ${config.tagline}.` : sentence;
+// The tagline leads, as its own sentence, so the reader knows what the
+// product is before being told what the list is. Joining it to the sentence
+// with a dash is exactly the construction the style guides rule out.
+const withTagline = (config, sentence) => {
+  if (!config.tagline) return sentence;
+  const t = config.tagline.trim().replace(/[.\s]+$/, "");
+  return `${t.charAt(0).toUpperCase()}${t.slice(1)}. ${sentence}`;
+};
 
 export function wording(config) {
   const product = config.product;
@@ -18,37 +25,36 @@ export function wording(config) {
     features: {
       title: "Features",
       intro: [
-        withTagline(config, `A plain-language list of what's built into ${product} today.`) +
-        " Grouped by area, with each feature tagged by size so it's easy to see the big pieces at a glance" +
-        " without losing the smaller touches that make the whole thing feel thought-through. Purely mechanical" +
-        " form checks (required fields, valid email format, and the like) aren't listed — this is about what the" +
-        " system actually *does*, not basic input policing.",
+        withTagline(config, `A plain-language list of what ${product} does today.`) +
+        ` Every entry is one capability someone using ${product} would name: something they can ask for,` +
+        " or would miss if it went away. Smaller things — a default, a guardrail, a piece of polish, a" +
+        " routine form check — are described inside the capability they belong to rather than listed on" +
+        " their own, so this list stays the size of the product rather than the size of the codebase.",
         "",
-        "**Big** = a major capability on its own. **Medium** = a meaningful feature within a bigger area." +
-        " **Small** = a specific, deliberate touch or guardrail. **New** = added this release." +
-        " **Changed** = meaningfully changed this release.",
+        "**Big** = a capability the product is chosen for. **Medium** = a capability in its own right," +
+        " inside a bigger one. **Small** = a capability narrow enough to describe in a line." +
+        " **New** = added this release. **Changed** = meaningfully changed this release.",
       ].join("\n"),
     },
     extended: {
       title: "Features (extended)",
       intro:
-        "The same feature list as the client-facing one — what actually ships and what the client sees — with" +
-        " technical implementation notes folded in under each entry, for anyone working in this codebase. This is" +
-        " the doc to read to understand the product **and** how it's built, without needing the two side by side.",
+        "The client-facing feature list, with technical implementation notes added under each entry." +
+        " Read this to understand both what the product does and how it is built, without opening two documents.",
     },
     dev: {
       title: "Dev Features",
       intro:
-        "Implementation-level notes on things a client never sees or cares about — no client-facing angle at all." +
-        " Paired with the extended feature list (client-facing features with dev notes attached).",
+        "Implementation notes on parts of the system a client never sees." +
+        " For client-facing features and their implementation notes, read the extended feature list.",
     },
     pdf: {
       // The <em> is the one word that takes the accent colour on the cover.
       title_html: "The Feature <em>Ledger</em>",
       intro: withTagline(
         config,
-        `Everything currently built into ${product}, in plain language, grouped by area.`,
-      ) + " Sized so the big pieces stand out without losing the small touches that make the whole thing hold together.",
+        `Everything ${product} does today, in plain language.`,
+      ) + " Each entry is one capability you could ask for by name, sized so the biggest pieces stand out.",
       colophon: `Prepared for ${config.prepared_for}; every entry describes behaviour that is built and running.`,
     },
   };
@@ -59,7 +65,7 @@ export function wording(config) {
 }
 
 export const GENERATED_HEADER = (ledgerDirName = ".ledger") => `<!--
-  GENERATED FILE — do not hand-edit, and don't commit it.
+  GENERATED FILE: do not hand-edit, and don't commit it.
   The source of truth is ${ledgerDirName}/; run \`ledger build\` to rebuild.
 -->
 

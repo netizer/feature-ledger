@@ -1,0 +1,15 @@
+{
+  "id": "markdown-docs",
+  "audience": "user",
+  "category": "The documents it produces",
+  "size": "Medium",
+  "history": [
+    {
+      "version": 1,
+      "name": "Three Markdown documents for the team",
+      "description": "The command ledger build also writes three Markdown documents from the same corpus: FEATURES.md, the client-facing list; FEATURES_EXTENDED.md, the same list with implementation notes under each entry; and DEV_FEATURES.md, the entries only the team sees. All three describe the latest release, so they read as what the product does today. They are build output: the corpus is what you commit, and it carries the documentation's history on its own.",
+      "changes": null,
+      "dev_notes": "src/render/markdown.mjs; the three docs are the three audience/dev_notes combinations. Titles, intros and the colophon are overridable per project under `docs` in config.json — see src/wording.mjs."
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "id": "sub-sections",
+  "audience": "user",
+  "category": "Recording what the product does",
+  "size": "Small",
+  "history": [
+    {
+      "version": 1,
+      "name": "Sub-sections inside an area",
+      "description": "A sub-section is a heading between an area and a feature, for an area with a real part inside it. Each one carries a name and a one-or-two-sentence overview of that part, and you file a feature into it when you record or update the feature. When every feature in a sub-section arrives in the same release, the edition flags the sub-section once rather than printing a column of identical New marks.",
+      "changes": null,
+      "dev_notes": "src/commands/write.mjs cmdSubcategory; .ledger/subcategories.json. FeatureSet#sections is the single layout both renderers walk. `ledger status` mentions a sub-section that leads with a Big entry, since its heading and intro already are that part's overview."
+    }
+  ]
+}

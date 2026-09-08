@@ -62,6 +62,38 @@ function report(project, feature, { dryRun, verb }) {
   out(`${verb} ${feature.id} at v${project.workingVersion} → ${path.relative(process.cwd(), project.featurePath(feature.id))}`);
 }
 
+/**
+ * Where a feature goes when the payload doesn't say.
+ *
+ * Areas are a reading aid, not a required taxonomy. A product with four
+ * capabilities has no areas — dividing it up would invent a structure the
+ * reader has to hold in their head for nothing — so an unfiled feature opens
+ * (or joins) the one default area, and the generators print that area without
+ * a heading. A product with one area already in use puts it there too: that
+ * is the same product, still undivided.
+ *
+ * Once someone has deliberately named two or more areas, the list *is* the
+ * reading order, and guessing a place in it is exactly the mistake that's
+ * expensive to find later. So from there on the category is asked for.
+ */
+function resolveCategory(project, dryRun) {
+  const existing = project.config.categories;
+  if (existing.length === 1) return existing[0];
+  if (existing.length > 1) {
+    fail(
+      "a new feature needs \"category\" — this ledger has areas, and which one an entry belongs to " +
+      `is the reading order of every document:\n${existing.map((c) => `  ${c}`).join("\n")}`,
+    );
+  }
+
+  const name = project.featureSet.defaultCategory;
+  if (!dryRun) {
+    project.config.categories = [name];
+    project.saveConfig();
+  }
+  return name;
+}
+
 export async function cmdAdd({ flags, positional }) {
   const project = openProject(flags);
   const version = project.workingVersion;
@@ -75,11 +107,16 @@ export async function cmdAdd({ flags, positional }) {
     fail(`feature "${id}" already exists — use \`ledger update ${id}\` to record a change to it`);
   }
 
+  // A category is only required once the product has more than one, so a
+  // small product never has to invent a taxonomy before it can record its
+  // first capability. See resolveCategory.
+  if (isBlank(data.category)) data.category = resolveCategory(project, flags["dry-run"]);
+
   for (const field of ["audience", "category", "size", "name", "description"]) {
     if (isBlank(data[field])) fail(`a new feature needs "${field}" — see \`ledger rules\` for what each one means`);
   }
 
-  // Both of these are checked here rather than left to `ledger check`, so a
+  // Both of these are checked here rather than left to `ledger status`, so a
   // typo'd category is caught while the agent still has the context to fix
   // it, not three features later.
   if (!project.config.categories.includes(data.category)) {
@@ -133,7 +170,16 @@ export async function cmdUpdate({ flags, positional }) {
   // Field moves (a re-filing, a resize) apply to the feature itself, not to
   // one moment in its history: they describe where the entry lives, not what
   // the product did.
-  if (data.category) feature.category = data.category;
+  if (data.category) {
+    if (!project.config.categories.includes(data.category)) {
+      fail(
+        `unknown area ${JSON.stringify(data.category)} — the areas are:\n` +
+        project.config.categories.map((c) => `  ${c}`).join("\n") +
+        "\nIf this really is a new one, `ledger categories add` places it first.",
+      );
+    }
+    feature.category = data.category;
+  }
   if ("subcategory" in data) feature.subcategory = data.subcategory || null;
   if (data.size) feature.size = data.size;
 
@@ -180,6 +226,73 @@ export async function cmdUpdate({ flags, positional }) {
 
   const rebuilt = new Feature(feature.toJSON());
   report(project, rebuilt, { dryRun: flags["dry-run"], verb: "updated" });
+}
+
+/**
+ * Rewording: the same feature, said better.
+ *
+ * `update` records that the product moved, which is why it insists on a
+ * `changes` bullet and tags the feature as Changed in the edition. A copy fix
+ * is not that. The product did not move, so nothing should appear in the
+ * release, and the improved wording should read as though it had always been
+ * there.
+ *
+ * So this edits the text of an existing history entry in place. It is what a
+ * project needs after adopting a style guide, when a corpus written in an
+ * older voice has to be brought over without every entry lighting up as new
+ * work.
+ */
+export async function cmdReword({ flags, positional }) {
+  const project = openProject(flags);
+  const id = positional[0];
+  if (!id) fail("usage: ledger reword <id>  (with the new wording as JSON on stdin)");
+  const feature = project.featureSet.find(id);
+
+  const data = await payload(flags, { allow: ["name", "description", "dev_notes", "changes"] });
+  if (!Object.keys(data).length) fail(`nothing to reword — pass at least one of: name, description, dev_notes, changes`);
+
+  // Default to the entry whose text is the one on show today; --version
+  // reaches back to fix an older edition's wording.
+  const asked = flags.version !== undefined && flags.version !== true ? Number(flags.version) : null;
+  const target = asked ?? feature.stateAt(project.releases.latestVersion)?.version;
+  if (target === undefined || target === null) fail(`${id} doesn't exist yet at v${project.releases.latestVersion}`);
+
+  const entry = feature.entryAt(target);
+  if (!entry) fail(`${id} has no history entry at v${target} — it has ${feature.history.map((h) => `v${h.version}`).join(", ")}`);
+  if (entry.removed) fail(`${id} v${target} is a removal; reword its reason with \`ledger reword ${id} --version <earlier>\` or fix the removal itself`);
+
+  const touched = [];
+  if (!isBlank(data.name)) { entry.name = data.name; touched.push("name"); }
+  if (!isBlank(data.description)) { entry.description = data.description; touched.push("description"); }
+  if (data.dev_notes !== undefined) {
+    if (isBlank(data.dev_notes)) delete entry.dev_notes;
+    else entry.dev_notes = data.dev_notes;
+    touched.push("dev_notes");
+  }
+  if (data.changes !== undefined) {
+    // Rewording can improve a bullet but not add or drop one: adding a bullet
+    // is recording a change, and that belongs in `update` where it will be
+    // tagged and dated.
+    const existing = entry.changes ?? [];
+    if (!Array.isArray(data.changes)) fail(`"changes" must be a list of strings`);
+    if (data.changes.length !== existing.length) {
+      fail(
+        `${id} v${target} has ${existing.length} change bullet(s) and the reword gives ${data.changes.length}. ` +
+        "Rewording can improve a bullet, never add or remove one — use `ledger update` for that.",
+      );
+    }
+    entry.changes = data.changes;
+    touched.push("changes");
+  }
+
+  const rebuilt = new Feature(feature.toJSON());
+  if (flags["dry-run"]) {
+    out(JSON.stringify(rebuilt.toJSON(), null, 2));
+    out("(--dry-run: nothing written)");
+    return;
+  }
+  project.saveFeature(rebuilt);
+  out(`reworded ${id} v${target} (${touched.join(", ")}) — wording only, no history entry`);
 }
 
 /**
@@ -266,13 +379,19 @@ export async function cmdCategories({ flags, positional }) {
   const [sub, name] = positional;
 
   if (!sub || sub === "list") {
+    if (!project.config.categories.length) {
+      out(`no areas yet — an unfiled feature opens one called “${project.featureSet.defaultCategory}”`);
+      return;
+    }
     for (const c of project.config.categories) {
       const n = project.featureSet.features().filter((f) => f.category === c).length;
       out(`${String(n).padStart(3)}  ${c}`);
     }
     return;
   }
-  if (sub !== "add") fail("usage: ledger categories [list | add \"Name\" [--after \"Other\"]]");
+  if (sub === "rename") return renameCategory(project, flags, positional.slice(1));
+  if (sub === "remove") return removeCategory(project, flags, positional.slice(1));
+  if (sub !== "add") fail('usage: ledger categories [list | add "Name" [--after "Other"] | rename "Old" "New" | remove "Name"]');
   if (isBlank(name)) fail('usage: ledger categories add "Name" [--after "Other"]');
   if (project.config.categories.includes(name)) fail(`category ${JSON.stringify(name)} already exists`);
 
@@ -301,11 +420,69 @@ export async function cmdCategories({ flags, positional }) {
 }
 
 /**
+ * The two moves a ledger makes as the product outgrows its structure, so
+ * neither one means opening config.json by hand.
+ *
+ * A product that started undivided and grew areas renames the default one
+ * into the first real area (its features come along, since they name it) or,
+ * once they've been re-filed elsewhere, drops it. An area name is a heading a
+ * client reads, so renaming it is a wording fix like any other: nothing about
+ * the product moved, and nothing is recorded against the release.
+ */
+function renameCategory(project, flags, args) {
+  const [from, to] = args;
+  if (!from || !to) fail('usage: ledger categories rename "Old name" "New name"');
+  const i = project.config.categories.indexOf(from);
+  if (i === -1) fail(`no area ${JSON.stringify(from)} — ${project.config.categories.map((c) => JSON.stringify(c)).join(", ") || "there are none yet"}`);
+  if (project.config.categories.includes(to)) fail(`area ${JSON.stringify(to)} already exists`);
+
+  const moving = project.featureSet.features().filter((f) => f.category === from);
+  const subs = project.subcategories.filter((s) => s.category === from);
+  if (flags["dry-run"]) {
+    out(`would rename ${JSON.stringify(from)} → ${JSON.stringify(to)}, carrying ${moving.length} feature(s) and ${subs.length} sub-section(s)`);
+    return;
+  }
+
+  project.config.categories[i] = to;
+  project.saveConfig();
+  for (const f of moving) {
+    f.category = to;
+    project.saveFeature(new Feature(f.toJSON()));
+  }
+  for (const s of subs) s.category = to;
+  if (subs.length) project.saveSubcategories();
+  out(`renamed area ${JSON.stringify(from)} → ${JSON.stringify(to)} (${moving.length} feature(s) moved with it)`);
+}
+
+function removeCategory(project, flags, args) {
+  const name = args[0];
+  if (!name) fail('usage: ledger categories remove "Name"');
+  if (!project.config.categories.includes(name)) fail(`no area ${JSON.stringify(name)}`);
+
+  const held = project.featureSet.features().filter((f) => f.category === name);
+  if (held.length) {
+    fail(
+      `${JSON.stringify(name)} still holds ${held.length} feature(s): ${held.map((f) => f.id).join(", ")}. ` +
+      "Re-file them first (`ledger update <id> --category \"…\"`) — dropping the area would leave them pointing at nothing.",
+    );
+  }
+  if (flags["dry-run"]) {
+    out(`would remove empty area ${JSON.stringify(name)}`);
+    return;
+  }
+  project.config.categories = project.config.categories.filter((c) => c !== name);
+  project.subcategories = project.subcategories.filter((s) => s.category !== name);
+  project.saveConfig();
+  project.saveSubcategories();
+  out(`removed empty area ${JSON.stringify(name)}`);
+}
+
+/**
  * A sub-section is the level between a category and a feature, for when one
  * area has grown big enough that its features would otherwise read as a wall.
  * The two rules that keep it load-bearing rather than a third tier of
  * taxonomy — at least N features, and no Big among them — are enforced by
- * `ledger check`, not here, because they're about the shape of the corpus
+ * `ledger status`, not here, because they're about the shape of the corpus
  * once the features have been filed.
  */
 export async function cmdSubcategory({ flags, positional }) {
@@ -319,7 +496,8 @@ export async function cmdSubcategory({ flags, positional }) {
     }
     return;
   }
-  if (sub !== "add") fail("usage: ledger subcategory [list | add]  (add takes JSON on stdin)");
+  if (sub === "reword") return rewordSubcategory(project, flags, positional.slice(1));
+  if (sub !== "add") fail("usage: ledger subcategory [list | add | reword <id>]  (add and reword take JSON on stdin)");
 
   const data = await payload(flags, { allow: ["id", "category", "name", "intro"] });
   if (flags.id) data.id = flags.id;
@@ -340,4 +518,33 @@ export async function cmdSubcategory({ flags, positional }) {
   project.subcategories.push(entry);
   writeJson(project.subcategoriesPath, project.subcategories);
   out(`added sub-section ${data.id} under ${data.category} — assign features to it with \`ledger update <id> --subcategory ${data.id}\``);
+}
+
+/**
+ * A sub-section's heading and intro are client-facing prose like any entry,
+ * so they need the same in-place fix. Nothing about the product moved, so
+ * this records nothing against the release.
+ */
+async function rewordSubcategory(project, flags, args) {
+  const id = args[0];
+  if (!id) fail("usage: ledger subcategory reword <id>  (with { name?, intro? } as JSON on stdin)");
+  const entry = project.subcategories.find((s) => s.id === id);
+  if (!entry) {
+    fail(`unknown sub-section ${JSON.stringify(id)} — the ones declared are: ${project.subcategories.map((s) => s.id).join(", ") || "(none)"}`);
+  }
+
+  const data = await payload(flags, { allow: ["name", "intro"] });
+  if (flags.intro) data.intro = flags.intro;
+  const touched = [];
+  if (!isBlank(data.name)) { entry.name = data.name; touched.push("name"); }
+  if (!isBlank(data.intro)) { entry.intro = data.intro; touched.push("intro"); }
+  if (!touched.length) fail("nothing to reword — pass a name, an intro, or both");
+
+  if (flags["dry-run"]) {
+    out(JSON.stringify(entry, null, 2));
+    out("(--dry-run: nothing written)");
+    return;
+  }
+  writeJson(project.subcategoriesPath, project.subcategories);
+  out(`reworded sub-section ${id} (${touched.join(", ")}) — wording only, nothing recorded against the release`);
 }

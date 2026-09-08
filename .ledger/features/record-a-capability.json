@@ -1,0 +1,15 @@
+{
+  "id": "record-a-capability",
+  "audience": "user",
+  "category": "Recording what the product does",
+  "size": "Big",
+  "history": [
+    {
+      "version": 1,
+      "name": "Recording a capability",
+      "description": "The command ledger add records one capability, with the audience it matters to, its size, its name and a present-tense description of what the product does. The id you give it is lower-case kebab-case and never changes, so it carries the feature's history through every later rename. An entry filed under an area or a sub-section that doesn't exist is refused as you write it, and the message lists the ones that do.",
+      "changes": null,
+      "dev_notes": "src/commands/write.mjs cmdAdd. The payload is JSON on stdin or --file, with flags overriding individual fields; --dry-run prints the file it would write. One file per feature at .ledger/features/<id>.json."
+    }
+  ]
+}

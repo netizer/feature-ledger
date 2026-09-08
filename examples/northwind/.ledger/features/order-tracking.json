@@ -7,7 +7,7 @@
     {
       "version": 1,
       "name": "Order tracking without an account",
-      "description": "An order reference and the postcode it was placed against are enough to see where an order is, change the delivery window, or cancel it — no password, no sign-up.",
+      "description": "An order reference and the postcode it was placed against are enough to see where an order is, change the delivery window, or cancel it. There is no password and no sign-up.",
       "changes": null
     }
   ]

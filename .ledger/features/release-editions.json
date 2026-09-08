@@ -1,0 +1,15 @@
+{
+  "id": "release-editions",
+  "audience": "user",
+  "category": "The documents it produces",
+  "size": "Big",
+  "history": [
+    {
+      "version": 1,
+      "name": "Cutting a release",
+      "description": "The command ledger release cut gives the release in progress its name and date and opens the next one behind it, which is where everything recorded from then on lands. The release just cut becomes an edition that never changes again, and ledger release list shows the timeline with the number of entries each release covers. Cutting a release with nothing recorded against it is refused, because the edition would be identical to the one before it.",
+      "changes": null,
+      "dev_notes": "src/commands/release.mjs; the timeline is .ledger/releases.json, validated as 1..N with at most one trailing future release. --force covers a deliberate re-issue."
+    }
+  ]
+}

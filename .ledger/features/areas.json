@@ -1,0 +1,15 @@
+{
+  "id": "areas",
+  "audience": "user",
+  "category": "Recording what the product does",
+  "size": "Medium",
+  "history": [
+    {
+      "version": 1,
+      "name": "Areas, and the order they read in",
+      "description": "Areas group the entries, and the order of the list is the reading order of every document the ledger produces. The command ledger categories add places one, before or after any other; rename and remove move the structure without touching the entries underneath it. A ledger with no areas puts everything in one called Features and prints it without a heading, so a small product reads as a list of what it does rather than as a chapter of one.",
+      "changes": null,
+      "dev_notes": "src/commands/write.mjs cmdCategories; the list lives in .ledger/config.json. FeatureSet#unstructured is what suppresses the heading and the contents page. Renaming the default area carries its features and sub-sections with it; removing one is refused while it still holds features."
+    }
+  ]
+}

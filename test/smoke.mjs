@@ -43,8 +43,30 @@ const feature = (o) => JSON.stringify(o);
 log(`workspace: ${dir}\n`);
 
 run(["init", "--product", "Testbed", "--agents", "none"]);
-run(["categories", "add", "First area"]);
+
+// A ledger with no areas takes a feature without one: it opens the default
+// area, and the generators print that without a heading.
+run(["add", "solo"], {
+  stdin: feature({ audience: "user", size: "Medium", name: "Solo", description: "Does the solo thing." }),
+});
+assert(
+  "an unfiled feature opens the default area",
+  JSON.parse(fs.readFileSync(path.join(dir, ".ledger/config.json"), "utf8")).categories.join() === "Features",
+);
+run(["build", "--md"]);
+assert(
+  "an undivided ledger prints no area heading",
+  !fs.readFileSync(path.join(dir, "docs/generated/FEATURES.md"), "utf8").includes("## 1. Features"),
+);
+fs.rmSync(path.join(dir, "docs/generated"), { recursive: true, force: true });
+
+// …and once it has real areas, the default one is renamed into the first of
+// them rather than being left behind as a heading nobody meant.
+run(["categories", "rename", "Features", "First area"]);
 run(["categories", "add", "Second area", "--after", "First area"]);
+// With two areas, the tool stops guessing where an entry belongs.
+run(["add", "unfiled"], { expect: "fail", stdin: feature({ audience: "user", size: "Small", name: "Unfiled", description: "x" }) });
+run(["categories", "remove", "First area"], { expect: "fail" });
 
 run(["add", "alpha"], {
   stdin: feature({ audience: "user", category: "First area", size: "Big", name: "Alpha", description: "Does the alpha thing." }),
@@ -59,7 +81,7 @@ run(["add", "gamma"], {
   stdin: feature({ audience: "dev", category: "Second area", size: "Medium", name: "Gamma", description: "An internal convenience." }),
 });
 
-run(["check"]);
+run(["status"]);
 run(["release", "cut", "--name", "Baseline", "--date", "2026-01-15"]);
 // A release with nothing recorded against it would print an identical edition.
 run(["release", "cut", "--name", "Too soon"], { expect: "fail" });
@@ -97,23 +119,32 @@ const alpha = JSON.parse(fs.readFileSync(path.join(dir, ".ledger/features/alpha.
 assert("one history entry per version", alpha.history.length === 2);
 assert("add_changes appended rather than replaced", alpha.history[1].changes.length === 2);
 
-// Sub-section rules are enforced at check/build time, not on load — you have
-// to be able to declare one and then fill it.
+// A sub-section is declared and then filled, and nothing counts what ends up
+// in it. Leading one with a Big entry is worth a word, never a refusal.
 run(["subcategory", "add"], {
-  stdin: feature({ id: "cluster", category: "First area", name: "A cluster", intro: "Four small things that belong together." }),
+  stdin: feature({ id: "cluster", category: "First area", name: "A cluster", intro: "Small things that belong together." }),
 });
-run(["check"], { expect: "fail" });
+assert("an unfilled sub-section is not a failure", run(["status", "--quiet"]).trim() === "");
+run(["update", "alpha", "--subcategory", "cluster"]);
+assert(
+  "a sub-section led by a Big entry is mentioned, not refused",
+  run(["status", "--quiet"]).includes("leads with a Big entry"),
+);
+run(["update", "alpha", "--subcategory", ""]);
 for (const id of ["c1", "c2", "c3", "c4"]) {
   run(["add", id], {
     stdin: feature({ audience: "user", category: "First area", subcategory: "cluster", size: "Small", name: `Cluster ${id}`, description: `The ${id} part of the cluster.` }),
   });
 }
-run(["check"]);
+run(["status"]);
+run(["check"], { expect: "fail" });   // merged into `status`, and says so
+run(["doctor"], { expect: "fail" });
 
 const list = run(["list"]);
 assert("list marks this release's work", list.includes("changed v2") && list.includes("new v2"));
 const status = run(["status", "--json"]);
 assert("status counts the removal", JSON.parse(status).removed.includes("gamma"));
+assert("status reports the setup it used to need `doctor` for", JSON.parse(status).setup.fonts.includes("embedded"));
 
 run(["build", "--md"]);
 const md = fs.readFileSync(path.join(dir, "docs/generated/FEATURES.md"), "utf8");
@@ -121,6 +152,7 @@ assert("renamed feature footnotes its old name", md.includes("previously “Beta
 assert("global change appears once", md.split("Also since last time").length === 2);
 assert("sub-section heading is numbered", md.includes("### 1.1 A cluster"));
 assert("dev feature stays out of the client doc", !md.includes("An internal convenience"));
+assert("areas are numbered once there are areas", md.includes("## 1. First area"));
 const dev = fs.readFileSync(path.join(dir, "docs/generated/DEV_FEATURES.md"), "utf8");
 assert("the removed dev feature is listed as gone, in the dev doc", dev.includes("No longer available") && dev.includes("Superseded by the build pipeline"));
 

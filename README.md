@@ -19,7 +19,7 @@ live in one file every agent can read, and every operation is a CLI command).
 | --- | --- |
 | **Corpus** | `.ledger/` — one JSON file per feature, plus the release timeline. Committed. |
 | **Generated** | `FEATURES.md`, `FEATURES_EXTENDED.md`, `DEV_FEATURES.md`, and a PDF per release. Gitignored build output. |
-| **Interface** | `ledger` — read, write, check, build. Nothing hand-edits the JSON. |
+| **Interface** | `ledger` — read, write, status, build. Nothing hand-edits the JSON. |
 
 ---
 
@@ -40,6 +40,53 @@ small), resolves which release an edit belongs to, and refuses the mistakes
 that are expensive to find later — a changed feature with no explanation, a
 sub-section with two features in it, an accent colour that collides with the
 "this changed" highlight.
+
+---
+
+## One altitude, whatever the size of the project
+
+The failure mode of a generated feature document is granularity. Left alone,
+an agent surveying a codebase writes down everything it finds — the guardrails,
+the defaults, the "safe to run twice" — and a small tool comes out as
+twenty-two pages that nobody reads, while a large one comes out as vague
+gestures at subsystems. Two projects, two different altitudes, neither of them
+the one the reader wanted.
+
+So the ledger fixes the altitude and lets the *count* vary:
+
+> **One entry is one capability someone using the product would name.**
+> Something they could ask for, or would miss if it went away.
+>
+> Could you demo it? Would demoing it look different from demoing the entry
+> next to it? Both, or it isn't an entry.
+
+A four-capability tool gets four entries. A two-hundred-capability platform
+gets two hundred. Each entry zooms in exactly as far as the other, so someone
+who reads the ledger for one product and then for another understands both at
+the same level. Guardrails, defaults, plumbing and polish still get recorded —
+inside the description of the capability they belong to, as `dev_notes`, as a
+`dev` feature, or as an `other-change` — just never as an entry of their own.
+
+Everything scales from there:
+
+- **Areas are optional.** A new ledger has none. An entry added without one
+  lands in a single area called "Features", and the generators print that
+  without a heading or a contents page — a product that is one coherent thing
+  reads as a list of what it does, not as a chapter of one.
+- **Areas arrive when the product has parts** a user would recognise and name.
+  `ledger categories rename` turns the default area into the first real one,
+  carrying its entries with it.
+- **Sub-sections arrive when an area has a real part inside it**, holding
+  however many entries that part turns out to have.
+- **Nothing counts entries per area.** An editor with twenty distinct
+  capabilities has an area with twenty entries in it; an area opened today for
+  work starting tomorrow has one. Both are facts about the product, and a tool
+  that warned about either would only teach people to flatten a shape that was
+  already true.
+
+`ledger size` is a ranking *within* one product (which capability is it chosen
+for?), not a measure of how far down an entry is allowed to go. All three
+sizes are capabilities.
 
 ---
 
@@ -125,30 +172,37 @@ ledger bootstrap        # prints a survey prompt — paste it into your coding a
 ```
 
 The survey is agent work: only something that can read the codebase can say
-what it does. The prompt has the agent propose the category list first (and
-wait for you to confirm it), then work through one category at a time, adding
-a feature per capability with `ledger add`, stopping between batches. Attempted
-in one pass it runs out of context and starts inventing; in batches it's
-reliable.
-
-When it's done:
+what it does. The prompt runs start to finish without asking you anything: the
+agent lists the capabilities first — against the bar above — then decides
+whether the product needs areas at all, then writes the entries a batch at a
+time, and finally cuts and prints the baseline itself — the last three
+commands it runs being:
 
 ```bash
-ledger check
-ledger release cut --name "Baseline" --date 2026-03-02   # when work on it started
+ledger status
+ledger release cut --name "Baseline" --date 2026-03-02   # the first commit's date
 ledger build
 ```
+
+Attempted in one pass the survey runs out of context and starts inventing; in
+batches it's reliable — so the prompt batches, but the agent moves between
+batches on its own rather than checking in. Editing is deliberately after the
+fact: it finishes by listing the entries it was least sure about, and
+`ledger reword`, `ledger update` and `ledger remove` fix anything that reads
+wrong. The output of `ledger bootstrap` is two parts, an explanation for you
+and then the prompt itself: everything below the rule is what gets pasted, and
+there's nothing after it.
 
 ### The baseline reads as an inventory, not as your work
 
 Two things make that true, and both are already the default:
 
 - **Voice.** The rules require every description to be a present-tense
-  statement of what the product does — "A guest can book without an account",
+  statement of what the product does: "A guest can book without an account",
   never "added", "we now support", "improved". A reader can't tell from the
   wording whether something shipped last week or three years ago. The
   bootstrap prompt says this twice, because it's the thing an agent drifts
-  away from first.
+  away from first. See [Tone](#tone) for the rest of it.
 - **No flags on version 1.** New/Changed highlighting is computed against a
   release's predecessor, and version 1 hasn't got one. So the first edition
   prints as a plain catalogue with nothing marked as new. From version 2 on,
@@ -202,8 +256,9 @@ That mints the archival PDF for what was just shown, and opens the next
 release. Every New/Changed tag from the cycle goes quiet on its own; there's
 nothing to strip by hand.
 
-Run `ledger rules` for the full authoring rules — sizing, the `user`/`dev`
-bar, sub-sections, removals, and what *isn't* worth a feature entry.
+Run `ledger rules` for the full authoring rules — the entry bar, sizing, the
+`user`/`dev` split, areas, sub-sections, removals, and where everything that
+*isn't* an entry goes instead.
 
 ---
 
@@ -223,9 +278,12 @@ ledger init --agents none               # wire nothing
 
 The stanza is a **pointer**, not a copy: it says the ledger exists, that a
 feature change isn't finished until the ledger records it, lists the six
-commands, and tells the agent to run `ledger rules` before its first edit.
-One source of truth, cheap in every session, and the full text is only pulled
-when an edit is actually happening.
+commands, names the project's tone, and tells the agent to run
+`ledger rules` before its first edit. One source of truth, cheap in every
+session, and the full text is only pulled when an edit is actually happening.
+
+`ledger style set` rewrites that stanza in every agent file, so the tone the
+agent reads is always the one the project is on.
 
 If you use the `tools/ledger` wrapper instead of a global install, edit the
 stanza's commands to match — the agent will use exactly what's written there.
@@ -266,8 +324,11 @@ strongest:
   ```bash
   # .git/hooks/pre-commit  — or via husky/lefthook/pre-commit
   #!/usr/bin/env bash
-  ledger check || exit 1
+  ledger status --quiet || exit 1
   ```
+
+  `--quiet` prints nothing when the corpus is sound and skips the browser
+  probe, so the hook costs nothing on a normal commit.
 
   This catches a corpus that's been broken, not one that's out of date. For
   out-of-date, add a soft check: if the commit touches source files but
@@ -284,6 +345,87 @@ gitignored build output — don't commit them and don't point `CLAUDE.md` at
 them. `FEATURES_EXTENDED.md` is genuinely useful for a human reading in, but
 an agent should reach for `ledger list` / `ledger show` instead, which is the
 same information at a fraction of the cost.
+
+---
+
+## Tone
+
+A ledger is read by a client, often in a second language. Left to itself a
+coding agent writes in its own voice: em-dash asides, a phrase repeated for
+rhythm, sentences carrying three ideas at once. That voice is wrong for this
+document, and "write more plainly" is too vague to survive across sessions and
+across tools.
+
+So the ledger names a **public style guide** instead. Every coding agent
+already knows these documents, which makes one line of configuration do the
+work of a page of instructions.
+
+```bash
+ledger style              # the tone this project writes in
+ledger style list         # the four built in
+ledger style set govuk    # switch, and update the agent stanza to match
+ledger style rewrite      # the prompt for bringing an existing ledger over
+```
+
+| id | guide | reads like |
+|----|-------|-----------|
+| `google` *(default)* | [Google developer documentation style guide](https://developers.google.com/style) | Neutral and precise. The one most coding agents know best. |
+| `govuk` | [GOV.UK content style guide](https://www.gov.uk/guidance/style-guide) | The plainest English of the four. Written to be understood by everyone. |
+| `plain-language` | [Federal Plain Language Guidelines](https://www.plainlanguage.gov/guidelines/) | The US plain-writing standard, with more attention to structure. |
+| `ste` | [ASD-STE100 Simplified Technical English](https://www.asd-ste100.org/) | The aviation standard. Maximum clarity, deliberately clipped. |
+
+It is one line in `.ledger/config.json`, so it is per project. A public sector
+client and a developer tool do not want the same voice.
+
+```json
+"style": "govuk"
+```
+
+There are no per-rule overrides — no word lists, no sentence limits, no
+spelling switch. A tone that can be tuned clause by clause stops being a tone
+and becomes a specification, and prose does not take instruction that way.
+
+### Your own tone
+
+If none of the four is what you want, write your own:
+
+```bash
+ledger style set custom     # starts .ledger/STYLE.md from a template
+```
+
+`.ledger/STYLE.md` is a page of prose, briefed the way you would brief a
+writer joining the team: who reads this, how formal it should feel, the words
+your product uses for its own things ("the people who book are guests, never
+users"). Naming a well-known guide and saying where you differ carries
+further than a page of rules — every coding agent knows the major ones.
+
+### Where it lands
+
+The tone reaches an agent at three points, all from the one setting:
+
+- **The agent stanza** in `CLAUDE.md` / `AGENTS.md` names it and links it, so
+  an agent making a small edit sees it without running anything.
+- **`ledger rules`** prints it in full inside the authoring rules.
+- **`ledger bootstrap`** puts it at the top of the baseline-survey prompt.
+
+`ledger style set` rewrites the stanza too, so it never names a guide the
+project has left.
+
+### Moving an existing ledger to a new tone
+
+`ledger reword <id>` fixes the words of an entry without recording a change:
+it edits the text in place, so nothing lands on the open release and no reader
+is told that something moved. `ledger subcategory reword <id>` does the same
+for a sub-section's heading and overview.
+
+`ledger style rewrite` prints a brief for a coding agent to do that across the
+whole ledger, one area at a time, holding it to changing the words rather than
+the meaning. A corpus written years ago in another voice comes over without a
+single feature reading as new work.
+
+Rewording can improve a `changes` bullet but not add or remove one — adding a
+bullet is recording a change, and belongs in `ledger update` where it will be
+dated.
 
 ---
 
@@ -312,7 +454,7 @@ same information at a fraction of the cost.
   One constraint: **the accent may not be green, blue or teal.** Those two
   hues carry meaning in every edition — green is "new", blue is "reworked" —
   and an accent in that range makes an unchanged row read as a changed one.
-  `ledger check` warns when a brand picks one that collides.
+  `ledger status` warns when a brand picks one that collides.
 
 - **`.ledger/theme.css`** — appended last to the PDF's stylesheet, for a
   one-off nudge that isn't worth a fork.
@@ -321,8 +463,8 @@ Wording — the doc titles, the intro paragraphs, the colophon — is overridabl
 per project in `.ledger/config.json` under `docs`. The defaults are built from
 `product` and the optional one-line `tagline`.
 
-`ledger doctor` shows the whole resolved setup: derived palette, masthead,
-fonts, and which browser will print.
+`ledger status` ends with the whole resolved setup: derived palette, masthead,
+fonts, the style guide in force, and which browser will print.
 
 ---
 
@@ -339,10 +481,13 @@ are what only the team cares about — and `dev_notes` on a user feature is
 implementation detail attached to a client-facing capability. The three
 Markdown docs are those three combinations.
 
-**Three sizes.** Big (a standalone capability), Medium (a meaningful piece of
-a bigger area), Small (a specific behaviour or guardrail). They order every
-section — a category can't bury its Big behind six Smalls just because that's
-the order things got written down in.
+**Three sizes, all of them capabilities.** Big (one the product is chosen
+for), Medium (a capability in its own right, inside a bigger one), Small (one
+narrow enough to describe in a line). The scale ranks entries within a single
+product and orders every section — an area can't bury its Big behind six
+Smalls just because that's the order things got written down in. It says
+nothing about how far down an entry may go; that's the entry bar's job, and
+it's the same bar in every project.
 
 **Two highlight semantics, on purpose.** The living Markdown docs tag New and
 Changed only while the target release is still in progress, so a shipped
@@ -350,11 +495,17 @@ release's docs read as a clean present-tense list. The archival PDF always
 diffs against its own predecessor, however old, because its whole job is
 reproducing what was in front of the client that day.
 
-**Sub-sections** sit between a category and a feature, for an area that grew
-big enough to read as a wall. At least four features, and no `Big` among them
-— the heading and its intro *are* the overview. When a whole sub-section
-arrives in one release it's flagged once, as one green card, rather than as a
-column of identical "New"s that says nothing.
+**Areas are a reading aid, not a taxonomy.** A ledger with none puts
+everything in one called "Features" and prints it without a heading. Areas
+appear when the product has parts a user would recognise, however many entries
+each of them ends up holding.
+
+**Sub-sections** sit between an area and a feature, for an area with a real
+part inside it. The heading and its intro *are* that part's overview, which is
+the one thing `ledger status` mentions: a sub-section leading with a `Big`
+entry says it twice. When a whole sub-section arrives in one release it's
+flagged once, as one green card, rather than as a column of identical "New"s
+that says nothing.
 
 ---
 
@@ -364,30 +515,34 @@ column of identical "New"s that says nothing.
 Reading
   ledger list [--category C] [--audience user|dev] [--size S] [--changed] [--json]
   ledger show <id> [--history] [--json]
-  ledger status [--json]              what this in-progress release has so far
+  ledger status [--json] [--quiet]    the open release, the corpus and the
+                                      setup, all checked; exit 1 on a problem
   ledger rules                        the authoring rules, in full
+  ledger style [show | list | set <id> | rewrite]
+                                      the tone every entry is written in
   ledger export [--out FILE]          the whole corpus as one JSON document
 
 Writing            (JSON payload on stdin or --file; --dry-run previews)
   ledger add <id>
   ledger update <id>
+  ledger reword <id> [--version N]    better words, same thing; no history entry
   ledger rename <id> "New name" --why "…"
   ledger remove <id> --reason "…"
   ledger other-change --audience user --description "…"
-  ledger categories [list | add "Name" [--after "Other" | --before "Other"]]
-  ledger subcategory [list | add]
+  ledger categories [list | add "Name" [--after "Other" | --before "Other"]
+                          | rename "Old" "New" | remove "Name"]
+  ledger subcategory [list | add | reword <id>]
 
 Releases
   ledger release list
   ledger release cut --name "…" [--date YYYY-MM-DD] [--force]
 
 Output
-  ledger check
   ledger build [--md] [--pdf] [--version N|all] [--out DIR] [--html]
-  ledger doctor
 
 Setup
   ledger init [--product "…"] [--accent "#hex"] [--logo PATH] [--agents …]
+              [--style google|govuk|plain-language|ste]
   ledger bootstrap
 ```
 
@@ -410,13 +565,14 @@ fast loop when you're tuning `theme.css`.
 ## Layout of `.ledger/`
 
 ```
-config.json          product, the category list (= reading order), wording overrides
+config.json          product, the area list (= reading order; may be empty), tone, wording overrides
 brand.json           logo, accent, fonts
 releases.json        the version timeline; the trailing "future" one is in progress
 features/<id>.json   one feature, with its full history
 index.json           the deliberate corpus order (ties within a size band)
 subcategories.json   sub-section headings
 other-changes.json   changes belonging to no single feature
+STYLE.md             optional, the project's own tone as prose
 theme.css            optional, appended last to the PDF stylesheet
 ```
 

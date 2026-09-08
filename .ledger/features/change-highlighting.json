@@ -1,0 +1,15 @@
+{
+  "id": "change-highlighting",
+  "audience": "user",
+  "category": "The documents it produces",
+  "size": "Medium",
+  "history": [
+    {
+      "version": 1,
+      "name": "What moved since the last edition",
+      "description": "Every edition marks its own changes against the edition before it: a green stripe for a feature that is new, a blue stripe and a \"What changed\" note for one that was reworked, and no stripe for an entry that stands as it did. The front page counts how many of each. A first edition has nothing behind it to compare against, so it prints as a plain inventory with no stripes anywhere on it.",
+      "changes": null,
+      "dev_notes": "Two semantics on purpose: the PDF always diffs against its own predecessor, however old, while the Markdown docs tag New and Changed only while the target release is still in progress, so a shipped release's docs read as a clean present-tense list. Nothing is tagged by hand."
+    }
+  ]
+}

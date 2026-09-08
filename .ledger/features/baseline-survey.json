@@ -1,0 +1,15 @@
+{
+  "id": "baseline-survey",
+  "audience": "user",
+  "category": "Setting up a ledger",
+  "size": "Medium",
+  "history": [
+    {
+      "version": 1,
+      "name": "Baseline survey of an existing codebase",
+      "description": "The command ledger bootstrap prints a brief you paste into a coding agent, which then reads the codebase and records what it already does as version 1. The brief carries the entry bar, the project's tone, and five steps: list the capabilities, decide the areas, write the entries, cut the baseline from the date of the first commit, and hand back the entries it was least sure of. The agent runs it start to finish without stopping to ask you anything.",
+      "changes": null,
+      "dev_notes": "src/commands/init.mjs cmdBootstrap prints assets/BOOTSTRAP.md with {product} and {style_line} filled in."
+    }
+  ]
+}
