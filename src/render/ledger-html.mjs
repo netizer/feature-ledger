@@ -29,6 +29,11 @@ export function renderLedgerHtml({ project, version }) {
 
 const SIZE_LEVELS = { big: 3, medium: 2, small: 1 };
 
+/* Anchors for the three sections that close the document. Named rather than
+ * numbered because, unlike the areas, they aren't part of the product's
+ * structure — see `categoryId`. */
+const CLOSING_IDS = { removed: "closing-removed", goneEarlier: "closing-gone-earlier", other: "closing-other" };
+
 class LedgerHtml {
   constructor(project, version) {
     this.project = project;
@@ -197,12 +202,20 @@ class LedgerHtml {
     return String(i + 1).padStart(2, "0");
   }
 
+  /** Anchor an area heading answers to, so the Contents entry for it can be
+   *  a real link. Chromium carries `<a href="#id">` into the printed PDF as
+   *  an internal jump, which is the only reason the contents list is
+   *  clickable — index-based, so it can't collide with a category name. */
+  categoryId(i) {
+    return `area-${i + 1}`;
+  }
+
   catHead(category, index, count, nNew, nUpd, nBack) {
     let meta = `${count} ${count === 1 ? "feature" : "features"}`;
     if (nNew > 0) meta += ` · <em>${nNew} new</em>`;
     if (nUpd > 0) meta += ` · <i>${nUpd} updated</i>`;
     if (nBack > 0) meta += ` · <b>${nBack} already in place</b>`;
-    return `<div class="cat-head"><span class="num">${this.categoryNumber(index)}</span>` +
+    return `<div class="cat-head" id="${this.categoryId(index)}"><span class="num">${this.categoryNumber(index)}</span>` +
       `<h2>${h(category)}</h2><span class="meta">${meta}</span></div>`;
   }
 
@@ -319,6 +332,17 @@ class LedgerHtml {
       return `<div class="category">${inner}</div>`;
     }).join("");
 
+    // The three closing sections are resolved before the contents list so it
+    // can link to whichever of them this edition actually prints.
+    const removed = this.removedThisVersion;
+    const goneEarlier = this.backfilledRemovals;
+    const other = this.otherChanges;
+    const closing = [
+      [removed.length, CLOSING_IDS.removed, "No longer available as of this edition", removed.length],
+      [goneEarlier.length, CLOSING_IDS.goneEarlier, this.words.tags.backfilled_removed, goneEarlier.length],
+      [other.length, CLOSING_IDS.other, "Also since last time", other.length],
+    ].filter(([present]) => present);
+
     const contents = this.categoryRows.map(([category, rows], i) => {
       const nNew = rows.filter((r) => r.badge === "new").length;
       const nUpd = rows.filter((r) => r.badge === "updated").length;
@@ -326,9 +350,17 @@ class LedgerHtml {
       const flags = '<i class="dot-new"></i>'.repeat(nNew)
         + '<i class="dot-updated"></i>'.repeat(nUpd)
         + '<i class="dot-backfilled"></i>'.repeat(nBack);
-      return `<li><span class="num">${this.categoryNumber(i)}</span><span class="nm">${h(category)}</span>` +
-        `<span class="flags">${flags}</span><span class="ct">${rows.length}</span></li>`;
+      return `<li><a href="#${this.categoryId(i)}">` +
+        `<span class="num">${this.categoryNumber(i)}</span><span class="nm">${h(category)}</span>` +
+        `<span class="flags">${flags}</span><span class="ct">${rows.length}</span></a></li>`;
     }).join("");
+
+    // Deliberately not numbered and deliberately quieter: these are closing
+    // notes about what left the product, not areas of it, and a reader
+    // scanning "01…08" shouldn't have to wonder why the count went up.
+    const closingContents = closing.map(([, id, title, count]) =>
+      `<li><a href="#${id}"><span class="num">&mdash;</span><span class="nm">${h(title)}</span>` +
+      `<span class="ct">${count}</span></a></li>`).join("");
 
     const sinceBlock = this.predecessor ? `
       <div class="split-label">Since the last edition${predDateLabel ? `, ${predDateLabel}` : ""}</div>
@@ -360,27 +392,24 @@ class LedgerHtml {
       `<div class="removed-box${cls}"><div class="removed-box-content">` +
       `<span class="name">${h(f.currentName)}</span> &mdash; ${h(s.reason)}</div></div>`;
 
-    const removed = this.removedThisVersion;
     const removedBlock = removed.length ? `
       <div class="category">
-        <div class="cat-head"><span class="num">&mdash;</span><h2>No longer available as of this edition</h2></div>
+        <div class="cat-head" id="${CLOSING_IDS.removed}"><span class="num">&mdash;</span><h2>No longer available as of this edition</h2></div>
         ${removed.map((r) => removedBox(r)).join("")}
       </div>` : "";
 
     // Deliberately its own block, and deliberately vague about timing: these
     // went before the last cutoff, and since the audit does no archaeology the
     // document cannot honestly name the release they went in.
-    const goneEarlier = this.backfilledRemovals;
     const goneEarlierBlock = goneEarlier.length ? `
       <div class="category">
-        <div class="cat-head"><span class="num">&mdash;</span><h2>${h(this.words.tags.backfilled_removed)}</h2>
+        <div class="cat-head" id="${CLOSING_IDS.goneEarlier}"><span class="num">&mdash;</span><h2>${h(this.words.tags.backfilled_removed)}</h2>
           <span class="meta">recorded here for the first time</span></div>
         ${goneEarlier.map((r) => removedBox(r, " backfilled")).join("")}
       </div>` : "";
 
-    const other = this.otherChanges;
     const otherBlock = other.length ? `
-      <div class="other-changes">
+      <div class="other-changes" id="${CLOSING_IDS.other}">
         <h2>Also since last time</h2>
         <p class="sub">Changes that run across the whole product rather than belonging to any one feature above.</p>
         <ul>${other.map((c) => `<li>${h(c.description)}</li>`).join("")}</ul>
@@ -440,6 +469,7 @@ ${this.project.themeCss()}
   ${this.set.unstructured ? "" : `<div class="contents">
     <div class="kicker">Contents</div>
     <ol>${contents}</ol>
+    ${closingContents ? `<ul class="closing">${closingContents}</ul>` : ""}
   </div>`}
 
   ${body}
@@ -620,15 +650,24 @@ const STYLES = `
   /* ---- Contents ---- */
   .contents { padding-top: 14px; border-top: 2px solid var(--accent); margin-bottom: 34px; break-inside: avoid; }
   .contents ol { columns: 2; column-gap: 34px; margin: 14px 0 0; padding: 0; list-style: none; }
-  .contents li {
-    display: flex; align-items: baseline; gap: 8px; break-inside: avoid;
-    padding: 5px 0; border-bottom: 1px solid var(--line-soft); font-size: 9.5pt;
+  .contents li { break-inside: avoid; border-bottom: 1px solid var(--line-soft); }
+  .contents a {
+    display: flex; align-items: baseline; gap: 8px;
+    padding: 5px 0; font-size: 9.5pt;
+    color: inherit; text-decoration: none;
   }
   .contents .num { font-family: var(--font-display); font-weight: 700; color: var(--accent); font-size: 9.5pt; flex: 0 0 auto; }
   .contents .nm { font-family: var(--font-display); font-weight: 600; flex: 1; min-width: 0; }
   .contents .flags { display: flex; gap: 3px; flex: 0 0 auto; }
   .contents .flags i { width: 4px; height: 11px; border-radius: 1px; display: inline-block; }
   .contents .ct { flex: 0 0 auto; color: var(--ink-faint); font-size: 8.5pt; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  /* The closing sections: same grid, dashed instead of numbered and a shade
+     quieter, so they read as notes after the areas rather than as areas. */
+  .contents .closing { columns: 2; column-gap: 34px; margin: 6px 0 0; padding: 0; list-style: none; }
+  .contents .closing li { break-inside: avoid; border-bottom: 1px solid var(--line-soft); }
+  .contents .closing .num { color: var(--ink-ghost); font-weight: 400; }
+  .contents .closing .nm { font-weight: 500; color: var(--ink-soft); }
 
   /* ======================= THE LEDGER ======================= */
   .category { margin-top: 30px; }
