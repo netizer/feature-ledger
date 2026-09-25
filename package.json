@@ -20,8 +20,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "test": "node test/smoke.mjs",
-    "fonts:coverage": "node scripts/font-coverage.mjs"
+    "test": "node test/smoke.mjs"
   },
   "dependencies": {
     "playwright-core": "^1.40.0"

@@ -59,7 +59,7 @@ export async function cmdBuild({ flags }) {
 
     for (const version of versions) {
       if (!project.releases.versions.includes(version)) fail(`no release v${version}`);
-      const { html, warnings } = renderLedgerHtml({ project, version });
+      const { html, warnings, fontsEmbedded } = renderLedgerHtml({ project, version });
       for (const w of warnings) warn(w);
 
       const file = project.config.output.pdf_name
@@ -75,7 +75,7 @@ export async function cmdBuild({ flags }) {
         out(`wrote ${path.relative(process.cwd(), htmlTarget)}`);
         continue;
       }
-      await htmlToPdf(html, target);
+      await htmlToPdf(html, target, { checkFonts: fontsEmbedded });
       out(`wrote ${path.relative(process.cwd(), target)}`);
     }
   }

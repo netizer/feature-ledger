@@ -22,26 +22,30 @@ curl -H 'User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:27.0) Gecko/20100101
   'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap'
 ```
 
+## Symbols
+
+**Noto Sans Symbols 2** (Google, also OFL 1.1) is embedded with every edition
+and named last in both font stacks. It draws the UI icons descriptions tend to
+quote (✕, ✉, ★, arrows, check marks) that neither text face carries.
+
 ## Coverage
 
-`coverage.json` is the set of codepoints every bundled face can draw,
-generated from the files' own `cmap` tables — never edited by hand:
+The files are the whole fonts, not subsets. Chromium subsets every embedded
+face down to the glyphs a document uses when it writes the PDF, so trimming
+them in advance only ever saved package bytes.
 
-```
-node scripts/font-coverage.mjs
-```
-
-Between them the two families cover Latin-1 and Latin Extended-A, so European
-names and prose (Polish, Czech, Turkish, the Nordic languages) print and copy
-correctly. Anything outside that — Greek, Cyrillic, CJK — fails the build with
-a named list of characters rather than silently falling back to Arial for a
-glyph or two, which is what nobody notices until the client is holding the
-PDF.
+Nothing predicts coverage from the text. After the page renders,
+`src/render/pdf.mjs` asks Chromium which font drew every element's text, and
+if any of it fell back to a system font the build fails, naming the text and
+the likely characters, rather than silently printing a glyph or two in Arial,
+which is what nobody notices until the client is holding the PDF. Between them
+the bundled faces cover Latin-1, Latin Extended-A and the common symbol
+blocks; Cyrillic, CJK or emoji need their own faces.
 
 ## Replacing them
 
 Drop static WOFF files in here named `<FamilyNoSpaces>-<weight>.woff`, list
-them in `FONT_FACES` in `src/render/fonts.mjs`, re-run the coverage script,
-and point `.ledger/brand.json`'s `fonts` at the family names. Fonts named in
+them in `FONT_FACES` in `src/render/fonts.mjs`, and point
+`.ledger/brand.json`'s `fonts` at the family names. Fonts named in
 `brand.json` that aren't bundled don't fail — the PDF prints in whatever the
 machine has, and `ledger status` warns that it will.

@@ -61,7 +61,58 @@ export async function probeBrowser() {
   return how;
 }
 
-export async function htmlToPdf(html, outPath) {
+/**
+ * A character none of the embedded faces carry doesn't fail: Chromium quietly
+ * draws it in a system font (Arial, Apple Symbols…), which nobody notices
+ * until the client is holding the PDF. So ask it which fonts it actually used
+ * for every element's text, and refuse to print if any isn't one the page
+ * embedded. This checks the outcome, so it can't drift from the font files
+ * the way a list of codepoints can, and it knows which face each run of text
+ * is really set in.
+ */
+async function checkEmbeddedFonts(page) {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("DOM.enable");
+  await cdp.send("CSS.enable");
+  const { root } = await cdp.send("DOM.getDocument", { depth: -1 });
+
+  const TEXT_NODE = 3;
+  const fallbacks = [];
+  const walk = async (node) => {
+    const text = (node.children ?? [])
+      .filter((c) => c.nodeType === TEXT_NODE && c.nodeValue.trim())
+      .map((c) => c.nodeValue)
+      .join("");
+    if (text && !["STYLE", "SCRIPT", "TITLE"].includes(node.nodeName)) {
+      const { fonts } = await cdp.send("CSS.getPlatformFontsForNode", { nodeId: node.nodeId });
+      const system = fonts.filter((f) => !f.isCustomFont).map((f) => f.familyName);
+      if (system.length) fallbacks.push({ system, text });
+    }
+    for (const c of node.children ?? []) await walk(c);
+  };
+  await walk(root);
+  await cdp.detach();
+  if (!fallbacks.length) return;
+
+  const lines = fallbacks.map(({ system, text }) => {
+    const suspects = [...new Set(text.match(/[^\x00-\x7F]/gu) ?? [])]
+      .map((c) => `U+${c.codePointAt(0).toString(16).toUpperCase().padStart(4, "0")} (${c})`)
+      .join(", ");
+    return `  · drawn in ${system.join(", ")}${suspects ? ` (likely ${suspects})` : ""}: "${text.trim().slice(0, 80)}…"`;
+  });
+  fail(
+    "some text isn't covered by the bundled fonts and would print in a system font:\n" +
+    `${lines.join("\n")}\n` +
+    "Replace those characters in the text, or bundle a face that carries them (see assets/fonts/README.md).",
+  );
+}
+
+/**
+ * @param {{ checkFonts?: boolean }} opts — `checkFonts` is off when the brand
+ * asked for faces this package doesn't bundle: then everything is a system
+ * font by design, and the build has already warned about it.
+ */
+export async function htmlToPdf(html, outPath, { checkFonts = true } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-"));
   const htmlPath = path.join(dir, "ledger.html");
   fs.writeFileSync(htmlPath, html);
@@ -75,6 +126,7 @@ export async function htmlToPdf(html, outPath) {
     // says nothing about whether they're ready — wait for them explicitly, or
     // a page can print in the fallback face.
     await page.evaluate(() => document.fonts.ready);
+    if (checkFonts) await checkEmbeddedFonts(page);
 
     // The printed running footer is Chromium's, not the page's — it lives in
     // the paper margin, outside the document flow, so it can't be styled from

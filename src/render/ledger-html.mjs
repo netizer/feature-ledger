@@ -1,7 +1,7 @@
 import { escapeHtml as h, longDate } from "../util.mjs";
 import { wording } from "../wording.mjs";
 import { resolveBrand, mastheadHtml } from "./brand.mjs";
-import { fontFaceCss, checkGlyphs } from "./fonts.mjs";
+import { fontFaceCss, SYMBOL_FACE } from "./fonts.mjs";
 
 /**
  * The client-facing "feature ledger" for one specific release — an archival
@@ -23,8 +23,7 @@ import { fontFaceCss, checkGlyphs } from "./fonts.mjs";
 export function renderLedgerHtml({ project, version }) {
   const doc = new LedgerHtml(project, version);
   const html = doc.render();
-  checkGlyphs(html);
-  return { html, warnings: doc.warnings };
+  return { html, warnings: doc.warnings, fontsEmbedded: doc.fontsEmbedded };
 }
 
 const SIZE_LEVELS = { big: 3, medium: 2, small: 1 };
@@ -288,6 +287,7 @@ class LedgerHtml {
 
   render() {
     const { css: fontCss, embedded } = fontFaceCss(this.brand);
+    this.fontsEmbedded = embedded;
     if (!embedded) {
       this.warnings.push(
         `brand.json asks for fonts this package doesn't bundle (${this.brand.fonts.display} / ${this.brand.fonts.body}). ` +
@@ -508,8 +508,8 @@ ${this.project.themeCss()}
        recedes, which is the point. */
     --slate: #6b7280; --slate-deep: #414753; --slate-soft: #edeff2; --slate-line: #dfe2e7;
 
-    --font-display: '${b.fonts.display}', Georgia, 'Times New Roman', serif;
-    --font-body: '${b.fonts.body}', 'Helvetica Neue', Arial, sans-serif;
+    --font-display: '${b.fonts.display}', '${SYMBOL_FACE[0]}', Georgia, 'Times New Roman', serif;
+    --font-body: '${b.fonts.body}', '${SYMBOL_FACE[0]}', 'Helvetica Neue', Arial, sans-serif;
 
     /* One shared text measure — roughly 70 characters at body size, the
        comfortable-reading width. Descriptions and change notes both honour

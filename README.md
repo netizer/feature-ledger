@@ -915,10 +915,11 @@ a feature file and see what one looks like. `cd examples/northwind
 
 Fonts: see `assets/fonts/README.md`. The short version is that they're
 **static** instances, not variable ones, because Chromium exports a variable
-font to PDF as a Type 3 font whose text copies out shredded — and that
-`scripts/font-coverage.mjs` reads their real coverage out of the files so a
+font to PDF as a Type 3 font whose text copies out shredded — and that the
+build asks Chromium which font actually drew each piece of text, so a
 character they can't draw fails the build instead of silently falling back to
-Arial in the client's hands.
+Arial in the client's hands. A symbol face is bundled for the UI icons (✕, ✉,
+★) descriptions quote.
 
 ## Not included, deliberately
 
