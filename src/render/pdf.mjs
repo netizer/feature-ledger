@@ -107,6 +107,35 @@ async function checkEmbeddedFonts(page) {
   );
 }
 
+// Letter, in inches; the margins leave room for Chromium's running footer.
+const PAPER = { width: 8.5, height: 11 };
+const MARGIN = { top: 0.55, bottom: 0.62, left: 0.6, right: 0.6 };
+const PX_PER_IN = 96;
+
+/**
+ * `break-inside: avoid` is a request, not a guarantee: a block taller than a
+ * whole page can't be kept on one, and Chromium's answer is to push it to a
+ * fresh page anyway — where it still splits — leaving behind a page that's
+ * empty below whatever preceded it (a section heading glued to that block,
+ * say). So lay the page out at the printed size first and drop the request
+ * from any block that can't fit on a page; it then fragments where it falls,
+ * and the page's own finer-grained rules (headings glued to what follows,
+ * orphans/widows) decide the break points.
+ */
+async function releaseOversizedBlocks(page) {
+  await page.emulateMedia({ media: "print" });
+  await page.setViewportSize({
+    width: Math.floor((PAPER.width - MARGIN.left - MARGIN.right) * PX_PER_IN),
+    height: 1000,
+  });
+  await page.evaluate((pageHeight) => {
+    for (const el of document.body.querySelectorAll("*")) {
+      if (getComputedStyle(el).breakInside !== "avoid") continue;
+      if (el.getBoundingClientRect().height > pageHeight) el.style.breakInside = "auto";
+    }
+  }, (PAPER.height - MARGIN.top - MARGIN.bottom) * PX_PER_IN);
+}
+
 /**
  * @param {{ checkFonts?: boolean }} opts — `checkFonts` is off when the brand
  * asked for faces this package doesn't bundle: then everything is a system
@@ -127,6 +156,7 @@ export async function htmlToPdf(html, outPath, { checkFonts = true } = {}) {
     // a page can print in the fallback face.
     await page.evaluate(() => document.fonts.ready);
     if (checkFonts) await checkEmbeddedFonts(page);
+    await releaseOversizedBlocks(page);
 
     // The printed running footer is Chromium's, not the page's — it lives in
     // the paper margin, outside the document flow, so it can't be styled from
@@ -139,9 +169,10 @@ export async function htmlToPdf(html, outPath, { checkFonts = true } = {}) {
 
     await page.pdf({
       path: outPath,
-      format: "Letter",
+      width: `${PAPER.width}in`,
+      height: `${PAPER.height}in`,
       printBackground: true,
-      margin: { top: "0.55in", bottom: "0.62in", left: "0.6in", right: "0.6in" },
+      margin: Object.fromEntries(Object.entries(MARGIN).map(([k, v]) => [k, `${v}in`])),
       displayHeaderFooter: true,
       headerTemplate: "<span></span>",
       footerTemplate: `

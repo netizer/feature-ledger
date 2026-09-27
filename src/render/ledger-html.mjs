@@ -677,6 +677,11 @@ const STYLES = `
      stranded alone at the foot of a page. */
   .cat-open { break-inside: avoid; }
   .cat-alone { break-after: avoid; }
+  /* The glue above gives way when the first row alone is taller than a page
+     (src/render/pdf.mjs lifts it, or Chromium would push the row to a fresh
+     page and still split it there, leaving the heading alone on an empty
+     one). These keep the heading on the row's opening lines even then. */
+  .cat-head, .sub-head, .feature .name { break-after: avoid; }
   .cat-head {
     display: flex; align-items: baseline; gap: 11px; padding-top: 14px;
     border-top: 2px solid var(--accent); margin-bottom: 6px;
