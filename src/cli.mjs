@@ -7,6 +7,7 @@ import * as build from "./commands/build.mjs";
 import * as status from "./commands/status.mjs";
 import * as style from "./commands/style.mjs";
 import * as audit from "./commands/audit.mjs";
+import * as review from "./commands/review.mjs";
 
 const COMMANDS = {
   init: init.cmdInit,
@@ -28,6 +29,7 @@ const COMMANDS = {
 
   release: release.cmdRelease,
   audit: audit.cmdAudit,
+  review: review.cmdReview,
 
   build: build.cmdBuild,
 };
@@ -95,6 +97,11 @@ const HELP = `ledger — a versioned feature ledger for any codebase
     ledger audit complete [--commit <sha>]    stamp the audited commit (default: HEAD)
     ledger audit confirm <id>                 vouch for a reason an audit inferred
     ledger audit log [--json]                 every audit so far
+
+  Reviewing (reading the release as the client will, before it's cut)
+    ledger review                             print the review brief for a coding agent
+    ledger review complete                    stamp what was reviewed; \`release cut\` refuses
+                                              an edition changed since its last review
 
   Output
     ledger build [--md] [--pdf] [--version N|all] [--out DIR]

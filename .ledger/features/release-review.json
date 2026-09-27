@@ -1,0 +1,15 @@
+{
+  "id": "release-review",
+  "audience": "user",
+  "category": "Recording what the product does",
+  "size": "Big",
+  "history": [
+    {
+      "version": 2,
+      "name": "Reviewing a release before it goes out",
+      "description": "The command ledger review prints a brief for a coding agent to read the open release the way the client will: as one document, against the edition they already have. The brief lists what arrived in the release, every client-facing entry in it by area, and the places the drafts probably show, such as change bullets that name something the previous edition never mentioned. The agent tests every bullet against the previous edition, drops or merges the ones whose \"before\" never shipped, removes change notes from new entries, and makes names, numbers and cross-references agree. It edits wording only and never invents a reason, and it ends with a list of questions for you. ledger review complete records what was reviewed, and ledger status reports any client-facing entry that changed after that.",
+      "changes": null,
+      "dev_notes": "src/commands/review.mjs. The stamp in .ledger/reviews.json is a per-entry sha256 of the words the client reads (name, description, changes, removal reason, backfilled) plus the user-audience other-changes, so dev_notes edits and `audit confirm` don't invalidate it and the cut gate can name what moved. `review complete` refuses a new entry carrying changes and an updated one with none. The \"never mentioned\" hint is quoted labels and non-sentence-initial capitalised words absent from the previous edition's text."
+    }
+  ]
+}

@@ -18,6 +18,7 @@ export const LEDGER_DIRNAME = ".ledger";
  *     subcategories.json   optional sub-section headings
  *     other-changes.json   changes belonging to no single feature
  *     audits.json          every audit so far, and the commit each was run against
+ *     reviews.json         every review of a release before it was cut, and what it read
  *     index.json           the deliberate corpus order
  *     features/<id>.json   one file per feature
  *     STYLE.md             optional prose tone, when style is "custom"
@@ -123,6 +124,7 @@ export class Project {
     this.otherChangesPath = path.join(ledgerDir, "other-changes.json");
     this.indexPath = path.join(ledgerDir, "index.json");
     this.auditsPath = path.join(ledgerDir, "audits.json");
+    this.reviewsPath = path.join(ledgerDir, "reviews.json");
     this.featuresDir = path.join(ledgerDir, "features");
     this.themeCssPath = path.join(ledgerDir, "theme.css");
     this.load();
@@ -138,6 +140,7 @@ export class Project {
     this.otherChangesList = readOptional(this.otherChangesPath, []);
     this.index = readOptional(this.indexPath, { order: [] }).order ?? [];
     this.audits = readOptional(this.auditsPath, { audits: [] }).audits ?? [];
+    this.reviews = readOptional(this.reviewsPath, { reviews: [] }).reviews ?? [];
 
     const files = exists(this.featuresDir)
       ? fs.readdirSync(this.featuresDir).filter((f) => f.endsWith(".json")).sort()
@@ -243,6 +246,16 @@ export class Project {
 
   saveAudits() {
     writeJson(this.auditsPath, { audits: this.audits });
+  }
+
+  /** The latest review recorded against one release, or null. */
+  lastReviewOf(version) {
+    return [...this.reviews].reverse().find((r) => r.version === version) ?? null;
+  }
+
+  recordReview(entry) {
+    this.reviews.push(entry);
+    writeJson(this.reviewsPath, { reviews: this.reviews });
   }
 
   saveIndex() {

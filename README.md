@@ -21,6 +21,7 @@ live in one file every agent can read, and every operation is a CLI command).
 | **Generated** | `FEATURES.md`, `FEATURES_EXTENDED.md`, `DEV_FEATURES.md` — gitignored build output — and a PDF per release, which a project can keep or regenerate. |
 | **Editions** | [`docs/client/`](docs/client) — this repo keeps its own, so you can open the document the tool actually produces. Start with [the v2 PDF](docs/client/feature-ledger-Feature-Ledger_2.pdf) to see what a client is handed. |
 | **Interface** | `ledger` — read, write, status, build. What it records goes through the CLI; how it's worded is a text edit. |
+| **Checks** | [`ledger audit`](#keeping-it-honest-ledger-audit) sweeps the codebase for what the ledger missed; [`ledger review`](#reading-a-release-as-the-client-will-ledger-review) reads a release against the last edition before it goes out. `ledger release cut` asks for both. |
 
 ---
 
@@ -192,7 +193,7 @@ ledger release cut --name "Baseline" --date 2026-03-02   # the first commit's da
 ledger build
 ```
 
-That third command is what makes [the audit](#keeping-it-honest) useful from
+That third command is what makes [the audit](#keeping-it-honest-ledger-audit) useful from
 day one: the survey has just read the whole codebase against the record, so it
 is recorded as a full sweep, and everything that lands afterwards is measured
 against it. `ledger bootstrap --no-audit` leaves it out.
@@ -262,11 +263,16 @@ single most valuable thing it does.
 When you present to the client:
 
 ```bash
+ledger audit             # a brief for an agent: what landed without the ledger hearing
+ledger review            # a brief for an agent: read the release as the client will
 ledger release cut --name "Sprint 6 demo" --date 2026-09-14
 ledger build
 ```
 
-That mints the archival PDF for what was just shown, and opens the next
+The first two print prompts for a coding agent, and the cut refuses while either
+is outstanding — see [Keeping it honest](#keeping-it-honest-ledger-audit) and
+[Reading a release as the client will](#reading-a-release-as-the-client-will-ledger-review).
+The cut mints the archival PDF for what was just shown, and opens the next
 release. Every New/Changed tag from the cycle goes quiet on its own; there's
 nothing to strip by hand.
 
@@ -389,7 +395,7 @@ Not much, and it's where a hand-edit would be either invisible or wrong.
   `ledger update` and `ledger remove` — and `ledger update` is also what
   refuses a change that never says *why*, the rule that makes the document
   worth reading rather than a diff.
-- **`releases.json`, and the audit stamp in `audits.json`.** A timeline edited
+- **`releases.json`, and the stamps in `audits.json` and `reviews.json`.** A timeline edited
   by hand stops matching the editions already handed over, and a stamp set
   without the sweep behind it makes a gap permanently invisible.
 - **Keeping `index.json` complete.** Every write adds a new id and prunes one
@@ -422,7 +428,7 @@ handful you noticed while reading the last edition, just open the files.
 
 ---
 
-## Keeping it honest
+## Keeping it honest: `ledger audit`
 
 Everything above keeps the ledger current for work done **through a coding
 agent that read the stanza**. Nothing keeps it current for the rest. A
@@ -510,6 +516,85 @@ writes first and asks afterwards, so an unattended run still lands its work,
 and the questions outlive the terminal it ran in.
 
 None of that reaches the client document. It's a note to the team.
+
+---
+
+## Reading a release as the client will: `ledger review`
+
+The audit makes sure the release has everything in it. The review makes sure
+what's in it reads right to the person it's for.
+
+Every entry in a release was written the moment its work landed, one
+`ledger update` at a time, and each update's bullet says what the feature was
+*just before that update*. Every one of those bullets was true when it was
+written. The client doesn't read them one at a time, though: they read the
+whole release, against the edition they already have, and they never saw
+anything in between. Read that way, a release written in instalments goes
+wrong in predictable places:
+
+- **A "before" that never shipped.** "Events synced from Acuity no longer
+  appear under *Unpaid*. Before, they were listed there alongside the app's
+  own bookings." True the day it was written — but the Acuity sync itself was
+  new in the same release, so the client is told about a fix to a problem they
+  never had.
+- **A fix to something that is itself new.** "*Confirm all* is now near the
+  top", in the release that introduced *Confirm all*.
+- **Drafts instead of a result.** A chart added in one bullet and redesigned in
+  the next three, where the client should read one sentence about a new chart.
+- **A new feature with a "What changed" note**, or described as news: "every
+  email is now actually delivered", in an entry the client is seeing for the
+  first time.
+- **The same change explained three times**, in three words for the same
+  thing, with two different numbers.
+
+`ledger review` prints a brief that has a coding agent read the release as one
+document and fix that — by editing the entries in place, the same hand-edits
+described in [Editing the ledger by hand](#editing-the-ledger-by-hand):
+
+```bash
+ledger review             # the brief, for a coding agent
+ledger review complete    # stamp what was reviewed
+```
+
+As with the audit, the CLI does the mechanical half first. The brief lists what
+arrived in this release — the things no bullet may describe a "before" for —
+then every client-facing entry in it, area by area, and a short list of places
+the drafts probably show: change bullets naming terms that appear nowhere in
+the previous edition, new entries still carrying a change note, descriptions
+that say "now" or "no longer". The agent then:
+
+- tests every bullet against the **previous edition**, not against the state
+  the last update started from, and drops or merges what fails;
+- gives new entries no change note and a description that reads as though it
+  had always been there;
+- takes an entry off the updated list entirely when nothing the client would
+  notice is left;
+- makes names, numbers and cross-references agree across the release;
+- changes wording only. It never changes what the ledger says the product does,
+  and never invents a reason: whatever it can't settle comes back to you as a
+  numbered list of questions.
+
+`ledger review complete` refuses while a new entry still carries a change note
+or an updated one has none, then records a fingerprint of every client-facing
+entry it covered. From then on the tool knows which entries have moved since:
+
+```
+$ ledger release cut --name "Sprint 6 demo"
+ledger: 2 client-facing entries have changed since v6 was reviewed on
+September 25, 2026 (booking-detail, dashboard). Run `ledger review` for the
+brief, `ledger review complete` if you have read them yourself, or pass
+--force to cut anyway.
+```
+
+The fingerprint covers only what the client reads — names, descriptions,
+change bullets, removals and product-wide notes. Editing dev notes or
+confirming an inferred reason doesn't ask for another review. A first edition
+isn't gated at all, because there is no earlier edition to compare it with.
+
+Two guards at write time keep the review short. `ledger update` refuses a
+change note on a feature that is new in the open release, and when a feature
+changes a second time in one release it reminds the agent which edition its
+bullets have to be true of.
 
 ---
 
@@ -850,6 +935,10 @@ Auditing            (the periodic sweep of the codebase against the record)
   ledger audit confirm <id>               vouch for a reason an audit inferred
   ledger audit log [--json]               every audit so far
 
+Reviewing           (reading the release against the last edition, before the cut)
+  ledger review                           the brief, for a coding agent
+  ledger review complete                  stamp what was reviewed
+
 Output
   ledger build [--md] [--pdf] [--version N|all] [--out DIR] [--html]
 
@@ -886,13 +975,15 @@ index.json           the deliberate corpus order (ties within a size band)
 subcategories.json   sub-section headings
 other-changes.json   changes belonging to no single feature
 audits.json          every audit so far, and the commit each was run against
+reviews.json         every review of a release, and a fingerprint of what it read
 STYLE.md             optional, the project's own tone as prose
 theme.css            optional, appended last to the PDF stylesheet
 ```
 
 Everything here is committed. The words in `features/`, `subcategories.json`,
 `other-changes.json` and `config.json` are yours to edit directly, as is the
-order of `index.json`; `releases.json` and `audits.json` are the CLI's. See
+order of `index.json`; `releases.json`, `audits.json` and `reviews.json` are
+the CLI's. See
 [Editing the ledger by hand](#editing-the-ledger-by-hand).
 
 One file per feature is a deliberate change from the single-file original: a

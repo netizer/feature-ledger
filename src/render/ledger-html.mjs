@@ -107,7 +107,10 @@ class LedgerHtml {
       let badge = null;
       if (state.version === this.version) {
         if (state.backfilled) badge = "backfilled";
-        else badge = state.changes === null ? "new" : "updated";
+        // New is decided by when the feature first appeared, not by whether it
+        // has a `changes` list: a note left on something the client has never
+        // seen describes a draft, and must not turn it blue.
+        else badge = f.firstVersion === this.version ? "new" : "updated";
       }
       if (!this.predecessor) badge = null; // nothing to diff a first edition against
       rows.push({ feature: f, state, badge, showBadge: true, noLine: false });
@@ -280,7 +283,7 @@ class LedgerHtml {
       `<div class="badges">${this.sizeChip(f.size)}${tag}</div>` +
       `<div class="body"><div class="name">${h(s.name)}${was}</div>` +
       `<div class="desc">${h(s.description)}</div>` +
-      `${badge ? this.changesPanel(s) : ""}</div></div></div>`;
+      `${badge && f.firstVersion !== this.version ? this.changesPanel(s) : ""}</div></div></div>`;
   }
 
   /* ---- the document --------------------------------------------------- */

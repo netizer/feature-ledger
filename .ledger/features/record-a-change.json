@@ -10,6 +10,14 @@
       "description": "The command ledger update replaces a feature's description with its full current-state text, and takes a list of change bullets alongside it. Each bullet says what the feature was before and why it moved, which is the part a reader cannot get from the description. A feature that existed before this release cannot be updated without one, so an edition never carries a changed entry with no reason attached.",
       "changes": null,
       "dev_notes": "src/commands/write.mjs cmdUpdate. add_changes appends instead of replacing. Category, sub-section and size moves apply to the feature rather than to one moment in its history; dev_notes carry forward to a new history entry on their own."
+    },
+    {
+      "version": 2,
+      "description": "The command ledger update replaces a feature's description with its full current-state text, and takes a list of change bullets alongside it. Each bullet says what the feature was in the last edition and why it moved, which is the part a reader cannot get from the description. A feature that existed before this release cannot be updated without one, so an edition never carries a changed entry with no reason attached. A feature that is new in this release takes no change bullets, because the client has never seen an earlier version of it. When a feature changes a second time in one release, the command reminds you that its bullets have to be true of the last edition, not of the state your previous update left.",
+      "changes": [
+        "A change bullet could be added to a feature that was new in the same release, and a second change in one release got no warning. Each bullet then described the state just before its own update, which the client never saw, so an edition could explain a fix to something that was new in the same release. The command now refuses bullets on a new feature and reminds you which edition a second change is measured against."
+      ],
+      "dev_notes": "src/commands/write.mjs cmdUpdate. add_changes appends instead of replacing. Category, sub-section and size moves apply to the feature rather than to one moment in its history; dev_notes carry forward to a new history entry on their own."
     }
   ]
 }

@@ -54,7 +54,7 @@ export async function cmdList({ flags }) {
       const state = f.stateAt(target);
       const marks = [];
       if (state?.removed) marks.push("removed");
-      else if (f.touchedAt(target)) marks.push(state?.changes === null ? `new v${target}` : `changed v${target}`);
+      else if (f.touchedAt(target)) marks.push(f.firstVersion === target ? `new v${target}` : `changed v${target}`);
       if (f.audience === "dev") marks.push("dev");
       if (f.subcategory) marks.push(`in ${f.subcategory}`);
       const tail = marks.length ? `  · ${marks.join(", ")}` : "";
@@ -92,7 +92,7 @@ export async function cmdShow({ flags, positional }) {
     }
   }
 
-  const versions = f.history.map((h) => `v${h.version}${h.removed ? " removed" : h.changes ? " changed" : " new"}`);
+  const versions = f.history.map((h, i) => `v${h.version}${h.removed ? " removed" : i === 0 ? " new" : " changed"}`);
   out(`History: ${versions.join(", ")}`);
 
   if (flags.history) {

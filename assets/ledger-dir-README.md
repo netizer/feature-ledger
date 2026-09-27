@@ -12,6 +12,8 @@ The source of truth for this product's feature ledger. Commit all of it.
 | `index.json` | The deliberate order of the corpus, which is what breaks ties within a size band. Maintained automatically. |
 | `subcategories.json` | Sub-section headings, for an area that grew too big to read as one list. |
 | `other-changes.json` | Changes belonging to no single feature. |
+| `audits.json` | Every audit so far, and the commit each one covered. Written by `ledger audit complete`. |
+| `reviews.json` | Every review of a release before it was cut, and a fingerprint of what it read. Written by `ledger review complete`. |
 | `theme.css` | Optional. Appended last to the PDF's stylesheet, for a one-off nudge. |
 
 ## Which of it you edit
@@ -32,9 +34,10 @@ which release the entry lands on, which is what every New/Changed tag in every
 document is computed from, and `ledger update` refuses a change that never
 says why it happened.
 
-**Leave `releases.json` and `audits.json` alone.** The timeline has to keep
-matching the editions already handed over, and an audit stamp set without the
-sweep behind it makes a gap permanently invisible. `index.json` is in between:
+**Leave `releases.json`, `audits.json` and `reviews.json` alone.** The
+timeline has to keep matching the editions already handed over, and an audit
+or review stamp set without the work behind it hides exactly what it exists
+to catch. `index.json` is in between:
 every write keeps it complete, and the order in it is the deliberate reading
 order — reorder that freely.
 

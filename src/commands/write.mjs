@@ -193,6 +193,18 @@ export async function cmdUpdate({ flags, positional }) {
   const existedBefore = feature.firstVersion < version;
   const prev = feature.history.filter((h) => h.version < version).pop();
   let entry = feature.entryAt(version);
+  const againThisCycle = existedBefore && Boolean(entry) && !entry.removed;
+
+  // A feature the client has never seen has no "before" to report, however
+  // many times it moved while it was being built: every intermediate state
+  // is a draft. A change bullet on it would print as a fix to something the
+  // reader never had, so the new state goes in the description instead.
+  if (!existedBefore && (data.changes?.length || data.add_changes?.length)) {
+    fail(
+      `${id} is new in v${version} — the client has never seen an earlier version of it, so there is nothing to ` +
+      "tell them changed. Pass the full updated \"description\" and no \"changes\".",
+    );
+  }
 
   if (!entry) {
     if (isBlank(data.description)) {
@@ -251,6 +263,17 @@ export async function cmdUpdate({ flags, positional }) {
 
   const rebuilt = new Feature(feature.toJSON());
   report(project, rebuilt, { dryRun: flags["dry-run"], verb: "updated" });
+
+  // The second change to one feature in a cycle is where a misleading bullet
+  // starts: it naturally says what the feature was a moment ago, and the
+  // client never saw that. Said here, while the agent still has the context.
+  if (againThisCycle && !flags["dry-run"]) {
+    out(
+      `note: ${id} had already changed in v${version}. The client compares this release with v${prev.version}, ` +
+      `not with the state your last update left it in, so every bullet's "before" has to be true of v${prev.version} ` +
+      `(\`ledger show ${id} --history\`). Revise or merge the earlier bullets rather than stacking a new one on them.`,
+    );
+  }
 }
 
 export async function cmdRemove({ flags, positional }) {

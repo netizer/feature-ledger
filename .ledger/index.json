@@ -23,6 +23,7 @@
     "markdown-docs",
     "change-highlighting",
     "client-branding",
-    "codebase-audit"
+    "codebase-audit",
+    "release-review"
   ]
 }

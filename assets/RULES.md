@@ -184,6 +184,20 @@ don't write a plausible-sounding one into a client-facing document.
 Adding a second bullet later in the same release cycle: `"add_changes": [...]`
 appends instead of replacing.
 
+**"Before" means the last edition the client has.** A feature that changes
+twice in one release still has one "before": the state the previous edition
+showed. The client never saw what your last update left behind. So when you
+change a feature for the second time in a cycle, don't write "Before, it did
+what I made it do yesterday". Revise the bullets already there, so that
+together they say what differs from the last edition. And if the thing a
+bullet's "before" involves is itself new in this release, there is no "before"
+to report: say how the feature works with the new thing, and point to it by
+name. `ledger update` reminds you of this when it happens.
+
+A feature that is **new** in the open release has no "before" at all, however
+many times it moved while it was being built. Update it with the full new
+`description` and no `changes`; `ledger update` refuses a change note on it.
+
 ### Better words for the same thing
 
 Not this section's business. A copy fix isn't a change: the product didn't
@@ -308,9 +322,9 @@ Not much, and it's where a hand-edit would be either invisible or wrong:
   `ledger update` and `ledger remove` resolve it, and `ledger update` is also
   what refuses a change that never says why it happened — the rule that makes
   this document worth reading rather than a diff.
-- **`releases.json`, and the audit stamp in `audits.json`.** A timeline edited
-  by hand stops matching the editions already handed over, and a stamp set
-  without the sweep behind it makes a gap permanently invisible.
+- **`releases.json`, and the stamps in `audits.json` and `reviews.json`.** A
+  timeline edited by hand stops matching the editions already handed over, and
+  a stamp set without the work behind it hides exactly what it exists to catch.
 - **Keeping `index.json` complete.** Every write adds a new id to it and prunes
   one whose file is gone, so it can't rot. Only that half is the CLI's: the
   **order** in the list is the deliberate reading order within a size band, and
@@ -507,6 +521,27 @@ work being done.
 
 `ledger release cut` refuses when source has landed since the last audit and
 says how much; `--force` overrides it.
+
+## Reviewing a release
+
+An entry is written the moment its work lands. Nobody reads the release as one
+document, against the edition the client already has, until someone runs:
+
+```
+ledger review                the brief, for a coding agent
+ledger review complete       stamp what was reviewed
+```
+
+The review drops bullets whose "before" never shipped and merges drafts into
+the result. It clears change notes off new entries, and it makes names,
+numbers and cross-references agree across the release. All of it is a
+hand-edit of the words: it never changes what the ledger says the product
+does, and never invents a reason.
+
+`ledger release cut` refuses when a client-facing entry of the open release has
+changed since its last review, and names it. `ledger review complete` covers an
+edit you've read yourself, and `--force` overrides the check. A first edition
+isn't checked, because there's nothing to compare it with.
 
 ## Generating
 

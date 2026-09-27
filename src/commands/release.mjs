@@ -1,6 +1,7 @@
 import { openProject } from "../store.mjs";
 import { fail, isBlank, today, longDate } from "../util.mjs";
 import { unauditedReport, unauditedLine, unconfirmedReasons } from "./audit.mjs";
+import { unreviewedReport, unreviewedLine } from "./review.mjs";
 import * as git from "../git.mjs";
 
 const out = (s) => process.stdout.write(`${s}\n`);
@@ -181,6 +182,21 @@ function cut(flags) {
       `nothing has been recorded against v${current.version}, so cutting it would produce an edition identical to ` +
       `v${current.version - 1}. Record the release's work first (\`ledger status\` shows what's there), or pass --force ` +
       "if you really are re-issuing an unchanged edition.",
+    );
+  }
+
+  // The last gate, because the two above can each send someone off to record
+  // more — and anything recorded afterwards is what a review has to read.
+  // Every entry is written the moment its work landed; this is the check that
+  // somebody has read the release as a whole, against the edition the client
+  // already has, before a document is minted from it. Named per entry, so a
+  // human who polished two sentences by hand after the review knows that
+  // `ledger review complete` is all it takes.
+  const unreviewed = unreviewedReport(project);
+  if (!unreviewed.ok && !flags.force) {
+    fail(
+      `${unreviewedLine(unreviewed)}. Run \`ledger review\` for the brief, \`ledger review complete\` if you have ` +
+      "read them yourself, or pass --force to cut anyway.",
     );
   }
 

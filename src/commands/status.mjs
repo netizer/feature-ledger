@@ -6,6 +6,7 @@ import { fontFaceCss } from "../render/fonts.mjs";
 import { probeBrowser } from "../render/pdf.mjs";
 import { resolveStyle, styleTitle } from "../style.mjs";
 import { unauditedReport, unauditedLine, unconfirmedReasons } from "./audit.mjs";
+import { unreviewedReport, unreviewedLine } from "./review.mjs";
 import { shortSha } from "../git.mjs";
 
 const out = (s) => process.stdout.write(`${s}\n`);
@@ -35,11 +36,12 @@ export async function cmdStatus({ flags }) {
   const release = releaseReport(project);
   const corpus = corpusReport(project);
   const audit = auditReport(project);
+  const review = unreviewedReport(project);
 
   if (flags.json) {
     const setup = setupReport(project);
     setup.browser = await browserLine();
-    out(JSON.stringify({ ...release, corpus, audit, setup, warnings }, null, 2));
+    out(JSON.stringify({ ...release, corpus, audit, review, setup, warnings }, null, 2));
     return;
   }
 
@@ -64,6 +66,7 @@ export async function cmdStatus({ flags }) {
     if (release.other_changes) {
       out(`  other (${release.other_changes}) — change${release.other_changes === 1 ? "" : "s"} belonging to no single feature`);
     }
+    out(`  reviewed    ${reviewLine(review)}`);
   }
 
   out("");
@@ -92,6 +95,12 @@ export async function cmdStatus({ flags }) {
   out("");
   for (const w of warnings) out(`! ${w}`);
   if (!warnings.length) out("Nothing to fix.");
+}
+
+function reviewLine(review) {
+  if (review.ok) return review.last ? `${review.last.date}, nothing changed since` : `not needed — ${review.reason}`;
+  if (!review.last) return "not yet — `ledger review` prints the brief";
+  return `${review.last.date}, then ${review.pending.length} entr${review.pending.length === 1 ? "y" : "ies"} changed`;
 }
 
 function listing(project, label, ids) {
@@ -264,6 +273,25 @@ function collectWarnings(project) {
       `${unauditedLine(unaudited)}. Until they are swept, an edition cut now may be missing capabilities the ` +
       "client already has. `ledger audit` prints the brief; `ledger release cut --force` overrides.",
     );
+  }
+
+  // Only once the edition has something to be compared with; a first edition
+  // prints nothing as new or changed.
+  const unreviewed = unreviewedReport(project);
+  if (!unreviewed.ok) {
+    warnings.push(`${unreviewedLine(unreviewed)}. \`ledger review\` prints the brief; \`ledger release cut\` refuses until then.`);
+  }
+
+  // A "What changed" note on something the client has never seen describes a
+  // state inside the release — a draft of the feature, not a change to it.
+  for (const f of set.features({ audience: "user" })) {
+    const h = f.entryAt(f.firstVersion);
+    if (f.firstVersion === project.releases.current.version && project.releases.current.future && h.changes?.length) {
+      warnings.push(
+        `${f.id} is new in v${f.firstVersion} but carries "changes". The client has never seen an earlier version of it, ` +
+        "so there is nothing to say changed: fold anything worth keeping into the description and set \"changes\" to null.",
+      );
+    }
   }
 
   const pending = unconfirmedReasons(project);

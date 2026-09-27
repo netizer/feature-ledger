@@ -108,7 +108,7 @@ export class MarkdownRenderer {
     if (!states.length) return null;
     if (!states.every((s) => !s.removed && s.version === this.target)) return null;
     if (states.every((s) => s.backfilled)) return this.words.tags.backfilled;
-    if (states.every((s) => !s.backfilled && s.changes === null)) return "New";
+    if (states.every((s) => !s.backfilled) && feats.every((f) => f.firstVersion === this.target)) return "New";
     return null;
   }
 
@@ -132,14 +132,14 @@ export class MarkdownRenderer {
     if (touched) {
       tags.push(state.backfilled
         ? this.words.tags.backfilled
-        : (state.changes === null ? "New" : "Changed"));
+        : (f.firstVersion === this.target ? "New" : "Changed"));
     }
 
     const name = state.renamedFrom ? `${state.name} (previously “${state.renamedFrom}”)` : state.name;
     // A colon, not a dash: the style guides rule the dash out, and the whole
     // document is meant to read as though written to one.
     let line = `- **[${tags.join(", ")}]** ${name}: ${state.description}`;
-    if (touched && state.changes?.length) {
+    if (touched && f.firstVersion !== this.target && state.changes?.length) {
       line += "\n\n  **What changed:**\n";
       line += state.changes.map((c) => `  - ${c}`).join("\n");
     }

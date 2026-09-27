@@ -39,6 +39,9 @@ function assert(label, cond) {
 }
 
 const feature = (o) => JSON.stringify(o);
+// `status --quiet` is silent on a sound corpus — apart from asking for a
+// review, which any release with work in it does until one is recorded.
+const quietWarnings = (o) => o.split("\n").filter((l) => l.trim() && !/(been|was) reviewed/.test(l)).join("\n");
 
 log(`workspace: ${dir}\n`);
 
@@ -107,8 +110,14 @@ run(["update", "alpha"], {
     changes: ["It used to stop at the alpha thing. The adjacent one was the question every user asked next, so leaving it out just moved the work elsewhere."],
   }),
 });
-// A second edit in the same cycle merges rather than appending a second entry.
-run(["update", "alpha"], { stdin: feature({ add_changes: ["A second bullet, added later in the same cycle."] }) });
+// A second edit in the same cycle merges rather than appending a second entry,
+// and says what the client will compare it with: the last edition, not the
+// state the first edit left it in.
+assert(
+  "a second change in one cycle is reminded what the client's \"before\" is",
+  run(["update", "alpha"], { stdin: feature({ add_changes: ["A second bullet, added later in the same cycle."] }) })
+    .includes("compares this release with v1"),
+);
 
 // A rename the client is told about is an ordinary change that happens to move
 // the name: `update` still refuses it without a reason.
@@ -127,7 +136,7 @@ assert("add_changes appended rather than replaced", alpha.history[1].changes.len
 run(["subcategory", "add"], {
   stdin: feature({ id: "cluster", category: "First area", name: "A cluster", intro: "Small things that belong together." }),
 });
-assert("an unfilled sub-section is not a failure", run(["status", "--quiet"]).trim() === "");
+assert("an unfilled sub-section is not a failure", quietWarnings(run(["status", "--quiet"])) === "");
 run(["update", "alpha", "--subcategory", "cluster"]);
 assert(
   "a sub-section led by a Big entry is mentioned, not refused",
@@ -158,7 +167,7 @@ const c1 = JSON.parse(fs.readFileSync(c1Path, "utf8"));
 c1.history[0].name = "Cluster one";
 c1.history[0].description = "The first part of the cluster, said the way the client says it.";
 fs.writeFileSync(c1Path, `${JSON.stringify(c1, null, 2)}\n`);
-assert("a hand-edited entry still validates", run(["status", "--quiet"]).trim() === "");
+assert("a hand-edited entry still validates", quietWarnings(run(["status", "--quiet"])) === "");
 assert("the new wording is what `show` prints", run(["show", "c1"]).includes("said the way the client says it"));
 assert(
   "rewording by hand records nothing against the release",
@@ -172,6 +181,35 @@ assert("a description deleted by hand is reported", run(["status"], { expect: "f
 c1.history[0].description = "The c1 part of the cluster.";
 c1.history[0].name = "Cluster c1";
 fs.writeFileSync(c1Path, `${JSON.stringify(c1, null, 2)}\n`);
+
+// A feature the client has never seen has no "before": however often it moved
+// while it was being built, the new state goes in the description.
+run(["update", "c2"], { expect: "fail", stdin: feature({ description: "The c2 part, reworked.", changes: ["It was different a day ago."] }) });
+run(["update", "c2"], { stdin: feature({ description: "The c2 part of the cluster, reworked." }) });
+
+// ---- The review ----
+// Nobody has read v2 as one release yet, so the corpus says so, and the brief
+// names what arrived — the things no bullet may describe a "before" for.
+assert("an unreviewed release is reported", run(["status", "--quiet"]).includes("v2 has not been reviewed"));
+const reviewBrief = run(["review"]);
+assert("the review brief names what arrived this cycle", reviewBrief.includes("What arrived in v2") && reviewBrief.includes("Cluster c1"));
+assert("…and reads against the edition the client has", reviewBrief.includes("The client compares v2 with v1"));
+// A new entry carrying a change note is refused outright: it has no "before".
+const c3Path = path.join(dir, ".ledger/features/c3.json");
+const c3 = JSON.parse(fs.readFileSync(c3Path, "utf8"));
+fs.writeFileSync(c3Path, JSON.stringify({ ...c3, history: [{ ...c3.history[0], changes: ["Was a draft."] }] }, null, 2));
+assert("a stray change note on a new entry is flagged", run(["status", "--quiet"]).includes("c3 is new in v2 but carries"));
+assert("…and the review can't be recorded over it", run(["review", "complete"], { expect: "fail" }).includes("c3 is new in v2"));
+fs.writeFileSync(c3Path, `${JSON.stringify(c3, null, 2)}\n`);
+run(["review", "complete"]);
+assert("a recorded review quiets the warning", !run(["status", "--quiet"]).includes("reviewed"));
+// A later edit to what the client reads asks for another look, by name.
+const a = JSON.parse(fs.readFileSync(path.join(dir, ".ledger/features/alpha.json"), "utf8"));
+a.history[1].changes = [a.history[1].changes[0]];
+fs.writeFileSync(path.join(dir, ".ledger/features/alpha.json"), `${JSON.stringify(a, null, 2)}\n`);
+assert("an entry edited after the review is named", /changed since v2 was reviewed.*alpha/.test(run(["status", "--quiet"])));
+assert("…and the brief marks it", /\* updated\s+alpha/.test(run(["review"])));
+run(["review", "complete"]);
 
 const list = run(["list"]);
 assert("list marks this release's work", list.includes("changed v2") && list.includes("new v2"));
@@ -273,7 +311,7 @@ fs.rmSync(kept, { recursive: true, force: true });
 // output, and three briefs marking it three ways teach them to look for three
 // different things.
 const RULE = "═════════════════════  COPY EVERYTHING BELOW THIS LINE  ═════════════════════";
-for (const brief of [["bootstrap"], ["style", "rewrite"], ["audit"]]) {
+for (const brief of [["bootstrap"], ["style", "rewrite"], ["audit"], ["review"]]) {
   assert(`\`ledger ${brief.join(" ")}\` marks where the prompt starts, the same way`,
     run(brief, { cwd: dir }).includes(RULE));
 }
@@ -347,6 +385,13 @@ run(["add", "two"], {
   stdin: feature({ audience: "user", size: "Small", name: "Two", description: "Does the two thing." }),
 });
 run(["audit", "complete"], { cwd: repo });
+// Audited, but not yet read as one release against the edition before it.
+assert(
+  "an unreviewed release can't be cut",
+  run(["release", "cut", "--name", "Same day, later", "--date", "2026-02-01"], { cwd: repo, expect: "fail" })
+    .includes("v3 has not been reviewed"),
+);
+run(["review", "complete"], { cwd: repo });
 // Same day as v2, but the code has moved — two real moments, two real editions.
 run(["release", "cut", "--name", "Same day, later", "--date", "2026-02-01"], { cwd: repo });
 const timeline = cutJson();
