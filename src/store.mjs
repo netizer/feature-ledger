@@ -19,6 +19,9 @@ export const LEDGER_DIRNAME = ".ledger";
  *     other-changes.json   changes belonging to no single feature
  *     audits.json          every audit so far, and the commit each was run against
  *     reviews.json         every review of a release before it was cut, and what it read
+ *     redrafts.json        every time the corpus was rewritten from scratch, and whether
+ *                          the new one has been checked against the old
+ *     archive/<label>/     the corpus a redraft set aside, read-only
  *     index.json           the deliberate corpus order
  *     features/<id>.json   one file per feature
  *     STYLE.md             optional prose tone, when style is "custom"
@@ -113,10 +116,20 @@ function readOptional(file, fallback) {
   return exists(file) ? readJson(file) : fallback;
 }
 
+/** The directory a redraft sets the old corpus aside in, inside `.ledger/`. */
+export const ARCHIVE_DIRNAME = "archive";
+
+/** The file that marks a directory as an archived corpus rather than a live one. */
+export const ARCHIVED_MARKER = "archived.json";
+
 export class Project {
   constructor(ledgerDir) {
     this.ledgerDir = ledgerDir;
-    this.root = path.dirname(ledgerDir);
+    // An archived corpus lives at <root>/.ledger/archive/<label>/, and still
+    // belongs to that project: its logo path, its git history and its output
+    // directories are all the project's.
+    this.archivedAs = readOptional(path.join(ledgerDir, ARCHIVED_MARKER), null);
+    this.root = this.archivedAs ? path.resolve(ledgerDir, "..", "..", "..") : path.dirname(ledgerDir);
     this.configPath = path.join(ledgerDir, "config.json");
     this.brandPath = path.join(ledgerDir, "brand.json");
     this.releasesPath = path.join(ledgerDir, "releases.json");
@@ -125,6 +138,8 @@ export class Project {
     this.indexPath = path.join(ledgerDir, "index.json");
     this.auditsPath = path.join(ledgerDir, "audits.json");
     this.reviewsPath = path.join(ledgerDir, "reviews.json");
+    this.redraftsPath = path.join(ledgerDir, "redrafts.json");
+    this.archiveDir = path.join(ledgerDir, ARCHIVE_DIRNAME);
     this.featuresDir = path.join(ledgerDir, "features");
     this.themeCssPath = path.join(ledgerDir, "theme.css");
     this.load();
@@ -141,6 +156,7 @@ export class Project {
     this.index = readOptional(this.indexPath, { order: [] }).order ?? [];
     this.audits = readOptional(this.auditsPath, { audits: [] }).audits ?? [];
     this.reviews = readOptional(this.reviewsPath, { reviews: [] }).reviews ?? [];
+    this.redrafts = readOptional(this.redraftsPath, { redrafts: [] }).redrafts ?? [];
 
     const files = exists(this.featuresDir)
       ? fs.readdirSync(this.featuresDir).filter((f) => f.endsWith(".json")).sort()
@@ -182,10 +198,12 @@ export class Project {
    * `release cut` and not yet written to would print an edition identical to
    * the one just shipped, which is not a document anybody wants handed to a
    * client. The very first release is always an edition, empty or not —
-   * there is nothing behind it to fall back to.
+   * there is nothing behind it to fall back to. After a redraft the same is
+   * true of the first release the new corpus opened.
    */
   get editionVersions() {
-    const all = this.releases.versions;
+    // Archived editions are printed from the archive, not from this corpus.
+    const all = this.releases.liveVersions;
     const current = this.releases.current;
     if (all.length > 1 && current.future && !this.recordedAt(current.version)) return all.slice(0, -1);
     return all;
@@ -203,11 +221,53 @@ export class Project {
       || this.featureSet.otherChanges({ version }).length > 0;
   }
 
+  /**
+   * The redraft that opened `version`, or null. The first edition after a
+   * redraft is the one that tells the client the ledger was reorganized.
+   */
+  redraftOpening(version) {
+    return this.redrafts.find((r) => r.opens === version) ?? null;
+  }
+
+  /** The latest redraft whose new corpus hasn't been checked against the old
+   *  one yet, or null. `ledger build` warns and `release cut` refuses on it. */
+  get pendingRedraft() {
+    const last = this.redrafts.length ? this.redrafts[this.redrafts.length - 1] : null;
+    return last && !last.reconciled ? last : null;
+  }
+
+  saveRedrafts() {
+    this.assertWritable();
+    writeJson(this.redraftsPath, { redrafts: this.redrafts });
+  }
+
+  /** The corpus an archived release was printed from, opened read-only. */
+  openArchive(release) {
+    const dir = path.join(this.ledgerDir, release.archive);
+    if (!exists(path.join(dir, "config.json"))) {
+      fail(`v${release.version} was archived to .ledger/${release.archive}/, but there is no corpus there any more`);
+    }
+    return new Project(dir);
+  }
+
+  /**
+   * An archive is a record of what an earlier corpus said, and the editions
+   * printed from it depend on it staying that way. `ledger show --dir` and
+   * `ledger list --dir` read it freely; nothing writes to it.
+   */
+  assertWritable() {
+    if (this.archivedAs) {
+      fail(`${path.relative(process.cwd(), this.ledgerDir) || this.ledgerDir} is an archived ledger, set aside by ` +
+        "`ledger redraft`. It is read-only: record changes in the live .ledger/ instead.");
+    }
+  }
+
   featurePath(id) {
     return path.join(this.featuresDir, `${id}.json`);
   }
 
   saveFeature(feature) {
+    this.assertWritable();
     writeJson(this.featurePath(feature.id), feature.toJSON());
     if (!this.index.includes(feature.id)) {
       // Insertion order is the deliberate order; the index is what keeps it
@@ -218,6 +278,7 @@ export class Project {
   }
 
   deleteFeatureFile(id) {
+    this.assertWritable();
     const p = this.featurePath(id);
     if (exists(p)) fs.unlinkSync(p);
     this.index = this.index.filter((x) => x !== id);
@@ -245,6 +306,7 @@ export class Project {
   }
 
   saveAudits() {
+    this.assertWritable();
     writeJson(this.auditsPath, { audits: this.audits });
   }
 
@@ -254,11 +316,13 @@ export class Project {
   }
 
   recordReview(entry) {
+    this.assertWritable();
     this.reviews.push(entry);
     writeJson(this.reviewsPath, { reviews: this.reviews });
   }
 
   saveIndex() {
+    this.assertWritable();
     // Prune ids whose files are gone, so the index can't quietly rot.
     const live = new Set(
       exists(this.featuresDir)
@@ -272,18 +336,22 @@ export class Project {
   }
 
   saveReleases() {
+    this.assertWritable();
     writeJson(this.releasesPath, this.releases.toJSON());
   }
 
   saveSubcategories() {
+    this.assertWritable();
     writeJson(this.subcategoriesPath, this.subcategories);
   }
 
   saveOtherChanges() {
+    this.assertWritable();
     writeJson(this.otherChangesPath, this.otherChangesList);
   }
 
   saveConfig() {
+    this.assertWritable();
     writeJson(this.configPath, this.config);
   }
 

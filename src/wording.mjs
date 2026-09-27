@@ -59,6 +59,20 @@ export function wording(config) {
       backfilled: "Already in place",
       backfilled_removed: "No longer present",
     },
+    // The first edition after a redraft, where the corpus was written again
+    // from scratch. The reader already holds editions arranged another way,
+    // and a document that silently changed shape would read as though the
+    // product had. {editions} is "Editions 1 to 4" or "Edition 1", {those}
+    // "those editions" or "that edition", and {last} the last of them. A
+    // per-redraft note, from `ledger redraft complete --note`, follows it.
+    redraft: {
+      title: "This edition is reorganized",
+      body:
+        "{editions} arranged this ledger differently. This edition arranges it afresh, so its areas, names and" +
+        " descriptions don't match {those} line for line. Every capability from version {last} that" +
+        ` ${product} still has is described here. Because the structure changed, nothing in this edition is` +
+        " marked as new or updated. From the next edition, changes are marked again.",
+    },
     pdf: {
       // The <em> is the one word that takes the accent colour on the cover.
       title_html: "The Feature <em>Ledger</em>",
@@ -73,6 +87,20 @@ export function wording(config) {
   const merged = {};
   for (const key of Object.keys(defaults)) merged[key] = { ...defaults[key], ...(custom[key] ?? {}) };
   return merged;
+}
+
+/**
+ * The standard redraft paragraph, filled in for the editions it follows.
+ * `versions` are the archived ones the redraft set aside.
+ */
+export function redraftBody(words, versions) {
+  const first = versions[0];
+  const last = versions[versions.length - 1];
+  const one = first === last;
+  return words.redraft.body
+    .replaceAll("{editions}", one ? `Edition ${first}` : `Editions ${first} to ${last}`)
+    .replaceAll("{those}", one ? "that edition" : "those editions")
+    .replaceAll("{last}", String(last));
 }
 
 export const GENERATED_HEADER = (ledgerDirName = ".ledger") => `<!--

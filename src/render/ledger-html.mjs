@@ -1,5 +1,5 @@
 import { escapeHtml as h, longDate } from "../util.mjs";
-import { wording } from "../wording.mjs";
+import { wording, redraftBody } from "../wording.mjs";
 import { resolveBrand, mastheadHtml } from "./brand.mjs";
 import { fontFaceCss, SYMBOL_FACE } from "./fonts.mjs";
 
@@ -41,6 +41,10 @@ class LedgerHtml {
     this.version = version ?? project.releases.latestVersion;
     this.release = project.releases.at(this.version);
     this.predecessor = project.releases.predecessorOf(this.version);
+    // Set on the first edition after a redraft: there is an earlier edition,
+    // but one arranged differently, so this one can't be diffed against it
+    // and says so instead.
+    this.redraftFrom = project.releases.archivedBefore(this.version);
     this.brand = resolveBrand(project.brand);
     this.words = wording(project.config);
     this.warnings = [];
@@ -391,6 +395,20 @@ class LedgerHtml {
         </div>
       </div></div>` : "";
 
+    // Where the green/blue callout would go, had there been something to diff
+    // against. Slate, like the third register, because it is the same kind of
+    // fact: the document moved, the product didn't.
+    const redraftBlock = this.redraftFrom ? (() => {
+      const versions = this.project.releases.archived
+        .filter((r) => r.archive === this.redraftFrom.archive).map((r) => r.version);
+      const note = this.project.redraftOpening(this.version)?.note;
+      return `
+      <div class="callout redraft"><div class="callout-content">
+        <b>${h(this.words.redraft.title)}.</b> ${h(redraftBody(this.words, versions))}
+        ${note ? `<p class="redraft-note">${h(note)}</p>` : ""}
+      </div></div>`;
+    })() : "";
+
     const removedBox = ([f, s], cls = "") =>
       `<div class="removed-box${cls}"><div class="removed-box-content">` +
       `<span class="name">${h(f.currentName)}</span> &mdash; ${h(s.reason)}</div></div>`;
@@ -450,7 +468,7 @@ ${this.project.themeCss()}
       Version ${this.version}${rel.name ? ` · ${h(rel.name)}` : ""}${rel.future ? " · draft, not yet presented" : ""}
     </div>
     <p class="intro">${h(w.intro)}</p>
-    ${callout}
+    ${callout}${redraftBlock}
 
     <div class="panel">
       <div class="kicker">The ledger at a glance</div>
@@ -601,6 +619,10 @@ const STYLES = `
   .callout { margin-top: 32px; background: var(--blue); border-radius: 8px; overflow: hidden; }
   .callout-content { background: var(--blue-soft); margin-left: 5px; padding: 16px 20px; font-size: 9.5pt; }
   .callout b { color: var(--blue-deep); }
+  .callout.redraft { background: var(--slate); }
+  .callout.redraft .callout-content { background: var(--slate-soft); }
+  .callout.redraft b { color: var(--slate-deep); }
+  .callout .redraft-note { margin: 10px 0 0; }
   .callout .legend { margin-top: 12px; display: flex; gap: 20px; flex-wrap: wrap; }
   .callout .legend span { display: inline-flex; align-items: center; gap: 7px; font-size: 8.5pt; color: var(--ink-soft); font-weight: 600; }
   .callout .legend i { width: 4px; height: 13px; border-radius: 2px; display: inline-block; }

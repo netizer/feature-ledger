@@ -144,13 +144,25 @@ export class FeatureSet {
     this.validateSubcategories();
 
     const known = new Set(this.releaseSet.versions);
+    // An archived version's edition was printed from the corpus a redraft set
+    // aside, so nothing in this one can be recorded against it.
+    const archived = new Map(this.releaseSet.archived.map((r) => [r.version, r]));
+    const notArchived = (what, version) => {
+      const r = archived.get(version);
+      if (r) {
+        fail(`${what}: v${version} belongs to the archived ledger in .ledger/${r.archive}/ — this corpus starts at ` +
+          `v${this.releaseSet.liveVersions[0]}`);
+      }
+    };
     for (const f of this.featureList) {
       for (const h of f.history) {
         if (!known.has(h.version)) fail(`feature ${f.id}: version ${h.version} isn't in releases.json`);
+        notArchived(`feature ${f.id}`, h.version);
       }
     }
     for (const c of this.otherChangesList) {
       if (!known.has(c.version)) fail(`other_changes entry for version ${c.version} isn't in releases.json`);
+      notArchived("an other_changes entry", c.version);
       if (!["user", "dev"].includes(c.audience)) fail("every other_changes entry needs an audience (user/dev)");
       if (isBlank(c.description)) fail(`other_changes entry at v${c.version} needs a description`);
     }

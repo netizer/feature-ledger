@@ -8,6 +8,7 @@ import * as status from "./commands/status.mjs";
 import * as style from "./commands/style.mjs";
 import * as audit from "./commands/audit.mjs";
 import * as review from "./commands/review.mjs";
+import * as redraft from "./commands/redraft.mjs";
 
 const COMMANDS = {
   init: init.cmdInit,
@@ -30,6 +31,7 @@ const COMMANDS = {
   release: release.cmdRelease,
   audit: audit.cmdAudit,
   review: review.cmdReview,
+  redraft: redraft.cmdRedraft,
 
   build: build.cmdBuild,
 };
@@ -103,8 +105,17 @@ const HELP = `ledger — a versioned feature ledger for any codebase
     ledger review complete                    stamp what was reviewed; \`release cut\` refuses
                                               an edition changed since its last review
 
+  Redrafting (starting the corpus again from scratch, keeping the client's record)
+    ledger redraft start [--force]            archive the corpus in .ledger/archive/, open the next
+                                              version on an empty one; numbering carries on
+    ledger redraft check                      print the brief: check the new corpus against the old
+    ledger redraft complete [--note "..."]    stamp the check; until then \`build\` warns and
+                                              \`release cut\` refuses
+    ledger redraft                            where the redraft stands, and the next step
+
   Output
     ledger build [--md] [--pdf] [--version N|all] [--out DIR]
+                                        an archived version prints from its archive
 
   Setup
     ledger init [--product "Name"] [--accent "#hex"] [--logo path] [--agents auto|none|claude,agents,...]

@@ -1,0 +1,15 @@
+{
+  "id": "redraft-the-ledger",
+  "audience": "user",
+  "category": "Recording what the product does",
+  "size": "Medium",
+  "history": [
+    {
+      "version": 2,
+      "name": "Redrafting the ledger",
+      "description": "The command ledger redraft start sets the corpus aside in .ledger/archive/ and opens the next version on an empty one, so you can write the ledger again from a fresh survey. The version numbers carry on, and every edition already printed keeps its number and its file. ledger build --version reprints an archived edition from its archive. The command ledger redraft check prints a brief for a coding agent to read every archived entry against the new corpus, put back anything the survey missed, and write a note for the client on how the arrangement changed. Until ledger redraft complete records that check, ledger build warns and ledger release cut refuses, and ledger redraft on its own says what is left to do. The first edition after a redraft opens with a note that it is reorganized, and marks nothing as new or updated.",
+      "changes": null,
+      "dev_notes": "src/commands/redraft.mjs. Archived releases keep their place in releases.json with status \"archived\" and an \"archive\" path, which keeps versions 1..N contiguous; predecessorOf() returns null across the boundary, so every diff treats the first edition after a redraft as a first edition, and archivedBefore() is what the renderers read for the note. The archive holds an archived.json marker: Project resolves the root three levels up and refuses every save. `redraft start` refuses a dirty .ledger/ and an open release with work on it (--force for both). The live corpus keeps config (areas reset), brand, STYLE.md and theme.css; audits.json and reviews.json start empty. bootstrap swaps its cut step for a stop-before-the-cut step while a redraft is pending. The old-to-new pairing is same id, else Jaccard over name and description words, with a 0.12 threshold."
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 # Baseline survey — hand this to your coding agent
 
-The survey is agent work: only something that can read the codebase can say
+{redraft_intro}The survey is agent work: only something that can read the codebase can say
 what {product} does. So this prints the brief, and whichever agent you use
 runs it.
 
@@ -173,27 +173,7 @@ invent a purpose to fill the gap: describe what you can actually see the
 product doing, and flag it. A guess in this document becomes a guess a client
 reads, so the flag is what stops it being one.
 
-## Step 4 — the baseline edition
-
-When every capability is recorded and `ledger status` is clean, date the
-baseline from the repository rather than asking me — the first commit is when
-work on this codebase started:
-
-```
-git log --reverse --format=%ad --date=short | head -1
-```
-
-{audit_block}Then cut the release and print it:
-
-```
-ledger release cut --name "Baseline" --date <that date, or today if there's no history>
-ledger build
-```
-
-Version 1 has no predecessor, so its edition prints as a plain inventory with
-nothing flagged as new or changed — which is exactly right for a snapshot of
-work that was already there. From the next release onward, every edition
-highlights only what actually moved.
+{baseline_step}
 
 ## Step 5 — hand it back
 

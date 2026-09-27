@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { openProject } from "../store.mjs";
 import { Feature } from "../model/feature.mjs";
-import { fail, readStdin, asList, isBlank, writeJson, exists } from "../util.mjs";
+import { fail, readStdin, asList, isBlank, exists } from "../util.mjs";
 
 const out = (s) => process.stdout.write(`${s}\n`);
 
@@ -477,6 +477,6 @@ export async function cmdSubcategory({ flags, positional }) {
     return;
   }
   project.subcategories.push(entry);
-  writeJson(project.subcategoriesPath, project.subcategories);
+  project.saveSubcategories();
   out(`added sub-section ${data.id} under ${data.category} — assign features to it with \`ledger update <id> --subcategory ${data.id}\``);
 }

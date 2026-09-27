@@ -322,9 +322,13 @@ Not much, and it's where a hand-edit would be either invisible or wrong:
   `ledger update` and `ledger remove` resolve it, and `ledger update` is also
   what refuses a change that never says why it happened — the rule that makes
   this document worth reading rather than a diff.
-- **`releases.json`, and the stamps in `audits.json` and `reviews.json`.** A
-  timeline edited by hand stops matching the editions already handed over, and
-  a stamp set without the work behind it hides exactly what it exists to catch.
+- **`releases.json`, and the stamps in `audits.json`, `reviews.json` and
+  `redrafts.json`.** A timeline edited by hand stops matching the editions
+  already handed over, and a stamp set without the work behind it hides exactly
+  what it exists to catch. A redraft's `note` is the exception: it is wording.
+- **Anything under `.ledger/archive/`.** It is the corpus a redraft set aside,
+  and the editions the client already holds print from it. Read it with
+  `ledger list --dir` and `ledger show --dir`; the CLI refuses to write there.
 - **Keeping `index.json` complete.** Every write adds a new id to it and prunes
   one whose file is gone, so it can't rot. Only that half is the CLI's: the
   **order** in the list is the deliberate reading order within a size band, and

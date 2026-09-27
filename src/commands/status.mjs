@@ -8,6 +8,7 @@ import { resolveStyle, styleTitle } from "../style.mjs";
 import { unauditedReport, unauditedLine, unconfirmedReasons } from "./audit.mjs";
 import { unreviewedReport, unreviewedLine } from "./review.mjs";
 import { shortSha } from "../git.mjs";
+import { redraftReport, redraftSteps, rangeLabel } from "./redraft.mjs";
 
 const out = (s) => process.stdout.write(`${s}\n`);
 const field = (k, v) => out(`  ${k.padEnd(11)} ${v}`);
@@ -37,11 +38,12 @@ export async function cmdStatus({ flags }) {
   const corpus = corpusReport(project);
   const audit = auditReport(project);
   const review = unreviewedReport(project);
+  const redraft = redraftReport(project);
 
   if (flags.json) {
     const setup = setupReport(project);
     setup.browser = await browserLine();
-    out(JSON.stringify({ ...release, corpus, audit, review, setup, warnings }, null, 2));
+    out(JSON.stringify({ ...release, corpus, audit, review, redraft, setup, warnings }, null, 2));
     return;
   }
 
@@ -78,6 +80,11 @@ export async function cmdStatus({ flags }) {
   field("releases", `${corpus.releases}, \`ledger build\` prints the v${corpus.prints} edition`);
   field("audited", audit.line);
   if (audit.full_line) field("full sweep", audit.full_line);
+  const lastRedraft = project.redrafts[project.redrafts.length - 1];
+  if (lastRedraft) {
+    field("redrafted", `${lastRedraft.started.date}, ${rangeLabel(lastRedraft.versions)} archived in .ledger/${lastRedraft.archive}/` +
+      (lastRedraft.reconciled ? `, checked against it ${lastRedraft.reconciled.date}` : " — not yet checked against it"));
+  }
 
   out("");
   out("Setup");
@@ -266,6 +273,11 @@ function collectWarnings(project) {
   // an area with twenty entries in it, and an area opened today for work
   // starting tomorrow has one. Neither is a defect, and a warning that says
   // otherwise just teaches people to even out a shape that was already true.
+
+  const redraft = redraftReport(project);
+  if (!redraft.ok) {
+    warnings.push(`unfinished redraft: ${redraft.line}. \`ledger release cut\` refuses until it's finished:\n${redraftSteps(redraft)}`);
+  }
 
   const unaudited = unauditedReport(project);
   if (!unaudited.ok) {

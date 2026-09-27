@@ -1,4 +1,4 @@
-import { wording, GENERATED_HEADER } from "../wording.mjs";
+import { wording, redraftBody, GENERATED_HEADER } from "../wording.mjs";
 
 /**
  * The three living Markdown docs, always rendered for the *latest* release in
@@ -18,6 +18,20 @@ export class MarkdownRenderer {
     this.words = wording(project.config);
     this.target = project.releases.latestVersion;
     this.inProgress = project.releases.at(this.target).future;
+    // Nothing to tag against in a first edition, or in the first one after a
+    // redraft: every entry would read "New", which says nothing. The PDF
+    // prints those editions without flags for the same reason.
+    this.tagging = this.inProgress && Boolean(project.releases.predecessorOf(this.target));
+    this.redraftFrom = project.releases.archivedBefore(this.target);
+  }
+
+  /** The "reorganized" paragraph, for the first edition after a redraft. */
+  redraftNotice() {
+    if (!this.redraftFrom) return "";
+    const versions = this.project.releases.archived
+      .filter((r) => r.archive === this.redraftFrom.archive).map((r) => r.version);
+    const note = this.project.redraftOpening(this.target)?.note;
+    return `> **${this.words.redraft.title}.** ${redraftBody(this.words, versions)}${note ? `\n>\n> ${note}` : ""}\n\n`;
   }
 
   all() {
@@ -48,7 +62,7 @@ export class MarkdownRenderer {
         other.map((c) => `- ${c.description}`).join("\n")}\n`
       : "";
 
-    return `${GENERATED_HEADER()}# ${title}\n\n${intro}\n\n---\n\n${body}${trailer}`;
+    return `${GENERATED_HEADER()}# ${title}\n\n${intro}\n\n${this.redraftNotice()}---\n\n${body}${trailer}`;
   }
 
   category(category, { audience, extended, number }) {
@@ -63,7 +77,7 @@ export class MarkdownRenderer {
       // and its features stay quiet — a column of identical "New"s says
       // nothing the heading hasn't already said, and it would drown out the
       // one genuinely changed entry the release after.
-      const whole = this.inProgress ? this.uniformTag(members) : null;
+      const whole = this.tagging ? this.uniformTag(members) : null;
       const label = number === null ? `${i + 1}.` : `${number}.${i + 1}`;
       lines.push("", `### ${label} ${sub.name}${whole ? ` **[${whole}]**` : ""}`, "", `*${sub.intro}*`, "");
       this.renderFeatures(members, lines, removedThisCycle, { extended, tag: !whole });
@@ -117,7 +131,7 @@ export class MarkdownRenderer {
       const state = f.stateAt(this.target);
       if (!state) continue;
       if (state.removed) {
-        if (this.inProgress && state.version === this.target) removedThisCycle.push([f, state]);
+        if (this.tagging && state.version === this.target) removedThisCycle.push([f, state]);
         continue;
       }
       lines.push(this.bullet(f, state, { extended, tag }));
@@ -126,7 +140,7 @@ export class MarkdownRenderer {
 
   bullet(f, state, { extended, tag }) {
     const tags = [f.size].filter(Boolean);
-    const touched = tag && this.inProgress && state.version === this.target;
+    const touched = tag && this.tagging && state.version === this.target;
     // Backfilled wins over both: the entry has a `changes` list like any
     // other, and tagging it "Changed" would say the product moved this cycle.
     if (touched) {

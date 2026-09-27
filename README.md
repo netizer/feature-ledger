@@ -21,7 +21,7 @@ live in one file every agent can read, and every operation is a CLI command).
 | **Generated** | `FEATURES.md`, `FEATURES_EXTENDED.md`, `DEV_FEATURES.md` — gitignored build output — and a PDF per release, which a project can keep or regenerate. |
 | **Editions** | [`docs/client/`](docs/client) — this repo keeps its own, so you can open the document the tool actually produces. Start with [the v2 PDF](docs/client/feature-ledger-Feature-Ledger_2.pdf) to see what a client is handed. |
 | **Interface** | `ledger` — read, write, status, build. What it records goes through the CLI; how it's worded is a text edit. |
-| **Checks** | [`ledger audit`](#keeping-it-honest-ledger-audit) sweeps the codebase for what the ledger missed; [`ledger review`](#reading-a-release-as-the-client-will-ledger-review) reads a release against the last edition before it goes out. `ledger release cut` asks for both. |
+| **Checks** | [`ledger audit`](#keeping-it-honest-ledger-audit) sweeps the codebase for what the ledger missed; [`ledger review`](#reading-a-release-as-the-client-will-ledger-review) reads a release against the last edition before it goes out. `ledger release cut` asks for both — and, after a [redraft](#starting-over-ledger-redraft), for the check that nothing was lost. |
 
 ---
 
@@ -395,9 +395,11 @@ Not much, and it's where a hand-edit would be either invisible or wrong.
   `ledger update` and `ledger remove` — and `ledger update` is also what
   refuses a change that never says *why*, the rule that makes the document
   worth reading rather than a diff.
-- **`releases.json`, and the stamps in `audits.json` and `reviews.json`.** A timeline edited
-  by hand stops matching the editions already handed over, and a stamp set
-  without the sweep behind it makes a gap permanently invisible.
+- **`releases.json`, and the stamps in `audits.json`, `reviews.json` and
+  `redrafts.json`.** A timeline edited by hand stops matching the editions
+  already handed over, and a stamp set without the sweep behind it makes a gap
+  permanently invisible. The one exception is a redraft's `note`, which is
+  wording. The same goes for `.ledger/archive/`: the old editions print from it.
 - **Keeping `index.json` complete.** Every write adds a new id and prunes one
   whose file is gone, so the index can't rot. Only that half is the CLI's: the
   **order** in the list is the deliberate reading order within a size band, and
@@ -595,6 +597,103 @@ Two guards at write time keep the review short. `ledger update` refuses a
 change note on a feature that is new in the open release, and when a feature
 changes a second time in one release it reminds the agent which edition its
 bullets have to be true of.
+
+---
+
+## Starting over: `ledger redraft`
+
+A ledger written one change at a time drifts into the shape its history gave
+it: areas that made sense three releases ago, an entry that grew a second
+capability inside it, names from before the product found its own words. Past
+a point, the cheapest way to a document that reads well is a fresh survey.
+
+What mustn't start again is everything the client already holds: the version
+numbers on the editions they were handed, those editions themselves, and every
+fact those editions told them. `ledger redraft` keeps all three.
+
+```bash
+ledger redraft start      # set the corpus aside, open the next version on an empty one
+ledger bootstrap          # the survey, from scratch — it knows it's a redraft
+git commit …
+ledger redraft check      # a brief: check the new corpus against the old one
+git commit …              # the check's edits, as a diff of their own
+ledger release cut --name "…" && ledger build
+```
+
+**`redraft start`** copies the whole corpus into `.ledger/archive/v1-v4/`
+(named for the editions it produced) and marks it read-only: the CLI refuses
+to write there, and `--dir` reads it (`ledger list --dir .ledger/archive/v1-v4`).
+The released versions stay in `releases.json` with `status: "archived"`, so
+the next release is v5, not v1. Config, brand, tone and theme carry over; the
+features, the areas, the sub-sections and the audit and review logs start
+empty, because deciding those afresh is the point. It refuses while `.ledger/`
+has uncommitted changes, so the corpus being set aside is one the history
+already holds. It also refuses while the open release has work recorded
+against it: the first edition after a redraft marks nothing as new, so that
+work would reach the client unannounced. Cut it first, or pass `--force`.
+
+**`bootstrap`**, run during a redraft, surveys as usual but doesn't read the
+archive (a survey that starts from the old structure reproduces it), and stops
+before the cut.
+
+**`redraft check`** prints the check, which is the step that makes a fresh survey
+safe. The CLI pairs every archived entry with its likely counterpart in the new
+corpus, by id or by shared wording, and lists the ones it couldn't pair first.
+The agent then reads each old description a statement at a time, finds where
+the new corpus says the same thing, and puts back whatever it doesn't. That's
+a detail the survey had no way of knowing, a capability hidden behind a
+setting, or the client's own word for something. It keeps the new structure:
+it restores facts, not the old arrangement. It also writes a short note for
+the client on how the arrangement changed, and stamps the redraft with
+`ledger redraft complete --note "…"`, recorded in `.ledger/redrafts.json`.
+Statements no longer true of the product come back to you as a list: the
+client read them in an earlier edition, so whether to tell them is your call.
+
+Until that stamp is there, the redraft is unfinished, and the tool says so
+where it matters:
+
+```
+$ ledger build
+! Unfinished redraft: the ledger was redrafted on September 27, 2026: v1–v4 are
+  archived in .ledger/archive/v1-v4/, and the new corpus hasn't been checked
+  against it yet, so this edition may have lost something the client was told in v4.
+  To finish it:
+    1. commit the current state of .ledger/, so the check's edits are a diff of their own
+    2. run `ledger redraft check` and hand the prompt it prints to your coding agent. …
+    3. commit its edits
+```
+
+Bare `ledger redraft` prints the same steps at any point, or says the redraft
+is complete. `ledger status` carries the same warning, and `ledger release cut` refuses
+until the check is done. That's the same shape as the audit and the review, and
+it's checked ahead of both.
+
+### What the client sees
+
+The first edition after a redraft prints as an inventory, like a first
+edition, because there's nothing it can be diffed against entry by entry. In
+place of the green-and-blue callout, it opens with a grey one:
+
+> **This edition is reorganized.** Editions 1 to 4 arranged this ledger
+> differently. This edition arranges it afresh, so its areas, names and
+> descriptions don't match those editions line for line. Every capability from
+> version 4 that Acme Portal still has is described here. Because the structure
+> changed, nothing in this edition is marked as new or updated. From the next
+> edition, changes are marked again.
+>
+> Bookings and Payments are one area, Bookings. Deposit refunds, previously its
+> own entry, is part of Checkout.
+
+The second paragraph is the agent's note, and the first can be overridden per
+project under `docs.redraft` in `config.json`. Grey for the same reason as the
+third register: the document moved, the product didn't. The edition after that
+is compared with this one as usual.
+
+The old editions are left alone. Their numbers never come round again, so no
+new PDF overwrites one. `ledger build --version all` prints only the current
+corpus's editions, and `ledger build --version 3` reprints an archived one from
+its archive, so a project that doesn't commit its PDFs can still reproduce
+every document it has handed over.
 
 ---
 
@@ -939,6 +1038,12 @@ Reviewing           (reading the release against the last edition, before the cu
   ledger review                           the brief, for a coding agent
   ledger review complete                  stamp what was reviewed
 
+Redrafting          (writing the corpus again from scratch, keeping the client's record)
+  ledger redraft start [--force]          archive the corpus, open the next version empty
+  ledger redraft check                    the brief: check the new corpus against the old
+  ledger redraft complete [--note "…"]    stamp the check, with the note the client reads
+  ledger redraft                          where the redraft stands, and the next step
+
 Output
   ledger build [--md] [--pdf] [--version N|all] [--out DIR] [--html]
 
@@ -976,14 +1081,16 @@ subcategories.json   sub-section headings
 other-changes.json   changes belonging to no single feature
 audits.json          every audit so far, and the commit each was run against
 reviews.json         every review of a release, and a fingerprint of what it read
+redrafts.json        every redraft, and whether the new corpus was checked against the old
+archive/v1-v4/       a corpus a redraft set aside, read-only; its editions print from it
 STYLE.md             optional, the project's own tone as prose
 theme.css            optional, appended last to the PDF stylesheet
 ```
 
 Everything here is committed. The words in `features/`, `subcategories.json`,
 `other-changes.json` and `config.json` are yours to edit directly, as is the
-order of `index.json`; `releases.json`, `audits.json` and `reviews.json` are
-the CLI's. See
+order of `index.json`; `releases.json`, `audits.json`, `reviews.json`,
+`redrafts.json` and `archive/` are the CLI's. See
 [Editing the ledger by hand](#editing-the-ledger-by-hand).
 
 One file per feature is a deliberate change from the single-file original: a

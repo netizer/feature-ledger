@@ -16,12 +16,25 @@ import { fail, isBlank } from "../util.mjs";
  * edition was printed from, and what makes two same-day releases tellable
  * apart. It is null for a release cut outside a repository, and for every
  * release cut before this was recorded.
+ *
+ * An `archived` release is one printed from an earlier corpus that `ledger
+ * redraft` has since set aside in `.ledger/archive/<label>/`. It stays in the
+ * timeline so version numbers carry on across the redraft and the editions
+ * already handed over keep their numbers, but nothing in the live corpus may
+ * be recorded against it, and its edition is printed from the archive. The
+ * archived releases are always the oldest ones: a redraft sets aside
+ * everything before the release it opens.
  */
 export class ReleaseSet {
   constructor(raw) {
     if (!Array.isArray(raw)) fail("releases.json must be an array of releases");
     this.releases = raw
-      .map((r) => ({ ...r, future: r.status === "future", released: r.status === "released" }))
+      .map((r) => ({
+        ...r,
+        future: r.status === "future",
+        released: r.status === "released",
+        archived: r.status === "archived",
+      }))
       .sort((a, b) => a.version - b.version);
     this.validate();
   }
@@ -49,13 +62,39 @@ export class ReleaseSet {
     return r;
   }
 
+  /**
+   * The release an edition is compared with, or null when there is nothing
+   * it can be compared with entry by entry: before v1, and across a redraft,
+   * where the previous edition was written in a structure this corpus no
+   * longer shares. Either way the edition prints as an inventory.
+   */
   predecessorOf(version) {
-    return version > 1 ? this.at(version - 1) : null;
+    if (version <= 1) return null;
+    const previous = this.at(version - 1);
+    return previous.archived ? null : previous;
+  }
+
+  /** The last archived release when `version` is the first one after a
+   *  redraft, else null. What the "reorganized" note in that edition names. */
+  archivedBefore(version) {
+    if (version <= 1) return null;
+    const previous = this.at(version - 1);
+    const self = this.at(version);
+    return previous.archived && !self.archived ? previous : null;
+  }
+
+  get archived() {
+    return this.releases.filter((r) => r.archived);
+  }
+
+  /** Versions that belong to the live corpus: everything since the last redraft. */
+  get liveVersions() {
+    return this.releases.filter((r) => !r.archived).map((r) => r.version);
   }
 
   toJSON() {
-    return this.releases.map(({ version, name, date, status, commit }) => ({
-      version, name, date, status, commit: commit ?? null,
+    return this.releases.map(({ version, name, date, status, commit, archive }) => ({
+      version, name, date, status, commit: commit ?? null, ...(archive ? { archive } : {}),
     }));
   }
 
@@ -69,16 +108,24 @@ export class ReleaseSet {
     if (future.length > 1) fail(`releases.json must have at most one future release, found ${future.length}`);
     if (future.length && future[0].version !== this.latestVersion) fail("a future release must be the last one");
     for (const r of this.releases) {
-      if (!["released", "future"].includes(r.status)) {
-        fail(`release ${r.version}: status must be "released" or "future"`);
+      if (!["released", "future", "archived"].includes(r.status)) {
+        fail(`release ${r.version}: status must be "released", "future" or "archived"`);
       }
-      if (r.released && isBlank(r.date)) fail(`release ${r.version}: released releases need a date`);
+      if ((r.released || r.archived) && isBlank(r.date)) fail(`release ${r.version}: released releases need a date`);
+      if (r.archived && isBlank(r.archive)) {
+        fail(`release ${r.version}: an archived release needs "archive", the directory its corpus was set aside in`);
+      }
       // Not required: a project with no repository, and every release cut
       // before commits were recorded, legitimately has none.
       if (r.commit != null && !/^[0-9a-f]{7,40}$/.test(String(r.commit))) {
         fail(`release ${r.version}: "commit" must be a git sha (got ${JSON.stringify(r.commit)})`);
       }
-      if (r.released && isBlank(r.name)) fail(`release ${r.version}: released releases need a name`);
+      if ((r.released || r.archived) && isBlank(r.name)) fail(`release ${r.version}: released releases need a name`);
+    }
+    const firstLive = this.releases.findIndex((r) => !r.archived);
+    if (firstLive === -1) fail("releases.json has no release after the archived ones — a redraft always opens one");
+    if (this.releases.slice(firstLive).some((r) => r.archived)) {
+      fail("archived releases must all come before the live ones: a redraft sets aside everything before the release it opens");
     }
   }
 }

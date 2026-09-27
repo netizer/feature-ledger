@@ -62,6 +62,7 @@ function setStyle(flags, args) {
   }
 
   const project = openProject(flags);
+  project.assertWritable();
 
   // A custom tone is a document, not a setting, so setting one starts the
   // document rather than leaving the project pointed at nothing.

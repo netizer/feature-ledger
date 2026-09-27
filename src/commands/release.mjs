@@ -2,6 +2,7 @@ import { openProject } from "../store.mjs";
 import { fail, isBlank, today, longDate } from "../util.mjs";
 import { unauditedReport, unauditedLine, unconfirmedReasons } from "./audit.mjs";
 import { unreviewedReport, unreviewedLine } from "./review.mjs";
+import { redraftReport, redraftSteps } from "./redraft.mjs";
 import * as git from "../git.mjs";
 
 const out = (s) => process.stdout.write(`${s}\n`);
@@ -18,6 +19,12 @@ function list(flags) {
   const project = openProject(flags);
   for (const r of project.releases.releases) {
     const touched = project.featureSet.features().filter((f) => f.touchedAt(r.version)).length;
+    if (r.archived) {
+      // Counted in its own corpus: nothing in this one is recorded against it.
+      out(`v${String(r.version).padStart(2)}  ${(longDate(r.date) ?? "").padEnd(20)}${(r.commit ? `  ${git.shortSha(r.commit)}` : "").padEnd(10)} ` +
+        `${r.name}  · archived in .ledger/${r.archive}/`);
+      continue;
+    }
     const when = r.future ? "in progress" : longDate(r.date);
     // The commit is what tells two editions cut on one day apart, so it goes
     // in the listing rather than only in the file.
@@ -41,6 +48,10 @@ function amend(flags, rest) {
   if (!Number.isInteger(version)) fail('usage: ledger release amend <version> --commit <sha>');
 
   const release = project.releases.at(version);
+  if (release.archived) {
+    fail(`v${version} belongs to the archived ledger in .ledger/${release.archive}/, which is read-only — ` +
+      "its commit is part of the record the client's edition was printed from");
+  }
   if (release.future) {
     fail(
       `v${version} is the release in progress, so it has no commit yet — it gets one when ` +
@@ -136,6 +147,14 @@ function cut(flags) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) fail(`--date must be YYYY-MM-DD (got ${date})`);
 
   const commit = resolveCutCommit(project, flags);
+
+  // Ahead of every other gate: until the redrafted corpus has been checked
+  // against the one it replaced, anything the others would ask for is being
+  // asked of a corpus that may still be missing what the client was told.
+  const redraft = redraftReport(project);
+  if (!redraft.ok && !flags.force) {
+    fail(`${redraft.line}. To finish the redraft:\n${redraftSteps(redraft)}\nor pass --force to cut anyway.`);
+  }
 
   // Two releases on one day are ordinary — a morning demo and an afternoon one
   // are two real moments — so the date alone was never the thing that

@@ -7,13 +7,15 @@ The source of truth for this product's feature ledger. Commit all of it.
 | --- | --- |
 | `config.json` | Product name, the area list (which is the reading order of every document, and may be empty), and any wording overrides. |
 | `brand.json` | The client-swap surface: logo, one accent colour, fonts. |
-| `releases.json` | The version timeline. The last entry, `status: "future"`, is the release in progress — everything new records against it. |
+| `releases.json` | The version timeline. The last entry, `status: "future"`, is the release in progress — everything new records against it. `status: "archived"` ones were printed from a corpus in `archive/`. |
 | `features/<id>.json` | One feature, with its full version history. |
 | `index.json` | The deliberate order of the corpus, which is what breaks ties within a size band. Maintained automatically. |
 | `subcategories.json` | Sub-section headings, for an area that grew too big to read as one list. |
 | `other-changes.json` | Changes belonging to no single feature. |
 | `audits.json` | Every audit so far, and the commit each one covered. Written by `ledger audit complete`. |
 | `reviews.json` | Every review of a release before it was cut, and a fingerprint of what it read. Written by `ledger review complete`. |
+| `redrafts.json` | Every time the corpus was written again from scratch, and when the new one was checked against the old. Written by `ledger redraft`. |
+| `archive/<label>/` | A corpus a redraft set aside, read-only. The editions it produced are printed from it. |
 | `theme.css` | Optional. Appended last to the PDF's stylesheet, for a one-off nudge. |
 
 ## Which of it you edit
@@ -34,7 +36,8 @@ which release the entry lands on, which is what every New/Changed tag in every
 document is computed from, and `ledger update` refuses a change that never
 says why it happened.
 
-**Leave `releases.json`, `audits.json` and `reviews.json` alone.** The
+**Leave `releases.json`, `audits.json`, `reviews.json`, `redrafts.json` and
+`archive/` alone** (a redraft's `note` is wording, and yours). The
 timeline has to keep matching the editions already handed over, and an audit
 or review stamp set without the work behind it hides exactly what it exists
 to catch. `index.json` is in between:

@@ -230,6 +230,7 @@ export async function cmdBootstrap({ flags }) {
   let config = DEFAULT_CONFIG;
   let ledgerDir = null;
   let projectRoot = null;
+  let redraft = null;
   try {
     const { openProject } = await import("../store.mjs");
     const project = openProject(flags);
@@ -237,17 +238,79 @@ export async function cmdBootstrap({ flags }) {
     config = project.config;
     ledgerDir = project.ledgerDir;
     projectRoot = project.root;
+    redraft = project.pendingRedraft;
   } catch {
     // Printing the prompt before `ledger init` is still useful.
   }
   const style = resolveStyle(config, ledgerDir);
   process.stdout.write(
     asset("BOOTSTRAP.md")
+      .replaceAll("{redraft_intro}", redraft ? redraftIntro(redraft) : "")
+      .replaceAll("{baseline_step}", redraft ? redraftStep(redraft) : BASELINE_STEP)
       .replaceAll("{product}", product)
       .replaceAll("{style_line}", styleLine(style))
-      .replaceAll("{audit_block}", auditBlock(flags, projectRoot))
+      .replaceAll("{audit_block}", auditBlock(flags, projectRoot, redraft))
       .replaceAll("{copy_rule}", COPY_RULE),
   );
+}
+
+/** Step 4 of an ordinary survey: date the baseline and cut it. */
+const BASELINE_STEP = `## Step 4 — the baseline edition
+
+When every capability is recorded and \`ledger status\` is clean, date the
+baseline from the repository rather than asking me — the first commit is when
+work on this codebase started:
+
+\`\`\`
+git log --reverse --format=%ad --date=short | head -1
+\`\`\`
+
+{audit_block}Then cut the release and print it:
+
+\`\`\`
+ledger release cut --name "Baseline" --date <that date, or today if there's no history>
+ledger build
+\`\`\`
+
+Version 1 has no predecessor, so its edition prints as a plain inventory with
+nothing flagged as new or changed — which is exactly right for a snapshot of
+work that was already there. From the next release onward, every edition
+highlights only what actually moved.`;
+
+/**
+ * A survey run inside a redraft stops before the cut. The old corpus has to be
+ * read against the new one first (`ledger redraft check`), and `release cut` refuses
+ * until it has been. It is also told not to read the archive: a survey that
+ * starts from the old structure reproduces it, and a new structure is the
+ * reason for redrafting at all.
+ */
+function redraftStep(redraft) {
+  const last = redraft.versions[redraft.versions.length - 1];
+  return `## Step 4 — stop before the cut
+
+This survey is a **redraft**. The ledger already had editions up to v${last},
+and their corpus is archived in \`.ledger/${redraft.archive}/\`. Don't read the
+archive, and don't try to match it: the point of starting again is a structure
+and wording chosen fresh from the product as it is now. A separate step reads
+the old corpus against yours afterwards and restores anything the survey
+missed.
+
+Everything you recorded is at v${redraft.opens}, the next edition after the one the
+client already has. That is the right place for it.
+
+{audit_block}Do **not** cut the release, and do not run \`ledger build\`. The cut
+refuses until the redraft is checked, and the check comes after this work is
+committed.`;
+}
+
+function redraftIntro(redraft) {
+  return `This is a **redraft**: the corpus behind the editions up to
+v${redraft.versions[redraft.versions.length - 1]} is archived in \`.ledger/${redraft.archive}/\`, and this survey
+writes the new one from scratch, at v${redraft.opens}. It stops before the cut.
+When it's done, commit what it recorded, then run \`ledger redraft check\` for the
+step that checks the new corpus against the old one.
+
+`;
 }
 
 /**
@@ -264,12 +327,12 @@ export async function cmdBootstrap({ flags }) {
  *
  * `--no-audit` leaves it out, for a survey that is deliberately partial.
  */
-function auditBlock(flags, root) {
+function auditBlock(flags, root, redraft = null) {
   if (flags.audit === false) return "";
   const sha = root ? git.head(root) : null;
   return [
     "This survey **is** a full audit: you have just read the whole codebase",
-    "against the record. Record that before you cut, so the tool knows the sweep",
+    `against the record. Record that ${redraft ? "before you stop" : "before you cut"}, so the tool knows the sweep`,
     "happened and can tell later how much has landed since:",
     "",
     "```",

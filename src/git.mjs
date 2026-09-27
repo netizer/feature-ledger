@@ -96,6 +96,13 @@ export function changes(root, from, to = "HEAD") {
   });
 }
 
+/** Paths under `dir` with uncommitted changes, tracked or not. Empty outside
+ *  a repository, where there is nothing to have committed. */
+export function uncommitted(root, dir) {
+  const out = git(root, ["status", "--porcelain", "--untracked-files=all", "--", dir]);
+  return out === null ? [] : out.split("\n").filter(Boolean).map((l) => l.slice(3));
+}
+
 /** Every tracked path, for a full sweep. */
 export function tracked(root) {
   const out = git(root, ["ls-files"]);

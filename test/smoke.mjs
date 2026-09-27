@@ -420,6 +420,80 @@ run(["release", "amend", "1", "--commit", "0".repeat(40)], { cwd: repo, expect: 
 
 fs.rmSync(repo, { recursive: true, force: true });
 
+// ---- The redraft: a corpus written again, a record that carries on ----
+const rd = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-redraft-"));
+const rgit = (...args) => spawnSync("git", ["-C", rd, ...args], { encoding: "utf8" });
+const commitAll = (msg) => { rgit("add", "-A"); rgit("commit", "-qm", msg); };
+rgit("init", "-q", ".");
+rgit("config", "user.email", "smoke@example.com");
+rgit("config", "user.name", "Smoke");
+run(["init", "--product", "Redrafted", "--agents", "none", "--commit-pdfs"], { cwd: rd });
+run(["add", "kept"], { cwd: rd, stdin: feature({ audience: "user", size: "Big", name: "Kept", description: "Does the kept thing." }) });
+run(["add", "lost"], { cwd: rd, stdin: feature({ audience: "user", size: "Small", name: "Quiet export", description: "Exports the ledger to spreadsheets." }) });
+// A redraft keeps what a client holds, so with nothing handed over there is nothing to keep.
+run(["redraft", "start"], { cwd: rd, expect: "fail" });
+run(["release", "cut", "--name", "Baseline", "--date", "2026-03-01"], { cwd: rd });
+assert("…and it refuses while the corpus it would set aside isn't committed",
+  run(["redraft", "start"], { cwd: rd, expect: "fail" }).includes("uncommitted"));
+commitAll("Baseline");
+run(["redraft", "start"], { cwd: rd });
+const rjson = (f) => JSON.parse(fs.readFileSync(path.join(rd, ".ledger", f), "utf8"));
+assert("the old corpus is set aside, whole, in the archive",
+  fs.existsSync(path.join(rd, ".ledger/archive/v1/features/lost.json")));
+assert("the numbering carries on: v1 stays in the timeline, archived, and v2 opens",
+  rjson("releases.json").map((r) => `${r.version}:${r.status}`).join() === "1:archived,2:future");
+assert("the live corpus starts empty, areas and all",
+  fs.readdirSync(path.join(rd, ".ledger/features")).length === 0 && rjson("config.json").categories.length === 0);
+// The archive is what the old editions print from, so nothing writes to it.
+run(["add", "sneaky", "--dir", ".ledger/archive/v1"], { cwd: rd, expect: "fail",
+  stdin: feature({ audience: "user", size: "Small", name: "Sneaky", description: "Does the sneaky thing." }) });
+assert("the archive reads through --dir", run(["list", "--dir", ".ledger/archive/v1"], { cwd: rd }).includes("Quiet export"));
+run(["redraft", "start"], { cwd: rd, expect: "fail" });
+const survey = run(["bootstrap"], { cwd: rd });
+assert("a survey inside a redraft stops before the cut", survey.includes("stop before the cut") && !survey.includes("release cut --name"));
+assert("…and knows where the archive is", survey.includes(".ledger/archive/v1"));
+assert("an unfinished redraft makes `ledger build` say what's left",
+  run(["build", "--md"], { cwd: rd }).includes("Unfinished redraft") );
+run(["redraft", "check"], { cwd: rd, expect: "fail" });   // nothing to compare yet
+assert("bare `ledger redraft` says what comes next", run(["redraft"], { cwd: rd }).includes("ledger bootstrap"));
+run(["add", "kept"], { cwd: rd, stdin: feature({ audience: "user", size: "Big", name: "Kept, reworded", description: "Does the kept thing, better said." }) });
+run(["add", "fresh"], { cwd: rd, stdin: feature({ audience: "user", size: "Medium", name: "Fresh", description: "Does a thing the old ledger never listed." }) });
+// Nothing in the new corpus can be recorded against a version it doesn't own.
+const stray = path.join(rd, ".ledger/features/stray.json");
+fs.writeFileSync(stray, JSON.stringify({ id: "stray", audience: "user", category: "Features", size: "Small",
+  history: [{ version: 1, name: "Stray", description: "x", changes: null }] }));
+assert("an entry recorded against an archived version is refused",
+  run(["status"], { cwd: rd, expect: "fail" }).includes("belongs to the archived ledger"));
+fs.unlinkSync(stray);
+const check = run(["redraft", "check"], { cwd: rd });
+assert("the check pairs old entries with new ones, and flags what has none",
+  check.includes(RULE) && /kept\s+→ kept/.test(check) && /lost\s+→ \(none found\)/.test(check));
+assert("the cut refuses until the redraft is checked",
+  run(["release", "cut", "--name", "Reorganized"], { cwd: rd, expect: "fail" }).includes("ledger redraft check"));
+run(["redraft", "complete", "--note", "Exports are part of Kept."], { cwd: rd });
+assert("…which is recorded in redrafts.json", rjson("redrafts.json").redrafts[0].reconciled !== null);
+assert("…and bare `ledger redraft` says it's complete", run(["redraft"], { cwd: rd }).includes("is complete"));
+assert("…and the warning goes quiet", !run(["build", "--md"], { cwd: rd }).includes("Unfinished redraft"));
+run(["build", "--pdf", "--html", "--version", "2"], { cwd: rd });
+const reorganized = fs.readFileSync(path.join(rd, "docs/client/Redrafted-Feature-Ledger_2.html"), "utf8");
+assert("the first edition after a redraft says it is reorganized, with the note",
+  reorganized.includes("This edition is reorganized") && reorganized.includes("Exports are part of Kept."));
+assert("…and marks nothing as new", !reorganized.includes("class=\"tag tag-new\""));
+run(["build", "--pdf", "--html", "--version", "1"], { cwd: rd });
+assert("an archived edition still prints, from its archive",
+  fs.readFileSync(path.join(rd, "docs/client/Redrafted-Feature-Ledger_1.html"), "utf8").includes("Quiet export"));
+run(["release", "amend", "1", "--commit", rgit("rev-parse", "HEAD").stdout.trim()], { cwd: rd, expect: "fail" });
+run(["release", "cut", "--name", "Reorganized", "--date", "2026-04-01"], { cwd: rd });
+assert("the timeline lists the archived release where it came from",
+  run(["release", "list"], { cwd: rd }).includes("archived in .ledger/archive/v1/"));
+run(["add", "later"], { cwd: rd, stdin: feature({ audience: "user", size: "Small", name: "Later", description: "Does a later thing." }) });
+run(["review", "complete"], { cwd: rd });
+run(["build", "--pdf", "--html", "--version", "3"], { cwd: rd });
+const after = fs.readFileSync(path.join(rd, "docs/client/Redrafted-Feature-Ledger_3.html"), "utf8");
+assert("from the next edition, changes are marked again",
+  after.includes("class=\"tag tag-new\"") && !after.includes("This edition is reorganized"));
+fs.rmSync(rd, { recursive: true, force: true });
+
 log("");
 if (failures) {
   log(`${failures} failure${failures === 1 ? "" : "s"} — workspace kept at ${dir}`);
