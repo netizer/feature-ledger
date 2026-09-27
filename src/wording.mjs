@@ -72,6 +72,15 @@ export function wording(config) {
         " descriptions don't match {those} line for line. Every capability from version {last} that" +
         ` ${product} still has is described here. Because the structure changed, nothing in this edition is` +
         " marked as new or updated. From the next edition, changes are marked again.",
+      // A first edition marked `redraft` in releases.json: the earlier
+      // reports were sent some other way, so there is no edition to name and
+      // no promise to make that every capability they listed is still here.
+      body_earlier:
+        `Earlier reports described ${product} in a different arrangement. This edition starts the list afresh,` +
+        " so its areas, names and descriptions don't match those reports line for line. Each entry here is one" +
+        " capability you could ask for by name, and smaller details are described inside the capability they" +
+        " belong to rather than listed on their own. Because the structure changed, nothing in this edition is" +
+        " marked as new or updated. From the next edition, changes are marked again.",
     },
     pdf: {
       // The <em> is the one word that takes the accent colour on the cover.
@@ -91,9 +100,11 @@ export function wording(config) {
 
 /**
  * The standard redraft paragraph, filled in for the editions it follows.
- * `versions` are the archived ones the redraft set aside.
+ * `versions` are the editions the redraft replaces — none when it is the
+ * first edition, and what it replaces are reports sent outside the ledger.
  */
 export function redraftBody(words, versions) {
+  if (!versions.length) return words.redraft.body_earlier;
   const first = versions[0];
   const last = versions[versions.length - 1];
   const one = first === last;

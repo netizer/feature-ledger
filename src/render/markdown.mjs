@@ -22,14 +22,13 @@ export class MarkdownRenderer {
     // redraft: every entry would read "New", which says nothing. The PDF
     // prints those editions without flags for the same reason.
     this.tagging = this.inProgress && Boolean(project.releases.predecessorOf(this.target));
-    this.redraftFrom = project.releases.archivedBefore(this.target);
+    this.redraftReplaces = project.releases.redraftReplaces(this.target);
   }
 
   /** The "reorganized" paragraph, for the first edition after a redraft. */
   redraftNotice() {
-    if (!this.redraftFrom) return "";
-    const versions = this.project.releases.archived
-      .filter((r) => r.archive === this.redraftFrom.archive).map((r) => r.version);
+    if (!this.redraftReplaces) return "";
+    const versions = this.redraftReplaces.map((v) => this.project.releases.labelOf(v));
     const note = this.project.redraftOpening(this.target)?.note;
     return `> **${this.words.redraft.title}.** ${redraftBody(this.words, versions)}${note ? `\n>\n> ${note}` : ""}\n\n`;
   }

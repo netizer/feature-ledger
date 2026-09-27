@@ -39,16 +39,16 @@ class LedgerHtml {
     this.config = project.config;
     this.set = project.featureSet;
     this.version = version ?? project.releases.latestVersion;
-    // The number printed on the page, which is not always `version`: see
-    // `display_version` in ReleaseSet. An archived edition is handed its label
-    // by the caller, because the live timeline is the one that says it.
-    this.label = label ?? project.releases.labelOf(this.version);
+    // The version printed on the page, which is not always `version`: see
+    // `display_version` and `redraft` in ReleaseSet. An archived edition is
+    // handed its label by the caller, because the live timeline says it.
+    this.label = label ?? project.releases.printedAs(this.version);
     this.release = project.releases.at(this.version);
     this.predecessor = project.releases.predecessorOf(this.version);
     // Set on the first edition after a redraft: there is an earlier edition,
     // but one arranged differently, so this one can't be diffed against it
     // and says so instead.
-    this.redraftFrom = project.releases.archivedBefore(this.version);
+    this.redraftReplaces = project.releases.redraftReplaces(this.version);
     this.brand = resolveBrand(project.brand);
     this.words = wording(project.config);
     this.warnings = [];
@@ -402,9 +402,8 @@ class LedgerHtml {
     // Where the green/blue callout would go, had there been something to diff
     // against. Slate, like the third register, because it is the same kind of
     // fact: the document moved, the product didn't.
-    const redraftBlock = this.redraftFrom ? (() => {
-      const versions = this.project.releases.archived
-        .filter((r) => r.archive === this.redraftFrom.archive).map((r) => this.project.releases.labelOf(r.version));
+    const redraftBlock = this.redraftReplaces ? (() => {
+      const versions = this.redraftReplaces.map((v) => this.project.releases.labelOf(v));
       const note = this.project.redraftOpening(this.version)?.note;
       return `
       <div class="callout redraft"><div class="callout-content">

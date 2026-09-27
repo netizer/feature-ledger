@@ -302,6 +302,49 @@ const relabelled = path.join(dir, "docs/generated/client/Testbed-Feature-Ledger_
 assert("a later edition follows on from the printed number", fs.existsSync(relabelled) &&
   fs.readFileSync(relabelled, "utf8").includes("Version 5") && !fs.readFileSync(relabelled, "utf8").includes("Version 2"));
 assert("…and `release list` shows it beside the real one", run(["release", "list"]).includes("printed as 5"));
+
+// A redraft done by hand is marked on its release: it reissues the number
+// before it, says it is reorganized, and marks nothing new or updated.
+const mark = (edit) => {
+  const rs = JSON.parse(timelineBefore);
+  edit(rs);
+  fs.writeFileSync(releasesPath, JSON.stringify(rs, null, 2));
+};
+// On the first edition it stands for reports sent before the ledger existed.
+mark((rs) => { rs[0].redraft = true; });
+run(["build", "--pdf", "--html", "--version", "1"]);
+const firstRedraft = path.join(dir, "docs/generated/client/Testbed-Feature-Ledger_1_redraft.html");
+const firstHtml = fs.existsSync(firstRedraft) ? fs.readFileSync(firstRedraft, "utf8") : "";
+assert("a first edition can be a redraft of reports sent another way",
+  firstHtml.includes("Version 1 (redraft)") && firstHtml.includes("Earlier reports described"));
+{
+  const lines = run(["release", "list"]).split("\n");
+  assert("…and the edition after it takes the next number",
+    lines.find((l) => l.startsWith("v 1"))?.includes("printed as 1 (redraft)") &&
+    !lines.find((l) => l.startsWith("v 2"))?.includes("printed as"));
+}
+mark((rs) => { rs[0].redraft = true; rs[0].display_version = 4; });
+run(["build", "--pdf", "--html", "--version", "1"]);
+assert("…printed under the number the client already counts by",
+  fs.existsSync(path.join(dir, "docs/generated/client/Testbed-Feature-Ledger_4_redraft.html")));
+assert("…with the release after it following on", run(["release", "list"]).includes("printed as 5"));
+mark((rs) => { rs[1].redraft = "yes"; });
+run(["status", "--quiet"], { expect: "fail" });
+mark((rs) => { rs[0].display_version = 3; rs[1].redraft = true; });
+run(["build", "--pdf", "--html", "--version", "2"]);
+const redrafted = path.join(dir, "docs/generated/client/Testbed-Feature-Ledger_3_redraft.html");
+const redraftHtml = fs.existsSync(redrafted) ? fs.readFileSync(redrafted, "utf8") : "";
+assert("a redraft marked by hand reissues the number before it, in the file name too",
+  redraftHtml.includes("Version 3 (redraft)"));
+assert("…opens with the reorganized note", redraftHtml.includes("This edition is reorganized") && redraftHtml.includes("Edition 3 arranged"));
+assert("…and marks nothing as new or updated", !/tag-(new|updated)"/.test(redraftHtml));
+mark((rs) => {
+  rs[0].display_version = 3;
+  Object.assign(rs[1], { redraft: true, status: "released", name: "Rewrite", date: "2026-02-01" });
+  rs.push({ version: 3, name: null, date: null, status: "future", commit: null });
+});
+const listed = run(["release", "list"]);
+assert("the release after a redraft takes the next number", listed.includes("printed as 3 (redraft)") && listed.includes("printed as 4"));
 fs.writeFileSync(releasesPath, timelineBefore);
 fs.rmSync(path.join(dir, "docs/generated"), { recursive: true, force: true });
 

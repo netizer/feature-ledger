@@ -19,8 +19,8 @@ function list(flags) {
   const project = openProject(flags);
   for (const r of project.releases.releases) {
     // Only when it differs: a ledger that never set `display_version` lists as before.
-    const label = project.releases.labelOf(r.version);
-    const printed = label !== r.version ? `  · printed as ${label}` : "";
+    const label = project.releases.printedAs(r.version);
+    const printed = label !== String(r.version) ? `  · printed as ${label}` : "";
     const touched = project.featureSet.features().filter((f) => f.touchedAt(r.version)).length;
     if (r.archived) {
       // Counted in its own corpus: nothing in this one is recorded against it.

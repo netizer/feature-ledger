@@ -31,6 +31,15 @@ import { fail, isBlank } from "../util.mjs";
  * changes the label and nothing else: the ledger still counts 1..N, and every
  * `version` in the corpus and every CLI argument is that real number. Set on
  * one release, it carries forward, so later editions follow on from it.
+ *
+ * `redraft: true` marks a release whose edition rewrites the document by hand
+ * rather than through `ledger redraft`, which archives the old corpus. Either
+ * way the edition opens with the "reorganized" note and prints as an
+ * inventory, with nothing marked new or updated. A hand-marked one reissues
+ * the number before it rather than taking the next: after Version 3 comes
+ * Version 3 (redraft), printed to `…_3_redraft.pdf`, and then Version 4.
+ * On the first release it stands for reports sent before the ledger existed,
+ * so there is no number to reissue: it prints as its `display_version`, or 1.
  */
 export class ReleaseSet {
   constructor(raw) {
@@ -75,8 +84,23 @@ export class ReleaseSet {
    * is set.
    */
   labelOf(version) {
-    const anchor = this.releases.findLast((r) => r.version <= version && r.display_version != null);
-    return anchor ? anchor.display_version + (version - anchor.version) : version;
+    let label = 0;
+    for (const r of this.releases) {
+      if (r.version > version) break;
+      if (r.display_version != null) label = r.display_version;
+      else if (!r.redraft || label === 0) label += 1;
+    }
+    return label;
+  }
+
+  /** The version as the edition names itself: "3", or "3 (redraft)". */
+  printedAs(version) {
+    return `${this.labelOf(version)}${this.at(version).redraft ? " (redraft)" : ""}`;
+  }
+
+  /** The same, for a file name: "3", or "3_redraft". */
+  fileLabel(version) {
+    return `${this.labelOf(version)}${this.at(version).redraft ? "_redraft" : ""}`;
   }
 
   /**
@@ -88,7 +112,26 @@ export class ReleaseSet {
   predecessorOf(version) {
     if (version <= 1) return null;
     const previous = this.at(version - 1);
-    return previous.archived ? null : previous;
+    return previous.archived || this.at(version).redraft ? null : previous;
+  }
+
+  /**
+   * The versions a redraft edition says it replaces, or null when `version`
+   * isn't one: the archived ones after `ledger redraft`, or, for a release
+   * marked `redraft` by hand, every edition back to the previous redraft.
+   */
+  redraftReplaces(version) {
+    const archived = this.archivedBefore(version);
+    if (archived) return this.archived.filter((r) => r.archive === archived.archive).map((r) => r.version);
+    if (!this.at(version).redraft) return null;
+    const out = [];
+    for (let v = version - 1; v >= 1; v--) {
+      const r = this.at(v);
+      if (r.archived) break;
+      out.unshift(v);
+      if (r.redraft || this.archivedBefore(v)) break;
+    }
+    return out;
   }
 
   /** The last archived release when `version` is the first one after a
@@ -110,9 +153,10 @@ export class ReleaseSet {
   }
 
   toJSON() {
-    return this.releases.map(({ version, name, date, status, commit, archive, display_version }) => ({
+    return this.releases.map(({ version, name, date, status, commit, archive, display_version, redraft }) => ({
       version, name, date, status, commit: commit ?? null, ...(archive ? { archive } : {}),
       ...(display_version != null ? { display_version } : {}),
+      ...(redraft ? { redraft } : {}),
     }));
   }
 
@@ -140,6 +184,9 @@ export class ReleaseSet {
       }
       if (r.display_version != null && !(Number.isInteger(r.display_version) && r.display_version >= 1)) {
         fail(`release ${r.version}: "display_version" must be a whole number of 1 or more (got ${JSON.stringify(r.display_version)})`);
+      }
+      if (r.redraft != null && r.redraft !== true) {
+        fail(`release ${r.version}: "redraft" is either true or left out (got ${JSON.stringify(r.redraft)})`);
       }
       if ((r.released || r.archived) && isBlank(r.name)) fail(`release ${r.version}: released releases need a name`);
     }

@@ -500,7 +500,7 @@ And elsewhere in `.ledger/`:
 | `subcategories.json` | A sub-section's `name` and `intro`. |
 | `config.json` | Product name, tagline, and the `docs` block that overrides document titles and intros. |
 | `other-changes.json` | The `description` of a product-wide note. |
-| `releases.json` | A release's `display_version`: see [Carrying on from earlier reports](#carrying-on-from-earlier-reports). Nothing else in the file. |
+| `releases.json` | A release's `display_version` and `redraft`: see [Carrying on from earlier reports](#carrying-on-from-earlier-reports) and [A redraft done by hand](#a-redraft-done-by-hand). Nothing else in the file. |
 | `STYLE.md`, `theme.css` | Prose and CSS. They were always yours. |
 
 Renaming an **area** is the exception, because the name is repeated on every
@@ -521,7 +521,8 @@ Not much, and it's where a hand-edit would be either invisible or wrong.
   `redrafts.json`.** A timeline edited by hand stops matching the editions
   already handed over, and a stamp set without the sweep behind it makes a gap
   permanently invisible. The exceptions are a redraft's `note`, which is
-  wording, and a release's `display_version`, which is only a label. The same goes for `.ledger/archive/`: the old editions print from it.
+  wording, and a release's `display_version` and `redraft`, which only
+  change how its edition prints. The same goes for `.ledger/archive/`: the old editions print from it.
 - **Keeping `index.json` complete.** Every write adds a new id and prunes one
   whose file is gone, so the index can't rot. Only that half is the CLI's: the
   **order** in the list is the deliberate reading order within a size band, and
@@ -816,6 +817,39 @@ new PDF overwrites one. `ledger build --version all` prints only the current
 corpus's editions, and `ledger build --version 3` reprints an archived one from
 its archive, so a project that doesn't commit its PDFs can still reproduce
 every document it has handed over.
+
+### A redraft done by hand
+
+Not every rewrite goes through `ledger redraft`. When you've reworked the
+entries yourself, mark the release in `.ledger/releases.json`:
+
+```json
+{ "version": 4, "name": "Rewrite", "date": "2026-10-02", "status": "released", "commit": "…", "redraft": true }
+```
+
+Its edition opens with the same grey note and prints as an inventory, but
+nothing is archived: the corpus stays live, and the edition after it is
+compared with it as usual. It reissues the number before it rather than taking
+the next, and says so in the file name:
+
+```
+HappyCake-Feature-Ledger_3.pdf
+HappyCake-Feature-Ledger_3_redraft.pdf
+HappyCake-Feature-Ledger_4.pdf
+```
+
+It works on the first release too, for a ledger that takes over from reports
+sent some other way: set `"redraft": true` on v1, with a `display_version` if
+the client already counts past 1. That edition says the list was started
+afresh, so a client who notices that smaller items are no longer listed on
+their own knows why. Its note reads differently, since there is no earlier
+edition to name. You can override it under `docs.redraft.body_earlier` in
+`config.json`.
+
+The cover and footer read "Version 3 (redraft)". Since there is nothing to
+compare it with, `ledger release cut` doesn't ask for a review of it. Like
+`display_version`, it doesn't change how the ledger counts: the release is
+still v4 to the CLI.
 
 ---
 
