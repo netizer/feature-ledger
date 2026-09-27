@@ -25,6 +25,108 @@ live in one file every agent can read, and every operation is a CLI command).
 
 ---
 
+## Which command, when
+
+The commands come in two kinds, and every table below says which is which:
+
+- **runs** — the CLI does the work itself, and you see the result.
+- **prompt** — the CLI prints a prompt for your coding agent and changes
+  nothing. Paste the prompt into a fresh agent session in the project root, or
+  pipe it with `--prompt-only` (`ledger review --prompt-only | pbcopy`; see
+  [Straight to the clipboard](#straight-to-the-clipboard)). The agent does the
+  work, and ends by running the matching `complete` command itself.
+
+### Setting up a new project
+
+| | Command | Kind |
+| --- | --- | --- |
+| 1 | `ledger init --product "Acme Portal"` (add `--commit-pdfs` to keep the client PDFs in the repo) | runs |
+| 2 | `ledger bootstrap`: the agent surveys the codebase, writes every entry, records the survey as a full audit, cuts the baseline release and prints it | prompt |
+| 3 | Read the document, and fix the wording in `.ledger/features/<id>.json` | by hand |
+| 4 | `ledger status`: checks every file you edited | runs |
+| 5 | Commit `.ledger/` | git |
+
+### Day to day, while features are built with an agent
+
+| | Command | Kind |
+| --- | --- | --- |
+| 1 | Nothing to run. The agent reads the stanza `ledger init` wrote into `CLAUDE.md` / `AGENTS.md`, and records each feature with `ledger add` or `ledger update` as part of the change | — |
+| 2 | `ledger status`: what the open release has collected so far | runs |
+
+### A feature was built without an agent
+
+| | Command | Kind |
+| --- | --- | --- |
+| 1 | `ledger audit`: the agent reads everything that landed since the last audit, records what the ledger missed, and stamps the commit it checked (`ledger audit --full` sweeps the whole codebase) | prompt |
+| 2 | `ledger audit confirm <id>`: vouch for a reason the audit took from a commit message (`ledger status` lists them) | runs |
+
+If you know exactly what shipped, skip the audit and record it yourself with
+`ledger add <id>` or `ledger update <id>` (**runs**).
+
+### Reading the current state, and improving the wording
+
+| | Command | Kind |
+| --- | --- | --- |
+| 1 | `ledger build`: writes the Markdown docs to `docs/generated/`, and the PDF of the newest edition. Once anything is recorded on the open release, that is the open release, marked as a draft | runs |
+| 2 | `ledger list`, `ledger show <id>`: the same content in the terminal, one line or one entry at a time | runs |
+| 3 | Edit names, descriptions and dev notes in `.ledger/features/<id>.json`. Nothing is recorded against the release | by hand |
+| 4 | `ledger status`: checks every file you edited | runs |
+| — | `ledger style rewrite`: the agent rewrites the whole ledger in the project's tone, one area at a time, without changing what it says | prompt |
+
+### Presenting to the client, and cutting the release
+
+| | Command | Kind |
+| --- | --- | --- |
+| 1 | `ledger status`: says whether an audit or a review is still outstanding | runs |
+| 2 | `ledger audit`, if code landed since the last one | prompt |
+| 3 | `ledger review`: the agent reads the release against the edition the client already has, fixes the wording, and records the review | prompt |
+| 4 | `ledger release cut --name "Sprint 6 demo"`: closes the release and opens the next one. It refuses while step 2 or 3 is outstanding | runs |
+| 5 | `ledger build`: prints the PDF edition for the release just cut | runs |
+| 6 | Commit `.ledger/` (and `docs/client/`, if you keep the PDFs) | git |
+
+### Starting the document again from scratch
+
+When the structure has grown too complex to fix by editing. The version
+numbers and the editions already printed are kept. See
+[Starting over](#starting-over-ledger-redraft).
+
+| | Command | Kind |
+| --- | --- | --- |
+| 1 | `ledger redraft start`: sets the corpus aside in `.ledger/archive/` and opens the next version on an empty one | runs |
+| 2 | `ledger bootstrap`: the agent surveys the codebase from scratch, and stops before the cut | prompt |
+| 3 | Commit `.ledger/` | git |
+| 4 | `ledger redraft check`: the agent compares the new corpus with the old one, puts back anything lost, writes a note for the client, and records the check | prompt |
+| 5 | Commit its edits | git |
+| 6 | `ledger release cut --name "…"`, then `ledger build`: the first edition in the new structure, opening with a note that it is reorganized | runs |
+
+`ledger redraft` on its own (**runs**) says where a redraft stands and what
+comes next, at any point.
+
+### Reprinting an edition the client already has
+
+| | Command | Kind |
+| --- | --- | --- |
+| — | `ledger build --version 3`: prints one edition again, including an archived one, from its archive | runs |
+| — | `ledger build --version all`: prints every edition of the current corpus | runs |
+| — | `ledger release list`: which version is which, with the date and commit of each | runs |
+
+### Preparing the document for a new client
+
+| | Command | Kind |
+| --- | --- | --- |
+| 1 | Edit `.ledger/brand.json` (logo, accent colour) and the wording in `.ledger/config.json` | by hand |
+| 2 | `ledger style set govuk` (or another tone): switches the tone, and updates the agent stanza | runs |
+| 3 | `ledger style rewrite`, to bring the existing entries into the new tone | prompt |
+| 4 | `ledger status`: shows the resolved palette, fonts and tone | runs |
+
+### Keeping it sound automatically
+
+| | Command | Kind |
+| --- | --- | --- |
+| — | `ledger status --quiet` in a pre-commit hook or CI: prints only warnings, skips the browser check, and exits 1 when a file is broken | runs |
+
+---
+
 ## Why a CLI instead of "just edit the JSON"
 
 Because the corpus grows past what's cheap to **read**. A mature ledger is
