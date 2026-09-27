@@ -500,6 +500,7 @@ And elsewhere in `.ledger/`:
 | `subcategories.json` | A sub-section's `name` and `intro`. |
 | `config.json` | Product name, tagline, and the `docs` block that overrides document titles and intros. |
 | `other-changes.json` | The `description` of a product-wide note. |
+| `releases.json` | A release's `display_version`: see [Carrying on from earlier reports](#carrying-on-from-earlier-reports). Nothing else in the file. |
 | `STYLE.md`, `theme.css` | Prose and CSS. They were always yours. |
 
 Renaming an **area** is the exception, because the name is repeated on every
@@ -519,8 +520,8 @@ Not much, and it's where a hand-edit would be either invisible or wrong.
 - **`releases.json`, and the stamps in `audits.json`, `reviews.json` and
   `redrafts.json`.** A timeline edited by hand stops matching the editions
   already handed over, and a stamp set without the sweep behind it makes a gap
-  permanently invisible. The one exception is a redraft's `note`, which is
-  wording. The same goes for `.ledger/archive/`: the old editions print from it.
+  permanently invisible. The exceptions are a redraft's `note`, which is
+  wording, and a release's `display_version`, which is only a label. The same goes for `.ledger/archive/`: the old editions print from it.
 - **Keeping `index.json` complete.** Every write adds a new id and prunes one
   whose file is gone, so the index can't rot. Only that half is the CLI's: the
   **order** in the list is the deliberate reading order within a size band, and
@@ -1058,6 +1059,23 @@ This repo runs its own ledger on itself with the editions kept:
 from the corpus in `.ledger/`. The latest,
 [`feature-ledger-Feature-Ledger_2.pdf`](docs/client/feature-ledger-Feature-Ledger_2.pdf),
 is the clearest example of what this product produces.
+
+### Carrying on from earlier reports
+
+A ledger started after the client already has reports numbered some other way
+would hand them a "Version 1" they have seen before. Set `display_version` on
+a release in `.ledger/releases.json` to the number its edition should carry:
+
+```json
+{ "version": 1, "name": "Baseline", "date": "2026-09-08", "status": "released", "commit": "…", "display_version": 4 }
+```
+
+The v1 edition then prints as Version 4, and every later one follows on from
+it — v2 as 5, v3 as 6 — until another release sets its own. It is a label and
+nothing more: the cover, footer, colophon and PDF file name use it, while the
+ledger still counts 1..N, and every `version` in the corpus and every
+`--version` argument is that real number. `ledger release list` shows the
+printed number beside each release it differs on.
 
 ---
 

@@ -284,6 +284,27 @@ run(["audit", "confirm", "beta"]);
 assert("…and stops being reported once confirmed", !run(["status", "--quiet"]).includes("nobody has confirmed"));
 fs.rmSync(path.join(dir, "docs/generated"), { recursive: true, force: true });
 
+// ---- A printed number carried on from earlier reports ----
+// display_version relabels the editions and nothing else: the ledger still
+// counts 1..N, and --version still takes the real number.
+const releasesPath = path.join(dir, ".ledger/releases.json");
+const timelineBefore = fs.readFileSync(releasesPath, "utf8");
+const relabel = (v) => {
+  const rs = JSON.parse(timelineBefore);
+  rs[0].display_version = v;
+  fs.writeFileSync(releasesPath, JSON.stringify(rs, null, 2));
+};
+relabel(0);
+run(["status", "--quiet"], { expect: "fail" });
+relabel(4);
+run(["build", "--pdf", "--html", "--version", "2"]);
+const relabelled = path.join(dir, "docs/generated/client/Testbed-Feature-Ledger_5.html");
+assert("a later edition follows on from the printed number", fs.existsSync(relabelled) &&
+  fs.readFileSync(relabelled, "utf8").includes("Version 5") && !fs.readFileSync(relabelled, "utf8").includes("Version 2"));
+assert("…and `release list` shows it beside the real one", run(["release", "list"]).includes("printed as 5"));
+fs.writeFileSync(releasesPath, timelineBefore);
+fs.rmSync(path.join(dir, "docs/generated"), { recursive: true, force: true });
+
 // The other output shape: a project that keeps its client editions. The
 // Markdown docs stay build output either way; only the PDFs move, out of the
 // one directory `init` gitignores.
@@ -376,6 +397,13 @@ assert("the audit is logged with the mode it ran in", run(["audit", "log"], { cw
 run(["audit", "complete", "--commit", "0".repeat(40)], { cwd: repo, expect: "fail" });
 
 run(["release", "cut", "--name", "Baseline", "--date", "2026-01-15"], { cwd: repo });
+// Set by hand, and every later rewrite of the timeline has to keep it.
+{
+  const p = path.join(repo, ".ledger/releases.json");
+  const rs = JSON.parse(fs.readFileSync(p, "utf8"));
+  rs[0].display_version = 4;
+  fs.writeFileSync(p, JSON.stringify(rs, null, 2));
+}
 fs.writeFileSync(path.join(repo, "src/app.js"), "one\ntwo\n");
 git("add", "-A");
 git("commit", "-qm", "Add the two thing");
@@ -395,6 +423,7 @@ assert("the brief then reads as a range, not a sweep", incremental.includes("inc
 // printed from, so two same-day releases stay tellable apart.
 const cutJson = () => JSON.parse(fs.readFileSync(path.join(repo, ".ledger/releases.json"), "utf8"));
 assert("a cut records the commit it happened at", /^[0-9a-f]{40}$/.test(cutJson()[0].commit ?? ""));
+assert("…and keeps a printed number set by hand", cutJson()[0].display_version === 4);
 
 fs.writeFileSync(path.join(repo, "src/app.js"), "one\ntwo\nthree\n");
 git("add", "-A");

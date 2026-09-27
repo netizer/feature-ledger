@@ -18,18 +18,21 @@ export async function cmdRelease({ flags, positional }) {
 function list(flags) {
   const project = openProject(flags);
   for (const r of project.releases.releases) {
+    // Only when it differs: a ledger that never set `display_version` lists as before.
+    const label = project.releases.labelOf(r.version);
+    const printed = label !== r.version ? `  · printed as ${label}` : "";
     const touched = project.featureSet.features().filter((f) => f.touchedAt(r.version)).length;
     if (r.archived) {
       // Counted in its own corpus: nothing in this one is recorded against it.
       out(`v${String(r.version).padStart(2)}  ${(longDate(r.date) ?? "").padEnd(20)}${(r.commit ? `  ${git.shortSha(r.commit)}` : "").padEnd(10)} ` +
-        `${r.name}  · archived in .ledger/${r.archive}/`);
+        `${r.name}  · archived in .ledger/${r.archive}/${printed}`);
       continue;
     }
     const when = r.future ? "in progress" : longDate(r.date);
     // The commit is what tells two editions cut on one day apart, so it goes
     // in the listing rather than only in the file.
     const at = r.commit ? `  ${git.shortSha(r.commit)}` : "";
-    out(`v${String(r.version).padStart(2)}  ${(when ?? "").padEnd(20)}${at.padEnd(10)} ${r.name ?? "(unnamed)"}  · ${touched} entr${touched === 1 ? "y" : "ies"}`);
+    out(`v${String(r.version).padStart(2)}  ${(when ?? "").padEnd(20)}${at.padEnd(10)} ${r.name ?? "(unnamed)"}  · ${touched} entr${touched === 1 ? "y" : "ies"}${printed}`);
   }
 }
 

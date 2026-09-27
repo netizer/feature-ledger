@@ -85,12 +85,13 @@ export async function cmdBuild({ flags }) {
       const release = project.releases.at(version);
       const source = release.archived ? project.openArchive(release) : project;
       if (release.archived) out(`v${version} is archived — printing it from .ledger/${release.archive}/`);
-      const { html, warnings, fontsEmbedded } = renderLedgerHtml({ project: source, version });
+      const label = project.releases.labelOf(version);
+      const { html, warnings, fontsEmbedded } = renderLedgerHtml({ project: source, version, label });
       for (const w of warnings) warn(w);
 
       const file = source.config.output.pdf_name
         .replace("{slug}", titleSlug(source.brand.name ?? source.config.product))
-        .replace("{version}", String(version));
+        .replace("{version}", String(label));
       const target = path.join(clientDir, file);
       if (flags.html) {
         // Handy when tuning the theme: the same document, openable in a

@@ -24,6 +24,13 @@ import { fail, isBlank } from "../util.mjs";
  * be recorded against it, and its edition is printed from the archive. The
  * archived releases are always the oldest ones: a redraft sets aside
  * everything before the release it opens.
+ *
+ * `display_version` is the number the client sees printed on an edition, for
+ * a ledger started after the client was already counting — earlier reports
+ * were handed over some other way, and this edition carries on from them. It
+ * changes the label and nothing else: the ledger still counts 1..N, and every
+ * `version` in the corpus and every CLI argument is that real number. Set on
+ * one release, it carries forward, so later editions follow on from it.
  */
 export class ReleaseSet {
   constructor(raw) {
@@ -63,6 +70,16 @@ export class ReleaseSet {
   }
 
   /**
+   * The number printed on `version`'s edition: its own `display_version`, or
+   * the nearest earlier one's carried forward, or the real number when none
+   * is set.
+   */
+  labelOf(version) {
+    const anchor = this.releases.findLast((r) => r.version <= version && r.display_version != null);
+    return anchor ? anchor.display_version + (version - anchor.version) : version;
+  }
+
+  /**
    * The release an edition is compared with, or null when there is nothing
    * it can be compared with entry by entry: before v1, and across a redraft,
    * where the previous edition was written in a structure this corpus no
@@ -93,8 +110,9 @@ export class ReleaseSet {
   }
 
   toJSON() {
-    return this.releases.map(({ version, name, date, status, commit, archive }) => ({
+    return this.releases.map(({ version, name, date, status, commit, archive, display_version }) => ({
       version, name, date, status, commit: commit ?? null, ...(archive ? { archive } : {}),
+      ...(display_version != null ? { display_version } : {}),
     }));
   }
 
@@ -119,6 +137,9 @@ export class ReleaseSet {
       // before commits were recorded, legitimately has none.
       if (r.commit != null && !/^[0-9a-f]{7,40}$/.test(String(r.commit))) {
         fail(`release ${r.version}: "commit" must be a git sha (got ${JSON.stringify(r.commit)})`);
+      }
+      if (r.display_version != null && !(Number.isInteger(r.display_version) && r.display_version >= 1)) {
+        fail(`release ${r.version}: "display_version" must be a whole number of 1 or more (got ${JSON.stringify(r.display_version)})`);
       }
       if ((r.released || r.archived) && isBlank(r.name)) fail(`release ${r.version}: released releases need a name`);
     }

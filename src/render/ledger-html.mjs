@@ -20,8 +20,8 @@ import { fontFaceCss, SYMBOL_FACE } from "./fonts.mjs";
  * Rendered as real HTML/CSS and printed with headless Chromium the same way
  * a person would print a styled page — not hand-positioned PDF drawing.
  */
-export function renderLedgerHtml({ project, version }) {
-  const doc = new LedgerHtml(project, version);
+export function renderLedgerHtml({ project, version, label }) {
+  const doc = new LedgerHtml(project, version, label);
   const html = doc.render();
   return { html, warnings: doc.warnings, fontsEmbedded: doc.fontsEmbedded };
 }
@@ -34,11 +34,15 @@ const SIZE_LEVELS = { big: 3, medium: 2, small: 1 };
 const CLOSING_IDS = { removed: "closing-removed", goneEarlier: "closing-gone-earlier", other: "closing-other" };
 
 class LedgerHtml {
-  constructor(project, version) {
+  constructor(project, version, label) {
     this.project = project;
     this.config = project.config;
     this.set = project.featureSet;
     this.version = version ?? project.releases.latestVersion;
+    // The number printed on the page, which is not always `version`: see
+    // `display_version` in ReleaseSet. An archived edition is handed its label
+    // by the caller, because the live timeline is the one that says it.
+    this.label = label ?? project.releases.labelOf(this.version);
     this.release = project.releases.at(this.version);
     this.predecessor = project.releases.predecessorOf(this.version);
     // Set on the first edition after a redraft: there is an earlier edition,
@@ -307,7 +311,7 @@ class LedgerHtml {
     const predDateLabel = this.predecessor ? longDate(this.predecessor.date) : null;
     const stats = this.stats;
     const w = this.words.pdf;
-    const footerLeft = `${this.brand.name} · The Feature Ledger · Version ${this.version}` +
+    const footerLeft = `${this.brand.name} · The Feature Ledger · Version ${this.label}` +
       (dateLabel ? ` · ${dateLabel}` : "");
 
     const body = this.categoryRows.map(([category, rows, groups], i) => {
@@ -400,7 +404,7 @@ class LedgerHtml {
     // fact: the document moved, the product didn't.
     const redraftBlock = this.redraftFrom ? (() => {
       const versions = this.project.releases.archived
-        .filter((r) => r.archive === this.redraftFrom.archive).map((r) => r.version);
+        .filter((r) => r.archive === this.redraftFrom.archive).map((r) => this.project.releases.labelOf(r.version));
       const note = this.project.redraftOpening(this.version)?.note;
       return `
       <div class="callout redraft"><div class="callout-content">
@@ -445,7 +449,7 @@ class LedgerHtml {
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>${h(this.brand.name)} Feature Ledger — Version ${this.version}</title>
+<title>${h(this.brand.name)} Feature Ledger — Version ${this.label}</title>
 <!-- The PDF driver reads this to build the printed running footer, which
      lives in the paper margin and so can't be styled from this page. -->
 <meta name="pdf-footer-left" content="${h(footerLeft)}">
@@ -460,12 +464,12 @@ ${this.project.themeCss()}
   <header class="front">
     <div class="masthead">
       ${mastheadHtml(this.brand, this.project.root)}
-      <div class="imprint">Feature Ledger<br>Version ${this.version}${dateLabel ? ` · ${dateLabel}` : ""}</div>
+      <div class="imprint">Feature Ledger<br>Version ${this.label}${dateLabel ? ` · ${dateLabel}` : ""}</div>
     </div>
 
     <h1 class="title">${w.title_html}</h1>
     <div class="edition ${rel.future ? "is-draft" : "is-final"}">
-      Version ${this.version}${rel.name ? ` · ${h(rel.name)}` : ""}${rel.future ? " · draft, not yet presented" : ""}
+      Version ${this.label}${rel.name ? ` · ${h(rel.name)}` : ""}${rel.future ? " · draft, not yet presented" : ""}
     </div>
     <p class="intro">${h(w.intro)}</p>
     ${callout}${redraftBlock}
@@ -499,7 +503,7 @@ ${this.project.themeCss()}
   ${otherBlock}
 
   <div class="colophon">
-    ${h(this.brand.name)} · The Feature Ledger · Version ${this.version}${dateLabel ? ` · ${dateLabel}` : ""}.
+    ${h(this.brand.name)} · The Feature Ledger · Version ${this.label}${dateLabel ? ` · ${dateLabel}` : ""}.
     ${h(w.colophon)}
   </div>
 </body>

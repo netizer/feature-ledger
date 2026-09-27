@@ -326,6 +326,8 @@ Not much, and it's where a hand-edit would be either invisible or wrong:
   `redrafts.json`.** A timeline edited by hand stops matching the editions
   already handed over, and a stamp set without the work behind it hides exactly
   what it exists to catch. A redraft's `note` is the exception: it is wording.
+  So is a release's `display_version`, the number printed on its edition in
+  place of the real one — but that is the user's call, never an agent's.
 - **Anything under `.ledger/archive/`.** It is the corpus a redraft set aside,
   and the editions the client already holds print from it. Read it with
   `ledger list --dir` and `ledger show --dir`; the CLI refuses to write there.
