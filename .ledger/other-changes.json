@@ -8,5 +8,15 @@
     "version": 2,
     "audience": "dev",
     "description": "While a first edition is in progress, including the first edition after a redraft, the Markdown docs tag no entry as New. With nothing earlier to compare with, every entry would carry the tag, and the PDF already prints those editions without flags."
+  },
+  {
+    "version": 2,
+    "audience": "user",
+    "description": "Every command that prints a prompt for a coding agent (ledger bootstrap, ledger style rewrite, ledger audit, ledger review and ledger redraft check) takes --prompt-only, which prints the prompt alone. You can pipe it straight to the clipboard, for example with ledger review --prompt-only | pbcopy. Warnings from the explanation still print on your screen."
+  },
+  {
+    "version": 2,
+    "audience": "user",
+    "description": "Adding --help or -h to any command prints that command's part of the help and runs nothing. For example, ledger release cut --help never cuts a release."
   }
 ]

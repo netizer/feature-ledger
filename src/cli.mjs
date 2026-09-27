@@ -1,4 +1,4 @@
-import { parseArgs, fail } from "./util.mjs";
+import { parseArgs, fail, COPY_RULE } from "./util.mjs";
 import * as init from "./commands/init.mjs";
 import * as read from "./commands/read.mjs";
 import * as write from "./commands/write.mjs";
@@ -74,6 +74,7 @@ const HELP = `ledger — a versioned feature ledger for any codebase
     ledger rules                        the authoring rules, in full
     ledger style [show|list|set <id>]   the tone every entry is written in
     ledger style rewrite                the procedure for moving an existing ledger to it
+    ledger export [--out FILE]          the whole corpus as one JSON document
 
   Writing (payload as JSON on stdin, or --file f.json; add --dry-run to preview)
     ledger add <id>                     { audience, size, name, description, category?, dev_notes? }
@@ -135,8 +136,87 @@ const HELP = `ledger — a versioned feature ledger for any codebase
                                         the CLI. \`ledger rules\` draws the line.
 
   Global: --dir PATH (point at a .ledger directory), --json where offered.
+          --prompt-only on a command that prints a prompt for a coding agent (bootstrap,
+          style rewrite, audit, review, redraft check): the prompt alone, ready to pipe,
+          e.g. \`ledger review --prompt-only | pbcopy\`.
+          --help (or -h) after any command: its lines of this help, and nothing run.
   Full docs: the README in this package, or \`ledger rules\`.
 `;
+
+/**
+ * Which commands print a prompt for a coding agent, by subcommand (undefined
+ * is the bare command). Each prints an explanation for the person first, then
+ * COPY_RULE, then the prompt, so `--prompt-only` is one mechanism for all of
+ * them rather than a flag each command has to remember to honour.
+ */
+const PROMPT_COMMANDS = {
+  bootstrap: [undefined],
+  style: ["rewrite"],
+  audit: [undefined, "brief"],
+  review: [undefined, "brief"],
+  redraft: ["check"],
+};
+
+/**
+ * Runs a prompt command with stdout held back, then prints only what follows
+ * the rule. The explanation is for someone reading a terminal, and piping it
+ * into a clipboard would put it in front of the agent. Its warnings (the lines
+ * that start with "!") still matter to the person, so they go to stderr, which
+ * a pipe leaves on screen.
+ */
+async function promptOnly(run) {
+  const chunks = [];
+  const write = process.stdout.write;
+  process.stdout.write = (chunk, ...rest) => {
+    chunks.push(String(chunk));
+    const cb = rest.find((x) => typeof x === "function");
+    if (cb) cb();
+    return true;
+  };
+  try {
+    await run();
+  } finally {
+    process.stdout.write = write;
+  }
+  const text = chunks.join("");
+  const at = text.indexOf(COPY_RULE);
+  if (at === -1) fail("this command printed no prompt, so there is nothing for --prompt-only to keep");
+
+  let warning = false;
+  for (const line of text.slice(0, at).split("\n")) {
+    if (line.startsWith("!")) warning = true;
+    else if (!line.startsWith("  ")) warning = false;
+    if (warning) process.stderr.write(`${line}\n`);
+  }
+  process.stdout.write(text.slice(at + COPY_RULE.length).replace(/^\s*\n/, ""));
+}
+
+/**
+ * `ledger <command> --help`: that command's lines of the main help, picked out
+ * by the command name at the start of each, with their continuation lines.
+ * Taken from HELP rather than written a second time, so the two can't drift.
+ */
+function commandHelp(name) {
+  const lines = HELP.split("\n");
+  const picked = [];
+  let taking = false;
+  let heading = null;
+  for (const line of lines) {
+    if (/^ {2}\S/.test(line)) { heading = line; taking = false; continue; }
+    const m = /^ {4}ledger (\S+)/.exec(line);
+    if (m) {
+      taking = m[1].split("/").includes(name);
+      if (taking && heading) { if (picked.length) picked.push(""); picked.push(heading); heading = null; }
+    } else if (!/^ {6,}\S/.test(line)) {
+      taking = false;
+    }
+    if (taking) picked.push(line);
+  }
+  if (!picked.length) return null;
+  return `${picked.join("\n")}\n\n  Global: --dir PATH, --json where offered` +
+    `${PROMPT_COMMANDS[name] ? ", --prompt-only (the prompt alone, ready to pipe)" : ""}.\n` +
+    "  `ledger --help` lists every command.\n";
+}
 
 export async function main(argv) {
   const first = argv[0];
@@ -158,9 +238,27 @@ export async function main(argv) {
   const fn = COMMANDS[first];
   if (!fn) fail(`unknown command "${first}" — run \`ledger --help\``);
 
-  const { flags, positional } = parseArgs(argv.slice(1), {
+  // Before anything is parsed or run: `ledger add --help` must never read a
+  // payload, and `ledger release cut --help` must never cut. Anywhere after
+  // the command counts, so `ledger audit complete --help` is help too.
+  const rest = argv.slice(1);
+  if (rest.some((a) => a === "--help" || a === "-h" || a.startsWith("--help="))) {
+    process.stdout.write(commandHelp(first) ?? HELP);
+    return;
+  }
+
+  const { flags, positional } = parseArgs(rest, {
     booleans: ["dry-run", "json", "history", "changed", "md", "pdf", "force", "quiet", "commit-pdfs",
-      "backfilled", "reason-inferred", "full"],
+      "backfilled", "reason-inferred", "full", "prompt-only"],
   });
+  if (flags["prompt-only"]) {
+    if (!PROMPT_COMMANDS[first]?.includes(positional[0])) {
+      const which = Object.entries(PROMPT_COMMANDS)
+        .flatMap(([c, subs]) => subs.filter((x) => x !== "brief").map((x) => `ledger ${c}${x ? ` ${x}` : ""}`));
+      fail(`--prompt-only is for the commands that print a prompt: ${which.join(", ")}`);
+    }
+    await promptOnly(() => fn({ flags, positional }));
+    return;
+  }
   await fn({ flags, positional });
 }

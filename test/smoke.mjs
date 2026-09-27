@@ -316,6 +316,25 @@ for (const brief of [["bootstrap"], ["style", "rewrite"], ["audit"], ["review"]]
     run(brief, { cwd: dir }).includes(RULE));
 }
 
+// …and every one of them can print the prompt alone, ready to pipe into a
+// clipboard: nothing above the rule, and not the rule itself.
+for (const brief of [["bootstrap"], ["style", "rewrite"], ["audit"], ["review"]]) {
+  const only = run([...brief, "--prompt-only"], { cwd: dir });
+  assert(`\`ledger ${brief.join(" ")} --prompt-only\` prints just the prompt`,
+    !only.includes(RULE) && !only.includes("Copy it whole") && only.trim().length > 200);
+}
+run(["status", "--prompt-only"], { cwd: dir, expect: "fail" });
+
+// --help after any command is help, and never does the thing.
+const releasesBefore = fs.readFileSync(path.join(dir, ".ledger/releases.json"), "utf8");
+assert("`ledger release cut --help` prints help",
+  run(["release", "cut", "--name", "Oops", "--help"], { cwd: dir }).includes("ledger release cut --name"));
+assert("…and cuts nothing", fs.readFileSync(path.join(dir, ".ledger/releases.json"), "utf8") === releasesBefore);
+assert("`ledger add --help` prints help without reading a payload",
+  run(["add", "never", "--help"], { cwd: dir }).includes("ledger add <id>")
+  && !fs.existsSync(path.join(dir, ".ledger/features/never.json")));
+assert("-h works the same", run(["redraft", "-h"], { cwd: dir }).includes("ledger redraft check"));
+
 // ---- The audit itself, which needs a real repository ----
 // The range IS the signal: no per-feature map of source paths to keep true,
 // just what has landed since the last time anyone looked.
@@ -466,6 +485,8 @@ assert("an entry recorded against an archived version is refused",
   run(["status"], { cwd: rd, expect: "fail" }).includes("belongs to the archived ledger"));
 fs.unlinkSync(stray);
 const check = run(["redraft", "check"], { cwd: rd });
+assert("`ledger redraft check --prompt-only` prints just the prompt",
+  !run(["redraft", "check", "--prompt-only"], { cwd: rd }).includes(RULE));
 assert("the check pairs old entries with new ones, and flags what has none",
   check.includes(RULE) && /kept\s+→ kept/.test(check) && /lost\s+→ \(none found\)/.test(check));
 assert("the cut refuses until the redraft is checked",

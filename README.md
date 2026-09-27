@@ -208,6 +208,25 @@ anything where the product itself has moved. The output of `ledger bootstrap` is
 and then the prompt itself: everything below the rule is what gets pasted, and
 there's nothing after it.
 
+### Straight to the clipboard
+
+Every command that prints a prompt for a coding agent takes `--prompt-only`.
+It prints the prompt alone, without the explanation or the rule, so you can
+pipe it instead of selecting it:
+
+```bash
+ledger bootstrap --prompt-only | pbcopy        # macOS; then paste into your agent
+ledger review --prompt-only | pbcopy
+ledger redraft check --prompt-only | pbcopy
+```
+
+On Linux, use `xclip -selection clipboard` or `wl-copy` instead of `pbcopy`.
+It works the same for `ledger style rewrite` and `ledger audit`. Any warning
+from the explanation, such as unaudited commits ahead of a review, still
+prints on your screen, because it goes to stderr and the pipe doesn't take it.
+An agent that can run commands itself doesn't need the clipboard: tell it to
+run `ledger review --prompt-only` and follow what it prints.
+
 ### The baseline reads as an inventory, not as your work
 
 Two things make that true, and both are already the default:
@@ -1056,6 +1075,14 @@ Setup
 Every command takes `--dir PATH` to point at a `.ledger` directory
 elsewhere; otherwise it's found by walking up from the working directory.
 `$LEDGER_DIR` does the same thing.
+
+`--help` (or `-h`) after any command prints that command's part of the help
+and runs nothing, so `ledger release cut --help` never cuts and
+`ledger add x --help` never waits for a payload.
+
+`--prompt-only` on `bootstrap`, `style rewrite`, `audit`, `review` and
+`redraft check` prints the prompt alone, ready to pipe. See
+[Straight to the clipboard](#straight-to-the-clipboard).
 
 `ledger build` prints the newest edition that has something in it. Straight
 after `ledger release cut` that's the release you just cut, not the empty one
