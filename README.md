@@ -34,7 +34,7 @@ The commands come in two kinds, and every table below says which is which:
   nothing. Paste the prompt into a fresh agent session in the project root, or
   pipe it with `--prompt-only` (`ledger review --prompt-only | pbcopy`; see
   [Straight to the clipboard](#straight-to-the-clipboard)). The agent does the
-  work, and ends by running the matching `complete` command itself.
+  work.
 
 ### Setting up a new project
 
