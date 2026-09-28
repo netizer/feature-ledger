@@ -18,5 +18,10 @@
     "version": 2,
     "audience": "user",
     "description": "Adding --help or -h to any command prints that command's part of the help and runs nothing. For example, ledger release cut --help never cuts a release."
+  },
+  {
+    "version": 2,
+    "audience": "user",
+    "description": "Every command refuses an option it does not take, and runs nothing. The error names the option, suggests the one you probably meant, and lists the options that the command takes. For example, ledger release cut --dryrun stops with \"did you mean --dry-run?\" instead of cutting the release."
   }
 ]

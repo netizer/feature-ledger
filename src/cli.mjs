@@ -140,6 +140,7 @@ const HELP = `ledger — a versioned feature ledger for any codebase
           style rewrite, audit, review, redraft check): the prompt alone, ready to pipe,
           e.g. \`ledger review --prompt-only | pbcopy\`.
           --help (or -h) after any command: its lines of this help, and nothing run.
+          An option the command doesn't take is an error, and nothing is run.
   Full docs: the README in this package, or \`ledger rules\`.
 `;
 
@@ -156,6 +157,77 @@ const PROMPT_COMMANDS = {
   review: [undefined, "brief"],
   redraft: ["check"],
 };
+
+/**
+ * The options each command reads, by subcommand where it has them (the key a
+ * bare command dispatches to is its default). Anything else is refused before
+ * the command runs: `--dryrun` on `release cut` must not cut a release, and
+ * `--catgory` on `list` must not quietly list everything.
+ *
+ * `--dir` is taken everywhere, and `--prompt-only` has its own check below.
+ * A subcommand missing from its table is left to the command, which refuses
+ * it with its usage line.
+ */
+const GLOBAL_FLAGS = ["dir", "prompt-only"];
+const FLAGS = {
+  init: ["root", "product", "tagline", "prepared-for", "logo", "accent", "agents", "style", "commit-pdfs", "force", "gitignore"],
+  bootstrap: ["audit"],
+
+  list: ["category", "audience", "size", "changed", "json"],
+  show: ["history", "json"],
+  status: ["json", "quiet"],
+  rules: [],
+  style: { default: "show", show: ["json"], list: ["json"], set: [], rewrite: [] },
+  export: ["out"],
+
+  add: ["file", "audience", "category", "subcategory", "size", "name", "description", "dev-notes", "backfilled", "dry-run"],
+  update: ["file", "description", "change", "add-change", "name", "size", "category", "subcategory", "dev-notes",
+    "backfilled", "reason-inferred", "dry-run"],
+  remove: ["reason", "backfilled", "reason-inferred", "dry-run"],
+  "other-change": ["file", "audience", "description", "dry-run"],
+  categories: { default: "list", list: [], add: ["after", "before", "dry-run"], rename: ["dry-run"], remove: ["dry-run"] },
+  subcategory: { default: "list", list: [], add: ["file", "id", "category", "name", "intro", "dry-run"] },
+
+  release: { default: "list", list: [], cut: ["name", "date", "commit", "force", "dry-run"], amend: ["commit", "force", "dry-run"] },
+  audit: { default: "brief", brief: ["full", "since"], complete: ["commit", "full", "since", "dry-run"],
+    confirm: ["version", "dry-run"], log: ["json"] },
+  review: { default: "brief", brief: [], complete: ["dry-run"] },
+  redraft: { default: "status", status: [], start: ["force", "dry-run"], check: [], complete: ["note", "dry-run"] },
+
+  build: ["md", "pdf", "version", "out", "html"],
+};
+
+function checkFlags(command, flags, positional) {
+  let spec = FLAGS[command];
+  let label = `ledger ${command}`;
+  if (!Array.isArray(spec)) {
+    const sub = positional[0] ?? spec.default;
+    if (!Object.hasOwn(spec, sub) || sub === "default") return;
+    if (positional[0]) label += ` ${sub}`;
+    spec = spec[sub];
+  }
+  const unknown = Object.keys(flags).filter((f) => !spec.includes(f) && !GLOBAL_FLAGS.includes(f));
+  if (!unknown.length) return;
+
+  const lines = unknown.map((f) => {
+    const near = spec.find((s) => editDistance(s, f) <= 2);
+    return `unknown option --${f} for \`${label}\`${near ? ` — did you mean --${near}?` : ""}`;
+  });
+  const takes = spec.length ? `it takes ${spec.map((s) => `--${s}`).join(", ")}` : "it takes no options";
+  fail(`${lines.join("\n")}\n  (${takes}; nothing was run — \`${label} --help\` for more)`);
+}
+
+function editDistance(a, b) {
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const row = [i];
+    for (let j = 1; j <= b.length; j++) {
+      row[j] = Math.min(prev[j] + 1, row[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    prev = row;
+  }
+  return prev[b.length];
+}
 
 /**
  * Runs a prompt command with stdout held back, then prints only what follows
@@ -257,6 +329,9 @@ export async function main(argv) {
         .flatMap(([c, subs]) => subs.filter((x) => x !== "brief").map((x) => `ledger ${c}${x ? ` ${x}` : ""}`));
       fail(`--prompt-only is for the commands that print a prompt: ${which.join(", ")}`);
     }
+  }
+  checkFlags(first, flags, positional);
+  if (flags["prompt-only"]) {
     await promptOnly(() => fn({ flags, positional }));
     return;
   }

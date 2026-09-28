@@ -389,6 +389,16 @@ for (const brief of [["bootstrap"], ["style", "rewrite"], ["audit"], ["review"]]
 }
 run(["status", "--prompt-only"], { cwd: dir, expect: "fail" });
 
+// An option the command doesn't take is refused before anything runs, so a
+// typo can't turn into a release cut without the guard it was meant to set.
+const beforeTypo = fs.readFileSync(path.join(dir, ".ledger/releases.json"), "utf8");
+assert("a mistyped option is refused, with the one it was probably meant to be",
+  run(["release", "cut", "--name", "Typo", "--dryrun"], { cwd: dir, expect: "fail" }).includes("did you mean --dry-run?"));
+assert("…and nothing was cut", fs.readFileSync(path.join(dir, ".ledger/releases.json"), "utf8") === beforeTypo);
+run(["list", "--catgory", "x"], { cwd: dir, expect: "fail" });
+run(["release", "list", "--force"], { cwd: dir, expect: "fail" });
+run(["list", "--json", "--dir", ".ledger"], { cwd: dir });
+
 // --help after any command is help, and never does the thing.
 const releasesBefore = fs.readFileSync(path.join(dir, ".ledger/releases.json"), "utf8");
 assert("`ledger release cut --help` prints help",
