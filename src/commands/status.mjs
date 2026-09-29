@@ -5,7 +5,7 @@ import { resolveBrand, accentCollides } from "../render/brand.mjs";
 import { fontFaceCss } from "../render/fonts.mjs";
 import { probeBrowser } from "../render/pdf.mjs";
 import { resolveStyle, styleTitle } from "../style.mjs";
-import { unauditedReport, unauditedLine, unconfirmedReasons } from "./audit.mjs";
+import { unauditedReport, unauditedSince, unconfirmedReasons } from "./audit.mjs";
 import { unreviewedReport, unreviewedLine } from "./review.mjs";
 import { shortSha } from "../git.mjs";
 import { redraftReport, redraftSteps, rangeLabel } from "./redraft.mjs";
@@ -162,7 +162,7 @@ function auditReport(project) {
   else {
     const at = last.commit ? ` at ${shortSha(last.commit)}` : "";
     line = `${last.date}${at} (${last.mode})`;
-    line += unaudited.ok ? ", nothing unaudited since" : `, then ${unauditedLine(unaudited)}`;
+    line += unaudited.ok ? ", nothing unaudited since" : `, then ${unauditedSince(unaudited)}`;
   }
 
   // Only worth its own line when it says something the line above didn't: the
@@ -279,13 +279,9 @@ function collectWarnings(project) {
     warnings.push(`unfinished redraft: ${redraft.line}. \`ledger release cut\` refuses until it's finished:\n${redraftSteps(redraft)}`);
   }
 
-  const unaudited = unauditedReport(project);
-  if (!unaudited.ok) {
-    warnings.push(
-      `${unauditedLine(unaudited)}. Until they are swept, an edition cut now may be missing capabilities the ` +
-      "client already has. `ledger audit` prints the brief; `ledger release cut --force` overrides.",
-    );
-  }
+  // Work landing since the last audit is not a warning: the audit is periodic,
+  // so that is the normal state between sweeps. The "audited" line above says
+  // how much has landed, and `release cut` is where it gates.
 
   // Only once the edition has something to be compared with; a first edition
   // prints nothing as new or changed.

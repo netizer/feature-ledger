@@ -587,9 +587,9 @@ examined, and says so at the moment it matters:
 
 ```
 $ ledger release cut --name "Sprint 6 demo"
-ledger: 23 commits since the last audit (a1b3f9c, 12 September 2026), touching
-41 files outside the ledger, so this edition may be missing capabilities the
-client has already been given. Run `ledger audit` to sweep them, or pass
+ledger: 23 commits since the last audit (a1b3f9c, 12 September 2026), changing
+41 files besides the ledger's own, so this edition may be missing capabilities
+the client has already been given. Run `ledger audit` to sweep them, or pass
 --force to cut anyway.
 ```
 

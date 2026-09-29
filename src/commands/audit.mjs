@@ -75,8 +75,17 @@ export function unauditedReport(project) {
 export function unauditedLine(report) {
   const when = report.date ? `, ${longDate(report.date)}` : "";
   return `${report.commits} commit${report.commits === 1 ? "" : "s"} since the last audit ` +
-    `(${git.shortSha(report.since)}${when}), touching ${report.paths} ` +
-    `file${report.paths === 1 ? "" : "s"} outside the ledger`;
+    `(${git.shortSha(report.since)}${when}), changing ${report.paths} ` +
+    `file${report.paths === 1 ? "" : "s"} besides the ledger's own`;
+}
+
+/** The same gap as a state rather than a problem, for `ledger status`. Work
+ *  landing between audits is the normal condition: the audit is periodic, and
+ *  only `release cut` needs it done. Phrased as a warning, it read as "run the
+ *  audit now" to people and agents alike. */
+export function unauditedSince(report) {
+  return `${report.commits} commit${report.commits === 1 ? "" : "s"} and ${report.paths} ` +
+    `file${report.paths === 1 ? "" : "s"} since, due for a sweep before the next release cut`;
 }
 
 /**
