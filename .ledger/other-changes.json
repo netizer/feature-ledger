@@ -12,21 +12,21 @@
   {
     "version": 2,
     "audience": "user",
-    "description": "Every command that prints a prompt for a coding agent (ledger bootstrap, ledger style rewrite, ledger audit, ledger review and ledger redraft check) takes --prompt-only, which prints the prompt alone. You can pipe it straight to the clipboard, for example with ledger review --prompt-only | pbcopy. Warnings from the explanation still print on your screen."
+    "description": "Every command that prints a prompt for a coding agent (ledger bootstrap, ledger style rewrite, ledger audit, ledger review and ledger redraft check) takes --print, which prints the prompt alone. You can pipe it straight to the clipboard, for example with ledger review --print | pbcopy. Warnings print on your screen rather than into the pipe. See “Handing a task to a coding agent” for the other ways to deliver a prompt."
   },
   {
     "version": 2,
     "audience": "user",
-    "description": "Adding --help or -h to any command prints that command's part of the help and runs nothing. For example, ledger release cut --help never cuts a release."
+    "description": "Adding --help or -h to any command prints that command's part of the help and runs nothing. For example, ledger cut --help never cuts a release."
   },
   {
     "version": 2,
     "audience": "user",
-    "description": "Every command refuses an option it does not take, and runs nothing. The error names the option, suggests the one you probably meant, and lists the options that the command takes. For example, ledger release cut --dryrun stops with \"did you mean --dry-run?\" instead of cutting the release."
+    "description": "Every command refuses an option it does not take, and runs nothing. The error names the option, suggests the one you probably meant, and lists the options that the command takes. For example, ledger cut --dryrun stops with \"did you mean --dry-run?\" instead of cutting the release."
   },
   {
     "version": 2,
     "audience": "user",
-    "description": "The commands read as words you can guess: ledger cut, ledger releases and ledger subcategories replace ledger release cut, ledger release list and ledger subcategory, and --print replaces --prompt-only. The old names still work and say what they are called now. A mistyped command is answered with the closest one, the exit code tells a mistake (2) from a check that said no (3), and ledger completion adds tab completion to zsh, bash and fish."
+    "description": "The commands read as words you can guess: ledger cut, ledger releases and ledger subcategories replace ledger release cut, ledger release list and ledger subcategory. The old names still work and say what they are called now. A mistyped command is answered with the closest one, the exit code tells a mistake (2) from a check that said no (3), and ledger completion adds tab completion to zsh, bash and fish."
   }
 ]

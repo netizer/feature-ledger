@@ -14,7 +14,7 @@
     {
       "version": 2,
       "removed": true,
-      "reason": "Rewording an entry is no longer a command. The words of an entry are edited in .ledger/features/<id>.json directly, which records nothing against a release and marks nothing as changed — the same result the command produced, without a CLI between a person and a sentence they want to fix."
+      "reason": "Rewording an entry is no longer a command. You edit the words in .ledger/features/<id>.json directly, which records nothing against a release and marks nothing as changed: the same result the command produced, without a CLI between a person and a sentence they want to fix. See “Editing the ledger by hand”."
     }
   ]
 }

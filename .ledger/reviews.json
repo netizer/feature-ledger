@@ -1,0 +1,31 @@
+{
+  "reviews": [
+    {
+      "version": 2,
+      "date": "2026-10-10",
+      "commit": "4eb883b6e54b2efb6ad55f25f1c683b592aab358",
+      "entries": {
+        "init-a-ledger": "4f8e2641fc961484",
+        "baseline-survey": "2d070ce6f93628d4",
+        "record-a-change": "4a3794930092a541",
+        "editing-by-hand": "e91a6430843206f7",
+        "reword-an-entry": "8957aa28e8f4f4a9",
+        "rename-a-feature": "cb81ad27289f4d58",
+        "product-wide-change": "8589ae47e5c07deb",
+        "status-check": "65553ff5ae8c55e0",
+        "release-editions": "26c899e1715348d0",
+        "pdf-edition": "703e62cef1d30ca5",
+        "change-highlighting": "94bca15f1920da0b",
+        "codebase-audit": "d4e89625036dd28c",
+        "release-review": "3557dd0c6e9f9c0c",
+        "redraft-the-ledger": "9165a7c864212235",
+        "agent-handoff": "6272a059ffbbd3de",
+        "other:98bdd63e53e7e7a7": "98bdd63e53e7e7a7",
+        "other:761ee2841d4cda70": "761ee2841d4cda70",
+        "other:9645c2679d8a3e72": "9645c2679d8a3e72",
+        "other:14c895abc56f5e20": "14c895abc56f5e20",
+        "other:8f7661264613bae4": "8f7661264613bae4"
+      }
+    }
+  ]
+}
