@@ -8,6 +8,13 @@
   },
   {
     "version": 2,
+    "name": "Simplified API",
+    "date": "2026-10-10",
+    "status": "released",
+    "commit": "4913a189f7616717bfa4970cfcb9fe534eafc8e5"
+  },
+  {
+    "version": 3,
     "name": null,
     "date": null,
     "status": "future",
