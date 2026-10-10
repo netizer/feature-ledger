@@ -29,7 +29,7 @@ Write every entry in {style_line}
 One entry is one capability someone using the product would name — something
 they could ask for, or would miss if it went away. Guardrails, defaults,
 plumbing and polish are described inside the capability they belong to, or go
-in as `dev`, or as `ledger other-change`. They never get an entry of their own.
+in as `dev`, or as `ledger note`. They never get an entry of their own.
 
 Descriptions are present-tense statements of what the product does, never of
 who did what to it. Client-facing prose, not release notes. Every sentence

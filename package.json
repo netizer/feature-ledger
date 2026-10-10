@@ -17,6 +17,7 @@
     "scripts",
     "examples",
     "README.md",
+    "docs/*.md",
     "LICENSE"
   ],
   "scripts": {

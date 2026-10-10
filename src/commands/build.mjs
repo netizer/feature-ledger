@@ -1,7 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
+import { spawn } from "node:child_process";
 import { openProject } from "../store.mjs";
-import { fail, titleSlug } from "../util.mjs";
+import { fail, usage, titleSlug } from "../util.mjs";
+import { color } from "../ui.mjs";
 import { MarkdownRenderer } from "../render/markdown.mjs";
 import { renderLedgerHtml } from "../render/ledger-html.mjs";
 import { htmlToPdf } from "../render/pdf.mjs";
@@ -9,9 +11,10 @@ import { redraftReport, redraftSteps, rangeLabel } from "./redraft.mjs";
 
 const out = (s) => process.stdout.write(`${s}\n`);
 const warn = (s) => process.stdout.write(`  ! ${s}\n`);
+const rel = (p) => path.relative(process.cwd(), p) || p;
 
 /**
- * The three living Markdown docs and the archival PDF edition.
+ * The three living Markdown docs and the PDF editions.
  *
  * Nothing here judges the shape of the corpus. Loading it has already refused
  * anything that would make a document wrong — an entry with no description, a
@@ -19,14 +22,20 @@ const warn = (s) => process.stdout.write(`  ! ${s}\n`);
  * exist. Everything past that is an editorial call, and a tool that blocked a
  * build over one would only be teaching people to write around it.
  *
- * The one thing it does say out loud is an unfinished redraft, and only as a
- * warning: a redrafted corpus nobody has checked against the one it replaced
- * can print without something the client was already told, and a draft build
- * is exactly when someone would want to know. `release cut` is where it
- * refuses.
+ * Two kinds of PDF, and they never share a name or a folder. An edition is a
+ * release that was cut: `ledger cut` prints it into the client directory, and
+ * that is the only way a file gets there. A draft is the open release as it
+ * stands — `<name>_N-draft.pdf`, in the gitignored docs directory — so a draft
+ * can't be mistaken for, or committed as, the edition a client was handed.
+ *
+ * With no edition named, a build brings everything up to date: the Markdown,
+ * every cut edition whose PDF isn't on disk (a fresh clone of a project that
+ * doesn't commit them gets them all back), and the draft of the open release
+ * once it has something in it.
  */
-export async function cmdBuild({ flags }) {
+export async function cmdBuild({ flags, positional }) {
   const project = openProject(flags);
+  const c = color();
 
   const redraft = redraftReport(project);
   if (!redraft.ok) {
@@ -36,74 +45,138 @@ export async function cmdBuild({ flags }) {
     out("");
   }
 
-  const wantMd = flags.md || !flags.pdf;
+  const target = parseTarget(positional[0] ?? flags.version);
+  const wantMd = flags.md || (!flags.pdf && target === null);
   const wantPdf = flags.pdf || !flags.md;
 
-  const outDir = path.resolve(project.root, flags.out ?? project.config.output.dir);
-  const clientDir = flags.out
-    ? outDir
-    : path.resolve(project.root, project.config.output.client_dir);
-
   if (wantMd) {
+    const outDir = path.resolve(project.root, flags.out ?? project.config.output.dir);
     const docs = new MarkdownRenderer(project).all();
     fs.mkdirSync(outDir, { recursive: true });
     for (const [key, content] of Object.entries(docs)) {
       const name = project.config.output[key];
       if (!name) continue;
       fs.writeFileSync(path.join(outDir, name), content);
-      out(`wrote ${path.relative(process.cwd(), path.join(outDir, name))}`);
+      out(`wrote ${rel(path.join(outDir, name))}`);
     }
   }
+  if (!wantPdf) return;
 
-  if (wantPdf) {
-    const arg = flags.version;
-    const asked = arg !== undefined && arg !== true;
-    // Editions, not releases: a release opened by `release cut` and not yet
-    // written to isn't one, so the default straight after a cut is the
-    // edition that was just shipped rather than an empty reprint of it.
-    // Asking for it by number still prints it — that's the in-progress proof.
-    const all = String(arg ?? "").toLowerCase() === "all";
-    const versions = all ? project.editionVersions : [asked ? Number(arg) : project.editionVersion];
+  const releases = project.releases;
+  const open = releases.current.future ? releases.current : null;
+  const openRecorded = open && project.recordedAt(open.version);
+  const cut = releases.liveVersions.filter((v) => releases.at(v).released);
 
-    // Archived editions were printed from a corpus a redraft has set aside.
-    // `all` means this corpus's editions: the older ones are already out in
-    // the world, and reprinting them is something to ask for by number.
-    const archived = project.releases.archived;
-    if (all && archived.length) {
+  let versions;
+  const kept = [];
+  if (target === "draft") {
+    if (!open) fail(`v${releases.current.version} is already cut, and there is no open release to draft`);
+    versions = [open.version];
+  } else if (typeof target === "number") {
+    if (!releases.versions.includes(target)) fail(`no release v${target} — \`ledger releases\` lists them`);
+    versions = [target];
+  } else if (target === "all") {
+    versions = [...cut, ...(openRecorded ? [open.version] : [])];
+    const archived = releases.archived;
+    if (archived.length) {
       out(`${rangeLabel(archived.map((r) => r.version))} belong to archived ledgers and are left as they are. ` +
-        `\`ledger build --version ${archived[archived.length - 1].version}\` reprints one from its archive.`);
+        `\`ledger build v${archived[archived.length - 1].version}\` reprints one from its archive.`);
     }
-
-    if (!asked && project.editionVersion !== project.releases.latestVersion) {
-      const working = project.releases.latestVersion;
-      out(`v${working} is open with nothing recorded against it yet — printing the v${project.editionVersion} edition. ` +
-          `(\`ledger build --version ${working}\` prints it anyway, as a draft.)`);
+  } else {
+    versions = [];
+    for (const v of cut) {
+      if (fs.existsSync(editionFile(project, v, flags).target)) kept.push(v);
+      else versions.push(v);
     }
+    if (openRecorded) versions.push(open.version);
+  }
 
-    for (const version of versions) {
-      if (!project.releases.versions.includes(version)) fail(`no release v${version}`);
-      const release = project.releases.at(version);
-      const source = release.archived ? project.openArchive(release) : project;
-      if (release.archived) out(`v${version} is archived — printing it from .ledger/${release.archive}/`);
-      const label = project.releases.printedAs(version);
-      const { html, warnings, fontsEmbedded } = renderLedgerHtml({ project: source, version, label });
-      for (const w of warnings) warn(w);
+  for (const version of versions) {
+    const { target: file, draft } = await printEdition(project, version, flags);
+    out(draft
+      ? `wrote v${version} ${c.yellow("· DRAFT, not cut")} → ${rel(file)}`
+      : `wrote v${version} → ${rel(file)}`);
+  }
 
-      const file = source.config.output.pdf_name
-        .replace("{slug}", titleSlug(source.brand.name ?? source.config.product))
-        .replace("{version}", project.releases.fileLabel(version));
-      const target = path.join(clientDir, file);
-      if (flags.html) {
-        // Handy when tuning the theme: the same document, openable in a
-        // browser with devtools, without waiting on a print.
-        const htmlTarget = target.replace(/\.pdf$/, ".html");
-        fs.mkdirSync(path.dirname(htmlTarget), { recursive: true });
-        fs.writeFileSync(htmlTarget, html);
-        out(`wrote ${path.relative(process.cwd(), htmlTarget)}`);
-        continue;
-      }
-      await htmlToPdf(html, target, { checkFonts: fontsEmbedded });
-      out(`wrote ${path.relative(process.cwd(), target)}`);
+  if (target === null) {
+    if (kept.length) {
+      out(`${rangeLabel(kept)} already printed in ${rel(path.dirname(editionFile(project, kept[0], flags).target))}/ — ` +
+        "`ledger build all` reprints them with the current wording.");
     }
+    if (open && !openRecorded && releases.versions.length > 1) {
+      out(`v${open.version} is open with nothing recorded yet, so there's no draft to print. (\`ledger preview\` prints it anyway.)`);
+    }
+    if (!versions.length && !kept.length && !(open && !openRecorded && releases.versions.length > 1)) {
+      out("Nothing to print yet: no release is cut and nothing is recorded. `ledger add` records the first feature.");
+    }
+  }
+}
+
+/** `v3`, `3`, `all`, `draft`, or nothing: which editions a build prints. */
+function parseTarget(arg) {
+  if (arg === undefined || arg === true) return null;
+  const s = String(arg).toLowerCase();
+  if (s === "all" || s === "draft") return s;
+  const m = /^v?(\d+)$/.exec(s);
+  if (m) return Number(m[1]);
+  return usage(`usage: ledger build [v3 | all | draft]  — "${arg}" isn't an edition`);
+}
+
+/**
+ * Where one edition's file goes. A cut edition goes to the client directory
+ * under the name the client sees; the open release is a draft, and goes to
+ * the docs directory with "-draft" in its name. `--out` puts either where it
+ * says, and `--html` swaps the extension.
+ */
+export function editionFile(project, version, flags = {}) {
+  const release = project.releases.at(version);
+  const source = release.archived ? project.openArchive(release) : project;
+  const draft = Boolean(release.future);
+  let name = source.config.output.pdf_name
+    .replace("{slug}", titleSlug(source.brand.name ?? source.config.product))
+    .replace("{version}", project.releases.fileLabel(version));
+  if (draft) name = /\.pdf$/i.test(name) ? name.replace(/\.pdf$/i, "-draft.pdf") : `${name}-draft`;
+  const dir = flags.out
+    ? path.resolve(project.root, String(flags.out))
+    : path.resolve(project.root, draft ? project.config.output.dir : project.config.output.client_dir);
+  let target = path.join(dir, name);
+  if (flags.html) target = target.replace(/\.pdf$/i, ".html");
+  return { target, source, release, draft };
+}
+
+/**
+ * Prints one edition. `--html` writes the same document as HTML instead —
+ * openable in a browser with devtools, which is the fast loop when tuning
+ * theme.css.
+ */
+export async function printEdition(project, version, flags = {}) {
+  const { target, source, release, draft } = editionFile(project, version, flags);
+  if (release.archived) out(`v${version} is archived — printing it from .ledger/${release.archive}/`);
+  const label = project.releases.printedAs(version);
+  const { html, warnings, fontsEmbedded } = renderLedgerHtml({ project: source, version, label });
+  for (const w of warnings) warn(w);
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  if (flags.html) fs.writeFileSync(target, html);
+  else await htmlToPdf(html, target, { checkFonts: fontsEmbedded });
+  return { target, draft };
+}
+
+/**
+ * The open release as a draft PDF: the document as it would print if it were
+ * cut now, never in the client directory. `--open` hands it to the system
+ * viewer.
+ */
+export async function cmdPreview({ flags }) {
+  const project = openProject(flags);
+  const open = project.releases.current;
+  if (!open.future) fail(`v${open.version} is already cut, and there is no open release to preview`);
+  if (!project.recordedAt(open.version) && project.releases.versions.length > 1) {
+    out(`v${open.version} has nothing recorded yet, so this draft reads the same as the v${open.version - 1} edition.`);
+  }
+  const { target } = await printEdition(project, open.version, flags);
+  out(`wrote v${open.version} ${color().yellow("· DRAFT, not cut")} → ${rel(target)}`);
+  if (flags.open) {
+    const opener = process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
+    spawn(opener, [target], { detached: true, stdio: "ignore", shell: process.platform === "win32" }).unref();
   }
 }

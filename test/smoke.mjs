@@ -19,8 +19,13 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-smoke-"));
 let failures = 0;
 const log = (s) => process.stdout.write(`${s}\n`);
 
-function run(args, { stdin = "", expect = "ok", cwd = dir } = {}) {
-  const r = spawnSync("node", [BIN, ...args], { cwd, input: stdin, encoding: "utf8" });
+// The exit code of the last `run`, for the checks that care which kind of
+// failure it was: 2 for a mistake in the command line, 3 for a check saying no.
+let lastStatus = null;
+
+function run(args, { stdin = "", expect = "ok", cwd = dir, env = process.env } = {}) {
+  const r = spawnSync("node", [BIN, ...args], { cwd, input: stdin, encoding: "utf8", env });
+  lastStatus = r.status;
   const output = `${r.stdout}${r.stderr}`;
   const ok = r.status === 0;
   if ((expect === "ok") !== ok) {
@@ -85,9 +90,9 @@ run(["add", "gamma"], {
 });
 
 run(["status"]);
-run(["release", "cut", "--name", "Baseline", "--date", "2026-01-15"]);
+run(["cut", "--name", "Baseline", "--date", "2026-01-15", "--no-pdf"]);
 // A release with nothing recorded against it would print an identical edition.
-run(["release", "cut", "--name", "Too soon"], { expect: "fail" });
+run(["cut", "--name", "Too soon", "--no-pdf"], { expect: "fail" });
 
 // …and for the same reason the edition to print straight after a cut is the
 // one just shipped, not the empty release the cut opened.
@@ -98,7 +103,7 @@ assert(
 );
 assert(
   "the empty in-progress release still prints on request",
-  run(["build", "--pdf", "--html", "--version", "2"]).includes("Testbed-Feature-Ledger_2.html"),
+  run(["build", "v2", "--html"]).includes("Testbed-Feature-Ledger_2-draft.html"),
 );
 fs.rmSync(path.join(dir, "docs/generated"), { recursive: true, force: true });
 
@@ -125,7 +130,8 @@ run(["update", "beta", "--name", "Beta prime", "--description", "Does the beta t
 run(["update", "beta", "--name", "Beta prime", "--description", "Does the beta thing.",
   "--change", "Was “Beta”, which named the release it arrived in rather than what it does."]);
 run(["remove", "gamma", "--reason", "Superseded by the build pipeline."]);
-run(["other-change", "--audience", "user", "--description", "A global wording pass."]);
+assert("`other-change` still works, and says it is `note` now",
+  run(["other-change", "--audience", "user", "--description", "A global wording pass."]).includes("`ledger note`"));
 
 const alpha = JSON.parse(fs.readFileSync(path.join(dir, ".ledger/features/alpha.json"), "utf8"));
 assert("one history entry per version", alpha.history.length === 2);
@@ -229,7 +235,7 @@ assert("the removed dev feature is listed as gone, in the dev doc", dev.includes
 
 const pdf = run(["build", "--pdf"], { expect: "ok" });
 if (pdf.includes("wrote")) {
-  const file = path.join(dir, "docs/generated/client/Testbed-Feature-Ledger_2.pdf");
+  const file = path.join(dir, "docs/generated/Testbed-Feature-Ledger_2-draft.pdf");
   assert("the PDF edition is a real PDF", fs.existsSync(file) && fs.readFileSync(file).subarray(0, 4).toString() === "%PDF");
 }
 
@@ -270,7 +276,7 @@ assert("a backfilled entry leaves an already-issued edition untouched", fs.readF
 
 run(["build", "--pdf", "--html"]);
 run(["build", "--md"]);
-const v2 = fs.readFileSync(path.join(dir, "docs/generated/client/Testbed-Feature-Ledger_2.html"), "utf8");
+const v2 = fs.readFileSync(path.join(dir, "docs/generated/Testbed-Feature-Ledger_2-draft.html"), "utf8");
 assert("the third register draws in its own colour", v2.includes("tag-backfilled") && v2.includes("ALREADY IN PLACE"));
 assert("…and never puts the internal key in front of a client", !v2.includes(">BACKFILLED<"));
 assert("a removal found late is reported, apart from this cycle's news", v2.includes("No longer present"));
@@ -298,10 +304,10 @@ relabel(0);
 run(["status", "--quiet"], { expect: "fail" });
 relabel(4);
 run(["build", "--pdf", "--html", "--version", "2"]);
-const relabelled = path.join(dir, "docs/generated/client/Testbed-Feature-Ledger_5.html");
+const relabelled = path.join(dir, "docs/generated/Testbed-Feature-Ledger_5-draft.html");
 assert("a later edition follows on from the printed number", fs.existsSync(relabelled) &&
   fs.readFileSync(relabelled, "utf8").includes("Version 5") && !fs.readFileSync(relabelled, "utf8").includes("Version 2"));
-assert("…and `release list` shows it beside the real one", run(["release", "list"]).includes("printed as 5"));
+assert("…and `releases` shows it beside the real one", run(["releases"]).includes("printed as 5"));
 
 // A redraft done by hand is marked on its release: it reissues the number
 // before it, says it is reorganized, and marks nothing new or updated.
@@ -318,7 +324,7 @@ const firstHtml = fs.existsSync(firstRedraft) ? fs.readFileSync(firstRedraft, "u
 assert("a first edition can be a redraft of reports sent another way",
   firstHtml.includes("Version 1 (redraft)") && firstHtml.includes("Earlier reports described"));
 {
-  const lines = run(["release", "list"]).split("\n");
+  const lines = run(["releases"]).split("\n");
   assert("…and the edition after it takes the next number",
     lines.find((l) => l.startsWith("v 1"))?.includes("printed as 1 (redraft)") &&
     !lines.find((l) => l.startsWith("v 2"))?.includes("printed as"));
@@ -327,12 +333,12 @@ mark((rs) => { rs[0].redraft = true; rs[0].display_version = 4; });
 run(["build", "--pdf", "--html", "--version", "1"]);
 assert("…printed under the number the client already counts by",
   fs.existsSync(path.join(dir, "docs/generated/client/Testbed-Feature-Ledger_4_redraft.html")));
-assert("…with the release after it following on", run(["release", "list"]).includes("printed as 5"));
+assert("…with the release after it following on", run(["releases"]).includes("printed as 5"));
 mark((rs) => { rs[1].redraft = "yes"; });
 run(["status", "--quiet"], { expect: "fail" });
 mark((rs) => { rs[0].display_version = 3; rs[1].redraft = true; });
 run(["build", "--pdf", "--html", "--version", "2"]);
-const redrafted = path.join(dir, "docs/generated/client/Testbed-Feature-Ledger_3_redraft.html");
+const redrafted = path.join(dir, "docs/generated/Testbed-Feature-Ledger_3_redraft-draft.html");
 const redraftHtml = fs.existsSync(redrafted) ? fs.readFileSync(redrafted, "utf8") : "";
 assert("a redraft marked by hand reissues the number before it, in the file name too",
   redraftHtml.includes("Version 3 (redraft)"));
@@ -343,7 +349,7 @@ mark((rs) => {
   Object.assign(rs[1], { redraft: true, status: "released", name: "Rewrite", date: "2026-02-01" });
   rs.push({ version: 3, name: null, date: null, status: "future", commit: null });
 });
-const listed = run(["release", "list"]);
+const listed = run(["release", "list"]);   // the old name still works
 assert("the release after a redraft takes the next number", listed.includes("printed as 3 (redraft)") && listed.includes("printed as 4"));
 fs.writeFileSync(releasesPath, timelineBefore);
 fs.rmSync(path.join(dir, "docs/generated"), { recursive: true, force: true });
@@ -365,9 +371,15 @@ run(["add", "kept-one"], {
 });
 run(["build", "--pdf", "--html"], { cwd: kept });
 assert(
-  "…and `ledger build` prints the edition there",
-  fs.existsSync(path.join(kept, "docs/client/Kept-Feature-Ledger_1.html")),
+  "…and a draft never lands there, under a name that says it's a draft",
+  !fs.existsSync(path.join(kept, "docs/client")) &&
+    fs.existsSync(path.join(kept, "docs/generated/Kept-Feature-Ledger_1-draft.html")),
 );
+assert("`ledger cut` prints the edition there itself",
+  run(["cut", "--name", "Baseline", "--html"], { cwd: kept }).includes("docs/client/Kept-Feature-Ledger_1.html") &&
+  fs.existsSync(path.join(kept, "docs/client/Kept-Feature-Ledger_1.html")));
+assert("…and clears away the draft it replaces",
+  !fs.existsSync(path.join(kept, "docs/generated/Kept-Feature-Ledger_1-draft.html")));
 fs.rmSync(kept, { recursive: true, force: true });
 
 // Every printed brief draws the boundary between "for you" and "paste this"
@@ -396,18 +408,83 @@ assert("a mistyped option is refused, with the one it was probably meant to be",
   run(["release", "cut", "--name", "Typo", "--dryrun"], { cwd: dir, expect: "fail" }).includes("did you mean --dry-run?"));
 assert("…and nothing was cut", fs.readFileSync(path.join(dir, ".ledger/releases.json"), "utf8") === beforeTypo);
 run(["list", "--catgory", "x"], { cwd: dir, expect: "fail" });
-run(["release", "list", "--force"], { cwd: dir, expect: "fail" });
+run(["releases", "--force"], { cwd: dir, expect: "fail" });
 run(["list", "--json", "--dir", ".ledger"], { cwd: dir });
 
 // --help after any command is help, and never does the thing.
 const releasesBefore = fs.readFileSync(path.join(dir, ".ledger/releases.json"), "utf8");
-assert("`ledger release cut --help` prints help",
-  run(["release", "cut", "--name", "Oops", "--help"], { cwd: dir }).includes("ledger release cut --name"));
+assert("`ledger cut --help` prints help",
+  run(["cut", "--name", "Oops", "--help"], { cwd: dir }).includes("ledger cut --name"));
+assert("…and so does the old name for it", run(["release", "cut", "--help"], { cwd: dir }).includes("ledger cut --name"));
 assert("…and cuts nothing", fs.readFileSync(path.join(dir, ".ledger/releases.json"), "utf8") === releasesBefore);
 assert("`ledger add --help` prints help without reading a payload",
   run(["add", "never", "--help"], { cwd: dir }).includes("ledger add <id>")
   && !fs.existsSync(path.join(dir, ".ledger/features/never.json")));
 assert("-h works the same", run(["redraft", "-h"], { cwd: dir }).includes("ledger redraft check"));
+
+// ---- Finding your way ----
+// Bare `ledger` says where things stand and what to run next; outside a
+// project it is the help.
+const overview = run([], { cwd: dir });
+assert("bare `ledger` shows the checklist and the next command", overview.includes("Ready to cut?") && overview.includes("Next:"));
+assert("…and outside a project it prints the help", run([], { cwd: os.tmpdir() }).includes("a client-facing record"));
+assert("`ledger status` carries the same checklist", run(["status"], { cwd: dir }).includes("Ready to cut?"));
+assert("a subcommand typed on its own points at where it lives",
+  run(["amend"], { cwd: dir, expect: "fail" }).includes("ledger releases amend") && lastStatus === 2);
+assert("a near-miss of a command is suggested", run(["revew"], { cwd: dir, expect: "fail" }).includes("ledger review"));
+assert("completion offers the feature ids", run(["__complete", "show", ""], { cwd: dir }).includes("alpha"));
+assert("…and every shell gets a script", ["zsh", "bash", "fish"].every((sh) => run(["completion", sh], { cwd: dir }).includes("__complete")));
+run(["audit", "--print", "--copy"], { cwd: dir, expect: "fail" });
+assert("a bare --run with no agent configured is refused, not guessed",
+  run(["audit", "--run"], { cwd: dir, expect: "fail", env: { ...process.env, LEDGER_AGENT: "" } }).includes("--run needs an agent"));
+assert("a misspelt agent is caught before anything runs",
+  run(["review", "--run", "cluade"], { cwd: dir, expect: "fail" }).includes("did you mean claude?"));
+
+// ---- Handing a prompt to an agent ----
+// Fake agents on PATH, speaking each one's real event format, so the
+// adapters, the runner and the checks afterwards run end to end offline.
+const fakeBin = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-agents-"));
+const fakeAgent = (name, body) => {
+  const file = path.join(fakeBin, name);
+  fs.writeFileSync(file, `#!/usr/bin/env node
+const { spawnSync } = require("node:child_process");
+const say = (o) => process.stdout.write(JSON.stringify(o) + "\\n");
+const ledger = (...a) => spawnSync(process.execPath, [${JSON.stringify(BIN)}, ...a], { encoding: "utf8" });
+let prompt = ""; process.stdin.on("data", (d) => { prompt += d; }); process.stdin.on("end", () => { ${body} });
+`);
+  fs.chmodSync(file, 0o755);
+};
+fakeAgent("claude", `
+  say({ type: "system", subtype: "init", session_id: "sess-123" });
+  say({ type: "assistant", message: { content: [{ type: "text", text: "Reading the release." }, { type: "tool_use", name: "Bash", input: { command: "ledger list" } }] } });
+  if (!prompt.includes("Review the")) process.exit(9);
+  ledger("review", "complete");
+  say({ type: "result", result: "Reviewed. Next: cut it.", session_id: "sess-123", num_turns: 3, total_cost_usd: 0.1,
+    permission_denials: [{ tool_name: "Bash", tool_input: { command: "rm -rf build\\nand more" } }] });
+`);
+fakeAgent("codex", `
+  say({ type: "thread.started", thread_id: "th-9" });
+  say({ type: "item.completed", item: { type: "agent_message", text: "I looked, and stopped." } });
+`);
+const withFakes = { ...process.env, PATH: `${fakeBin}${path.delimiter}${process.env.PATH}` };
+const ran = run(["review", "--run", "claude"], { cwd: dir, env: withFakes });
+assert("--run claude shows the agent's last message", ran.includes("Reviewed. Next: cut it."));
+assert("…checks what it left behind", ran.includes("✓ v2 is reviewed"));
+assert("…names the tool calls it was refused, one line each", ran.includes("refused 1 tool call (Bash rm -rf build)"));
+assert("…and says how to resume its session", ran.includes("claude --resume sess-123"));
+const stopped = run(["audit", "--run", "codex"], { cwd: dir, env: withFakes, expect: "fail" });
+assert("an agent that stops without its stamp is reported, and exits 3",
+  stopped.includes("✗ no audit was recorded") && lastStatus === 3);
+assert("…still with the way back into its session", stopped.includes("codex resume th-9"));
+const customAgent = path.join(fakeBin, "custom-agent.cjs");
+fs.writeFileSync(customAgent, `const { spawnSync } = require("node:child_process");
+process.stdin.resume(); process.stdin.on("end", () => {
+  spawnSync(process.execPath, [${JSON.stringify(BIN)}, "audit", "complete"], { stdio: "inherit" });
+});`);
+const custom = run(["audit", "--run", `node ${JSON.stringify(customAgent)}`], { cwd: dir });
+assert("any command can be the agent, with the prompt on stdin", custom.includes("✓ incremental audit recorded"));
+assert("…and it says the resume command is the agent's own", custom.includes("agent's own command"));
+fs.rmSync(fakeBin, { recursive: true, force: true });
 
 // ---- The audit itself, which needs a real repository ----
 // The range IS the signal: no per-feature map of source paths to keep true,
@@ -438,7 +515,7 @@ assert(
 );
 assert(
   "…and it is stamped before the cut, so it logs against the release the entries went into",
-  boot.indexOf("audit complete") < boot.indexOf("release cut"),
+  boot.indexOf("audit complete") < boot.indexOf("ledger cut --name"),
 );
 assert("…and --no-audit leaves it out", !run(["bootstrap", "--no-audit"], { cwd: repo }).includes("audit complete"));
 
@@ -449,7 +526,7 @@ assert("the audit is logged with the mode it ran in", run(["audit", "log"], { cw
 // work being done, so a commit this history has never seen is refused.
 run(["audit", "complete", "--commit", "0".repeat(40)], { cwd: repo, expect: "fail" });
 
-run(["release", "cut", "--name", "Baseline", "--date", "2026-01-15"], { cwd: repo });
+run(["cut", "--name", "Baseline", "--date", "2026-01-15", "--no-pdf"], { cwd: repo });
 // Set by hand, and every later rewrite of the timeline has to keep it.
 {
   const p = path.join(repo, ".ledger/releases.json");
@@ -461,13 +538,16 @@ fs.writeFileSync(path.join(repo, "src/app.js"), "one\ntwo\n");
 git("add", "-A");
 git("commit", "-qm", "Add the two thing");
 
-assert(
-  "once source has landed unswept, the cut refuses and says how much",
-  run(["release", "cut", "--name", "Next"], { cwd: repo, expect: "fail" }).includes("since the last audit"),
-);
+const refused = run(["cut", "--name", "Next", "--no-pdf"], { cwd: repo, expect: "fail" });
+assert("once source has landed unswept, the cut refuses and says how much", refused.includes("since the last audit"));
+assert("…listing every open check at once, not the first one it hit",
+  refused.includes("was NOT cut") && /✗ audit/.test(refused) && /✗ content/.test(refused) && lastStatus === 3);
+assert("--skip passes only the checks it names",
+  run(["cut", "--name", "Next", "--no-pdf", "--skip", "audit"], { cwd: repo, expect: "fail" }).includes("✗ content"));
+run(["cut", "--name", "Next", "--skip", "audti"], { cwd: repo, expect: "fail" });
 assert(
   "…and --force still gets through",
-  run(["release", "cut", "--name", "Next", "--date", "2026-02-01", "--force"], { cwd: repo }).includes("cut v2"),
+  run(["cut", "--name", "Next", "--date", "2026-02-01", "--force", "--no-pdf"], { cwd: repo }).includes("cut v2"),
 );
 const incremental = run(["audit"], { cwd: repo });
 assert("the brief then reads as a range, not a sweep", incremental.includes("incremental") && incremental.includes("Add the two thing"));
@@ -489,12 +569,12 @@ run(["audit", "complete"], { cwd: repo });
 // Audited, but not yet read as one release against the edition before it.
 assert(
   "an unreviewed release can't be cut",
-  run(["release", "cut", "--name", "Same day, later", "--date", "2026-02-01"], { cwd: repo, expect: "fail" })
+  run(["cut", "--name", "Same day, later", "--date", "2026-02-01", "--no-pdf"], { cwd: repo, expect: "fail" })
     .includes("v3 has not been reviewed"),
 );
 run(["review", "complete"], { cwd: repo });
 // Same day as v2, but the code has moved — two real moments, two real editions.
-run(["release", "cut", "--name", "Same day, later", "--date", "2026-02-01"], { cwd: repo });
+run(["cut", "--name", "Same day, later", "--date", "2026-02-01", "--no-pdf"], { cwd: repo });
 const timeline = cutJson();
 assert("two releases can share a date when the code moved between them",
   timeline[1].date === timeline[2].date && timeline[1].commit !== timeline[2].commit);
@@ -504,20 +584,20 @@ run(["add", "three"], {
   stdin: feature({ audience: "user", size: "Small", name: "Three", description: "Does the third thing." }),
 });
 assert("…but not when the day and the code are both the same",
-  run(["release", "cut", "--name", "Again", "--date", "2026-02-01"], { cwd: repo, expect: "fail" })
-    .includes("nothing to tell the two editions apart"));
-assert("…which --force still allows, as a deliberate re-issue",
-  run(["release", "cut", "--name", "Again", "--date", "2026-02-01", "--force"], { cwd: repo }).includes("cut v4"));
-assert("the timeline lists each release's commit", /[0-9a-f]{7}  Same day, later/.test(run(["release", "list"], { cwd: repo })));
+  run(["cut", "--name", "Again", "--date", "2026-02-01", "--no-pdf"], { cwd: repo, expect: "fail" })
+    .includes("would stand for the same moment"));
+assert("…which --skip allows, as a deliberate re-issue",
+  run(["cut", "--name", "Again", "--date", "2026-02-01", "--skip", "moment,review", "--no-pdf"], { cwd: repo }).includes("cut v4"));
+assert("the timeline lists each release's commit", /[0-9a-f]{7}  Same day, later/.test(run(["releases"], { cwd: repo })));
 // Every ledger that predates commits has a timeline of nulls, so they have to
 // be fillable in after the fact — otherwise the field only ever works forward.
 const head = spawnSync("git", ["-C", repo, "rev-parse", "HEAD"], { encoding: "utf8" }).stdout.trim();
-run(["release", "amend", "1", "--commit", head], { cwd: repo });
+run(["releases", "amend", "1", "--commit", head], { cwd: repo });
 assert("a release cut before commits were recorded can be filled in",
   cutJson()[0].commit === head);
 // The in-progress release has no commit because it hasn't happened yet.
-run(["release", "amend", "5", "--commit", head], { cwd: repo, expect: "fail" });
-run(["release", "amend", "1", "--commit", "0".repeat(40)], { cwd: repo, expect: "fail" });
+run(["releases", "amend", "5", "--commit", head], { cwd: repo, expect: "fail" });
+run(["release", "amend", "1", "--commit", "0".repeat(40)], { cwd: repo, expect: "fail" });   // the old name, still refusing
 
 fs.rmSync(repo, { recursive: true, force: true });
 
@@ -533,7 +613,7 @@ run(["add", "kept"], { cwd: rd, stdin: feature({ audience: "user", size: "Big", 
 run(["add", "lost"], { cwd: rd, stdin: feature({ audience: "user", size: "Small", name: "Quiet export", description: "Exports the ledger to spreadsheets." }) });
 // A redraft keeps what a client holds, so with nothing handed over there is nothing to keep.
 run(["redraft", "start"], { cwd: rd, expect: "fail" });
-run(["release", "cut", "--name", "Baseline", "--date", "2026-03-01"], { cwd: rd });
+run(["cut", "--name", "Baseline", "--date", "2026-03-01", "--no-pdf"], { cwd: rd });
 assert("…and it refuses while the corpus it would set aside isn't committed",
   run(["redraft", "start"], { cwd: rd, expect: "fail" }).includes("uncommitted"));
 commitAll("Baseline");
@@ -551,7 +631,7 @@ run(["add", "sneaky", "--dir", ".ledger/archive/v1"], { cwd: rd, expect: "fail",
 assert("the archive reads through --dir", run(["list", "--dir", ".ledger/archive/v1"], { cwd: rd }).includes("Quiet export"));
 run(["redraft", "start"], { cwd: rd, expect: "fail" });
 const survey = run(["bootstrap"], { cwd: rd });
-assert("a survey inside a redraft stops before the cut", survey.includes("stop before the cut") && !survey.includes("release cut --name"));
+assert("a survey inside a redraft stops before the cut", survey.includes("stop before the cut") && !survey.includes("ledger cut --name"));
 assert("…and knows where the archive is", survey.includes(".ledger/archive/v1"));
 assert("an unfinished redraft makes `ledger build` say what's left",
   run(["build", "--md"], { cwd: rd }).includes("Unfinished redraft") );
@@ -572,27 +652,27 @@ assert("`ledger redraft check --prompt-only` prints just the prompt",
 assert("the check pairs old entries with new ones, and flags what has none",
   check.includes(RULE) && /kept\s+→ kept/.test(check) && /lost\s+→ \(none found\)/.test(check));
 assert("the cut refuses until the redraft is checked",
-  run(["release", "cut", "--name", "Reorganized"], { cwd: rd, expect: "fail" }).includes("ledger redraft check"));
+  run(["cut", "--name", "Reorganized", "--no-pdf"], { cwd: rd, expect: "fail" }).includes("ledger redraft check"));
 run(["redraft", "complete", "--note", "Exports are part of Kept."], { cwd: rd });
 assert("…which is recorded in redrafts.json", rjson("redrafts.json").redrafts[0].reconciled !== null);
 assert("…and bare `ledger redraft` says it's complete", run(["redraft"], { cwd: rd }).includes("is complete"));
 assert("…and the warning goes quiet", !run(["build", "--md"], { cwd: rd }).includes("Unfinished redraft"));
 run(["build", "--pdf", "--html", "--version", "2"], { cwd: rd });
-const reorganized = fs.readFileSync(path.join(rd, "docs/client/Redrafted-Feature-Ledger_2.html"), "utf8");
+const reorganized = fs.readFileSync(path.join(rd, "docs/generated/Redrafted-Feature-Ledger_2-draft.html"), "utf8");
 assert("the first edition after a redraft says it is reorganized, with the note",
   reorganized.includes("This edition is reorganized") && reorganized.includes("Exports are part of Kept."));
 assert("…and marks nothing as new", !reorganized.includes("class=\"tag tag-new\""));
 run(["build", "--pdf", "--html", "--version", "1"], { cwd: rd });
 assert("an archived edition still prints, from its archive",
   fs.readFileSync(path.join(rd, "docs/client/Redrafted-Feature-Ledger_1.html"), "utf8").includes("Quiet export"));
-run(["release", "amend", "1", "--commit", rgit("rev-parse", "HEAD").stdout.trim()], { cwd: rd, expect: "fail" });
-run(["release", "cut", "--name", "Reorganized", "--date", "2026-04-01"], { cwd: rd });
+run(["releases", "amend", "1", "--commit", rgit("rev-parse", "HEAD").stdout.trim()], { cwd: rd, expect: "fail" });
+run(["cut", "--name", "Reorganized", "--date", "2026-04-01", "--no-pdf"], { cwd: rd });
 assert("the timeline lists the archived release where it came from",
-  run(["release", "list"], { cwd: rd }).includes("archived in .ledger/archive/v1/"));
+  run(["releases"], { cwd: rd }).includes("archived in .ledger/archive/v1/"));
 run(["add", "later"], { cwd: rd, stdin: feature({ audience: "user", size: "Small", name: "Later", description: "Does a later thing." }) });
 run(["review", "complete"], { cwd: rd });
 run(["build", "--pdf", "--html", "--version", "3"], { cwd: rd });
-const after = fs.readFileSync(path.join(rd, "docs/client/Redrafted-Feature-Ledger_3.html"), "utf8");
+const after = fs.readFileSync(path.join(rd, "docs/generated/Redrafted-Feature-Ledger_3-draft.html"), "utf8");
 assert("from the next edition, changes are marked again",
   after.includes("class=\"tag tag-new\"") && !after.includes("This edition is reorganized"));
 fs.rmSync(rd, { recursive: true, force: true });

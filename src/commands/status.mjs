@@ -9,6 +9,10 @@ import { unauditedReport, unauditedSince, unconfirmedReasons } from "./audit.mjs
 import { unreviewedReport, unreviewedLine } from "./review.mjs";
 import { shortSha } from "../git.mjs";
 import { redraftReport, redraftSteps, rangeLabel } from "./redraft.mjs";
+import { cutChecks, renderChecks } from "./release.mjs";
+import { findLedgerDir } from "../store.mjs";
+import { UserError } from "../util.mjs";
+import { color } from "../ui.mjs";
 
 const out = (s) => process.stdout.write(`${s}\n`);
 const field = (k, v) => out(`  ${k.padEnd(11)} ${v}`);
@@ -39,11 +43,13 @@ export async function cmdStatus({ flags }) {
   const audit = auditReport(project);
   const review = unreviewedReport(project);
   const redraft = redraftReport(project);
+  const checks = project.releases.current.future ? cutChecks(project) : [];
 
   if (flags.json) {
     const setup = setupReport(project);
     setup.browser = await browserLine();
-    out(JSON.stringify({ ...release, corpus, audit, review, redraft, setup, warnings }, null, 2));
+    const ready = checks.map(({ id, ok, line, fix }) => ({ id, ok, line, fix }));
+    out(JSON.stringify({ ...release, corpus, audit, review, redraft, checks: ready, setup, warnings }, null, 2));
     return;
   }
 
@@ -71,13 +77,19 @@ export async function cmdStatus({ flags }) {
     out(`  reviewed    ${reviewLine(review)}`);
   }
 
+  if (checks.length) {
+    out("");
+    out(`Ready to cut?  ${checks.every((ch) => ch.ok) ? "yes — `ledger cut --name \"…\"`" : "not yet"}`);
+    out(renderChecks(checks));
+  }
+
   out("");
   out("Corpus");
   field("features", `${corpus.features} (${corpus.user} client-facing, ${corpus.dev} team-only)`);
   field("areas", corpus.areas === 0
     ? "none yet — the first feature opens one"
     : `${corpus.areas}${corpus.largest ? `, largest is “${corpus.largest.category}” with ${corpus.largest.count}` : ""}`);
-  field("releases", `${corpus.releases}, \`ledger build\` prints the v${corpus.prints} edition`);
+  field("releases", `${corpus.releases} (\`ledger releases\` lists them)`);
   field("audited", audit.line);
   if (audit.full_line) field("full sweep", audit.full_line);
   const lastRedraft = project.redrafts[project.redrafts.length - 1];
@@ -276,18 +288,18 @@ function collectWarnings(project) {
 
   const redraft = redraftReport(project);
   if (!redraft.ok) {
-    warnings.push(`unfinished redraft: ${redraft.line}. \`ledger release cut\` refuses until it's finished:\n${redraftSteps(redraft)}`);
+    warnings.push(`unfinished redraft: ${redraft.line}. \`ledger cut\` refuses until it's finished:\n${redraftSteps(redraft)}`);
   }
 
   // Work landing since the last audit is not a warning: the audit is periodic,
   // so that is the normal state between sweeps. The "audited" line above says
-  // how much has landed, and `release cut` is where it gates.
+  // how much has landed, and `ledger cut` is where it gates.
 
   // Only once the edition has something to be compared with; a first edition
   // prints nothing as new or changed.
   const unreviewed = unreviewedReport(project);
   if (!unreviewed.ok) {
-    warnings.push(`${unreviewedLine(unreviewed)}. \`ledger review\` prints the brief; \`ledger release cut\` refuses until then.`);
+    warnings.push(`${unreviewedLine(unreviewed)}. \`ledger review\` prints the brief; \`ledger cut\` refuses until then.`);
   }
 
   // A "What changed" note on something the client has never seen describes a
@@ -324,4 +336,51 @@ function collectWarnings(project) {
   }
 
   return warnings;
+}
+
+/**
+ * Bare `ledger`, inside a project: where things stand and the one command to
+ * run next, in a few lines. Outside one, the help.
+ *
+ * The next step is picked in the order the cut checks run, so following it
+ * repeatedly walks a release from open to cut without having to know the
+ * workflow — the same thing a person who does know it would do.
+ */
+export async function cmdOverview({ flags, help }) {
+  let project;
+  try {
+    findLedgerDir(process.cwd(), flags.dir ?? null);
+    project = openProject(flags);
+  } catch (e) {
+    if (!(e instanceof UserError)) throw e;
+    process.stdout.write(help);
+    if (!/no \.ledger\/ found/.test(e.message)) process.stderr.write(`\nerror: ${e.message}\n`);
+    return;
+  }
+  const c = color();
+  const rel = project.releases.current;
+  const release = releaseReport(project);
+  const counts = [["added", release.added.length], ["changed", release.changed.length],
+    ["removed", release.removed.length], ["product-wide notes", release.other_changes]]
+    .filter(([, n]) => n).map(([k, n]) => `${n} ${k}`).join(", ");
+
+  if (!rel.future) {
+    out(`${project.config.product} · v${rel.version} is cut (${rel.date}), and nothing is open.`);
+    return;
+  }
+  out(`${c.bold(project.config.product)} · v${rel.version} open — ${counts || "nothing recorded yet"}`);
+  out("");
+  const checks = cutChecks(project);
+  out("Ready to cut?");
+  out(renderChecks(checks));
+  out("");
+
+  const open = checks.find((ch) => !ch.ok);
+  let next;
+  if (!open) next = 'ledger cut --name "…"      (prints the edition; `ledger preview` shows the draft first)';
+  else if (open.id === "redraft") next = redraftReport(project).steps[0];
+  else if (open.id === "content") next = "record work as it lands: `ledger add` / `ledger update` (an agent that read the stanza does this itself)";
+  else next = open.fix;
+  out(`Next: ${next}`);
+  out(c.dim("`ledger status` has the full picture · `ledger help` lists every command"));
 }

@@ -1,19 +1,58 @@
 import fs from "node:fs";
 import path from "node:path";
 
+/**
+ * Exit codes, distinct so a script or an agent can tell "you typed it wrong"
+ * from "it ran and something is wrong" from "it ran, and a check said no".
+ * The last one is what a refused `ledger cut` returns: nothing is broken, the
+ * release just isn't ready, and a wrapper may well want to act on that.
+ */
+export const EXIT = { error: 1, usage: 2, refused: 3 };
+
 // Anything thrown with this is a message for the person (or agent) running
 // the command, not a bug — bin/ledger.mjs prints it without a stack.
+// `raw` messages are already laid out for the terminal (a checklist, say) and
+// print as they are, without the "error:" prefix.
 export class UserError extends Error {
-  constructor(message, exitCode = 1) {
+  constructor(message, exitCode = EXIT.error, { raw = false } = {}) {
     super(message);
     this.name = "UserError";
     this.exitCode = exitCode;
+    this.raw = raw;
   }
 }
 
+// A message that opens with "usage:" is a mistake in the command line, and
+// exits as one, wherever it was raised.
 export const fail = (msg) => {
-  throw new UserError(msg);
+  throw new UserError(msg, String(msg).startsWith("usage:") ? EXIT.usage : EXIT.error);
 };
+
+export const usage = (msg) => {
+  throw new UserError(msg, EXIT.usage);
+};
+
+/** Closest of `candidates` to `word`, within two edits, or null. */
+export function nearest(word, candidates) {
+  let best = null;
+  for (const c of candidates) {
+    const d = editDistance(String(word), c);
+    if (d <= 2 && (!best || d < best.d)) best = { c, d };
+  }
+  return best?.c ?? null;
+}
+
+export function editDistance(a, b) {
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const row = [i];
+    for (let j = 1; j <= b.length; j++) {
+      row[j] = Math.min(prev[j] + 1, row[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    prev = row;
+  }
+  return prev[b.length];
+}
 
 /**
  * The line every printed brief puts between the part addressed to the person
@@ -24,6 +63,14 @@ export const fail = (msg) => {
  * boundary three different ways teach them to look for three different things.
  */
 export const COPY_RULE = "═════════════════════  COPY EVERYTHING BELOW THIS LINE  ═════════════════════";
+
+/** Printed just above the rule, so the way round the copying is in the one
+ *  place people look when they are about to do it. */
+export const DELIVERY_HINT = "Or skip the copying: add --copy to put the prompt on the clipboard, or\n" +
+  "--run claude (or codex, gemini) to hand it straight to an agent and wait for it.";
+
+/** The rule with the hint above it, as every brief prints it. */
+export const COPY_BLOCK = `${DELIVERY_HINT}\n\n${COPY_RULE}`;
 
 export function readJson(file) {
   let raw;

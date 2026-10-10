@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { openProject, Project, ARCHIVE_DIRNAME, ARCHIVED_MARKER } from "../store.mjs";
 import { ReleaseSet } from "../model/release-set.mjs";
-import { fail, readJson, writeJson, exists, today, longDate, COPY_RULE } from "../util.mjs";
+import { fail, readJson, writeJson, exists, today, longDate, COPY_BLOCK } from "../util.mjs";
 import * as git from "../git.mjs";
 
 const out = (s) => process.stdout.write(`${s}\n`);
@@ -33,7 +33,7 @@ const out = (s) => process.stdout.write(`${s}\n`);
  * Bare `ledger redraft` says where a redraft stands and what comes next, so
  * it is always safe to run.
  *
- * Until the stamp is there, `ledger build` warns and `ledger release cut`
+ * Until the stamp is there, `ledger build` warns and `ledger cut`
  * refuses: a redrafted edition nobody has checked against the old one can
  * quietly drop something the client was told.
  */
@@ -83,7 +83,7 @@ export function rangeLabel(versions) {
  * Whether a redraft is waiting to be checked against the corpus it replaced,
  * and what to do about it. `ok` when there is none.
  *
- * `steps` is the one list `ledger build`, `ledger release cut` and
+ * `steps` is the one list `ledger build`, `ledger cut` and
  * `ledger status` all print, so they can't drift apart in what they ask for.
  */
 export function redraftReport(project) {
@@ -147,7 +147,7 @@ function start(flags) {
       + project.featureSet.otherChanges({ version: open }).length;
     fail(`v${open} already has ${n} entr${n === 1 ? "y" : "ies"} recorded that the client hasn't seen. The first ` +
       "edition after a redraft marks nothing as new or changed, so those would reach the client unannounced. Cut " +
-      `v${open} first (\`ledger release cut\`), so it gets an edition that highlights them, then redraft. Pass ` +
+      `v${open} first (\`ledger cut\`), so it gets an edition that highlights them, then redraft. Pass ` +
       "--force to fold them into the redraft unmarked.");
   }
 
@@ -237,7 +237,7 @@ function start(flags) {
   out("Next:");
   out(redraftSteps(redraftReport(openProject(flags))));
   out("");
-  out(`Then as usual: \`ledger release cut\` and \`ledger build\`. The v${opens} edition prints as an inventory, with a note ` +
+  out(`Then as usual: \`ledger cut\` and \`ledger build\`. The v${opens} edition prints as an inventory, with a note ` +
     "telling the client the ledger was reorganized.");
 }
 
@@ -278,7 +278,7 @@ function complete(flags) {
   project.saveRedrafts();
   out(`recorded the redraft as complete: the v${redraft.opens} corpus has been checked against ${rangeLabel(redraft.versions)}`);
   if (redraft.note) out(`the v${redraft.opens} edition will tell the client: ${redraft.note}`);
-  out("Commit the result. `ledger release cut` and `ledger build` work as usual from here.");
+  out("Commit the result. `ledger cut` and `ledger build` work as usual from here.");
 }
 
 /* ---- matching ---------------------------------------------------------- */
@@ -384,7 +384,7 @@ function brief(flags) {
   out("the redraft complete, and ends by listing what it couldn't settle without you.");
   out("Commit its edits when it's done.");
   out("");
-  out(COPY_RULE);
+  out(COPY_BLOCK);
   out("");
 
   /* ---- the part for the agent ---- */
@@ -499,7 +499,7 @@ function brief(flags) {
   p("  leave must be something a reader could confirm by using the product.");
   p(`- Every entry stays at ${N}, with "changes" set to null. Don't run \`ledger update\``);
   p("  or `ledger remove`, and don't touch releases.json, redrafts.json or the archive.");
-  p("- Don't run `ledger build` or `ledger release cut`.");
+  p("- Don't run `ledger build` or `ledger cut`.");
   p("");
   p("## The note for the client");
   p("");

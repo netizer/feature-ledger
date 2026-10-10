@@ -65,7 +65,7 @@ description has two or three sentences to work with, which is room for a
 capability *and* the guardrail that makes it trustworthy — without that
 guardrail becoming its own line in the contents. Everything else that still
 deserves recording has a home: `dev_notes` for the team's detail, `dev`
-features for internal capabilities, `ledger other-change` for a tweak that
+features for internal capabilities, `ledger note` for a tweak that
 spans the product.
 
 ## Naming an entry
@@ -240,7 +240,7 @@ or, if it belongs to no single feature (a colour-semantics change, a wording
 pass across many screens), use:
 
 ```
-ledger other-change --audience user --description "…"
+ledger note --audience user --description "…"
 ```
 
 That's exactly what it's for, so one global tweak doesn't force a `changes`
@@ -397,7 +397,7 @@ has grown big enough that its features would otherwise read as a wall. Declare
 one, then file features into it:
 
 ```
-ledger subcategory add <<'JSON'
+ledger subcategories add <<'JSON'
 { "id": "daily-calendar", "category": "Bookings", "name": "Daily calendar",
   "intro": "One or two sentences saying what this whole area is." }
 JSON
@@ -482,12 +482,14 @@ All work records against the open (in-progress) release. When a release is
 actually presented to the client:
 
 ```
-ledger release cut --name "Client demo" --date 2026-08-21
-ledger build
+ledger cut --name "Client demo" --date 2026-08-21
 ```
 
-That mints the archival PDF edition for what was just shown, and opens the
-next release for the work that follows. The PDF for an old release always
+That prints the archival PDF edition for what was just shown, and opens the
+next release for the work that follows. Before it writes anything, the cut runs
+every check (`redraft`, `audit`, `content`, `review`, `moment`), and when any
+is open it refuses and lists them all, each with the command that fixes it.
+`ledger status`, or bare `ledger`, shows the same list without trying to cut. The PDF for an old release always
 reproduces what was presented at that moment, however long ago.
 
 A cut also records the commit it happened at. The date is too coarse to name
@@ -496,11 +498,11 @@ cut this morning is not the one cut this afternoon — so the commit is what
 says which state of the product an edition was printed from. Two releases can
 share a date freely; what's refused is one that shares a date *and* a commit
 with the release before it, because then there is nothing to tell the two
-editions apart. `--force` covers a deliberate re-issue, and `--commit <sha>`
+editions apart. `--skip moment` covers a deliberate re-issue, and `--commit <sha>`
 cuts a release retrospectively at a known point.
 
-`ledger release list` prints the timeline with each release's commit, and
-`ledger release amend <version> --commit <sha>` fills one in on a release that
+`ledger releases` prints the timeline with each release's commit, and
+`ledger releases amend <version> --commit <sha>` fills one in on a release that
 was cut before commits were recorded. The release in progress never has one:
 it gets its commit when the cut turns it into a real moment.
 
@@ -526,8 +528,8 @@ The commit is stamped by the command, never written into the JSON by hand: it
 is the one field that makes a gap permanently invisible if it's set without the
 work being done.
 
-`ledger release cut` refuses when source has landed since the last audit and
-says how much; `--force` overrides it.
+`ledger cut` refuses when source has landed since the last audit and
+says how much; `--skip audit` overrides it.
 
 ## Reviewing a release
 
@@ -545,19 +547,22 @@ numbers and cross-references agree across the release. All of it is a
 hand-edit of the words: it never changes what the ledger says the product
 does, and never invents a reason.
 
-`ledger release cut` refuses when a client-facing entry of the open release has
+`ledger cut` refuses when a client-facing entry of the open release has
 changed since its last review, and names it. `ledger review complete` covers an
-edit you've read yourself, and `--force` overrides the check. A first edition
+edit you've read yourself, and `--skip review` overrides the check. A first edition
 isn't checked, because there's nothing to compare it with.
 
 ## Generating
 
-`ledger build` writes the three Markdown docs and the PDF edition. They're
-build output and are gitignored — **the corpus under `.ledger/` is the thing
-that's committed**, and it carries the documentation's git history on its own.
+`ledger build` writes the three Markdown docs, any cut edition whose PDF isn't
+on disk yet, and a draft of the open release. The draft is named `…_N-draft.pdf`
+and goes in the docs directory, never next to the client editions. `ledger
+preview` prints the draft alone. All of it is build output — **the corpus under
+`.ledger/` is the thing that's committed**, and it carries the documentation's
+git history on its own.
 
 Don't regenerate as part of an ordinary change. Generation is run by hand,
-occasionally, by whoever needs a fresh copy — and always when cutting a
-release.
+occasionally, by whoever needs a fresh copy. The client edition of a release
+is printed by `ledger cut` itself.
 
 Before you finish: `ledger status`.

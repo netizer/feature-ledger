@@ -130,7 +130,7 @@ export async function cmdAdd({ flags, positional }) {
   }
   if (data.subcategory) {
     const sub = project.subcategories.find((s) => s.id === data.subcategory);
-    if (!sub) fail(`unknown sub-section ${JSON.stringify(data.subcategory)} — declare it with \`ledger subcategory add\``);
+    if (!sub) fail(`unknown sub-section ${JSON.stringify(data.subcategory)} — declare it with \`ledger subcategories add\``);
     if (sub.category !== data.category) {
       fail(`sub-section ${sub.id} lives under ${JSON.stringify(sub.category)}, not ${JSON.stringify(data.category)}`);
     }
@@ -326,7 +326,7 @@ export async function cmdOtherChange({ flags }) {
   }
   project.otherChangesList.push(entry);
   project.saveOtherChanges();
-  out(`recorded an other-change at v${version}`);
+  out(`recorded a product-wide note at v${version}`);
 }
 
 export async function cmdCategories({ flags, positional }) {
@@ -453,12 +453,12 @@ export async function cmdSubcategory({ flags, positional }) {
   }
   if (sub === "reword") {
     fail(
-      "`ledger subcategory reword` is now a hand-edit: change \"name\" or \"intro\" in " +
+      "`ledger subcategories reword` is now a hand-edit: change \"name\" or \"intro\" in " +
       ".ledger/subcategories.json. A heading and its overview are client-facing prose like any entry, " +
       "and rewording them records nothing against the release either way. `ledger status` checks the file.",
     );
   }
-  if (sub !== "add") fail("usage: ledger subcategory [list | add]  (add takes JSON on stdin; the wording of an existing one is edited in .ledger/subcategories.json)");
+  if (sub !== "add") fail("usage: ledger subcategories [list | add]  (add takes JSON on stdin; the wording of an existing one is edited in .ledger/subcategories.json)");
 
   const data = await payload(flags, { allow: ["id", "category", "name", "intro"] });
   if (flags.id) data.id = flags.id;

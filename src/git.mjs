@@ -112,7 +112,7 @@ export function tracked(root) {
 /**
  * Paths that say nothing about whether the product moved: the corpus itself,
  * and the documents generated from it. A commit that only writes the ledger is
- * not unaudited product work, and counting it would make the `release cut`
+ * not unaudited product work, and counting it would make the `ledger cut`
  * gate fire on the audit's own commit.
  */
 export function isLedgerPath(config, p) {

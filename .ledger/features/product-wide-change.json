@@ -10,6 +10,14 @@
       "description": "The command ledger other-change records something that runs across the whole product, such as a wording pass over many screens or a change in what a colour means. It prints once at the end of the edition, under the heading Also since last time, instead of forcing the same note onto a dozen unrelated entries.",
       "changes": null,
       "dev_notes": "src/commands/write.mjs cmdOtherChange, stored in .ledger/other-changes.json with a version and an audience."
+    },
+    {
+      "version": 2,
+      "description": "The command ledger note records something that runs across the whole product, such as a wording pass over many screens or a change in what a colour means. It prints once at the end of the edition, under the heading Also since last time, instead of forcing the same note onto a dozen unrelated entries.",
+      "changes": [
+        "The command was ledger other-change. It is now ledger note, which names what it records; the old name still works and says what it is called now."
+      ],
+      "dev_notes": "src/commands/write.mjs cmdOtherChange, stored in .ledger/other-changes.json with a version and an audience. `ledger other-change` is an alias in src/cli.mjs."
     }
   ]
 }

@@ -1,4 +1,8 @@
-import { parseArgs, fail, COPY_RULE } from "./util.mjs";
+import { parseArgs, fail, usage, nearest } from "./util.mjs";
+import { openProject, findLedgerDir } from "./store.mjs";
+import { taskFor, deliver, deliveryMode, PROMPT_COMMANDS } from "./prompt.mjs";
+import { AGENTS } from "./agents/index.mjs";
+import { STYLES, CUSTOM_STYLE_ID } from "./style.mjs";
 import * as init from "./commands/init.mjs";
 import * as read from "./commands/read.mjs";
 import * as write from "./commands/write.mjs";
@@ -24,17 +28,40 @@ const COMMANDS = {
   add: write.cmdAdd,
   update: write.cmdUpdate,
   remove: write.cmdRemove,
-  "other-change": write.cmdOtherChange,
+  note: write.cmdOtherChange,
   categories: write.cmdCategories,
-  subcategory: write.cmdSubcategory,
+  subcategories: write.cmdSubcategory,
 
-  release: release.cmdRelease,
+  cut: release.cmdCut,
+  releases: release.cmdReleases,
   audit: audit.cmdAudit,
   review: review.cmdReview,
   redraft: redraft.cmdRedraft,
 
   build: build.cmdBuild,
+  preview: build.cmdPreview,
+  completion: cmdCompletion,
 };
+
+/**
+ * Names that changed, and what they became. The old form keeps working and
+ * says once, on stderr, what it is called now — so a script or an agent
+ * stanza written against the old name doesn't break, and the person running
+ * it learns the new one.
+ *
+ * `release cut` became `cut` because cutting is the verb people reach for,
+ * and the nesting only ever made them type it twice. `other-change` became
+ * `note` because that is what it records. `subcategory` became
+ * `subcategories` to match `categories`.
+ */
+const ALIASES = [
+  { from: ["release", "cut"], to: ["cut"] },
+  { from: ["release", "amend"], to: ["releases", "amend"] },
+  { from: ["release", "list"], to: ["releases"] },
+  { from: ["release"], to: ["releases"] },
+  { from: ["other-change"], to: ["note"] },
+  { from: ["subcategory"], to: ["subcategories"] },
+];
 
 /** Commands that used to exist. `check` (is the corpus sound?), `doctor` (is
  *  the setup sound?) and `status` (what has this release collected?) were
@@ -65,110 +92,103 @@ titles in config.json. \`ledger rules\` has the section on editing by hand.`,
                                    document footnotes the old name on its own, as it always did.`,
 };
 
-const HELP = `ledger — a versioned feature ledger for any codebase
+const DELIVERY_HELP = `  Delivering a prompt (bootstrap, audit, review, redraft check, style rewrite)
+    (default)        an explanation for you, then the prompt to paste into a fresh agent session
+    --print          the prompt alone, ready to pipe: \`ledger review --print | pbcopy\`
+    --copy           the prompt, straight onto the clipboard
+    --run AGENT      hand it to ${Object.keys(AGENTS).join(", ")} — or to "any command" that reads the prompt on
+                     stdin — wait, check what it recorded, and print how to resume its session.
+                     Only ever when you pass it. A bare --run uses $LEDGER_AGENT, or "agent"
+                     in .ledger/config.json`;
 
-  Reading (cheap; don't read the corpus by hand — it's big)
+const HELP = `ledger — a client-facing record of what your product does, kept in the repo
+
+  Where you are
+    ledger                              what's open, whether it's ready to cut, the next command
+    ledger status [--json] [--quiet]    the release, the corpus and the setup, all checked
+
+  Reading (cheap; don't read .ledger/ by hand — it's big)
     ledger list [--category C] [--audience user|dev] [--size S] [--changed] [--json]
     ledger show <id> [--history] [--json]
-    ledger status [--json] [--quiet]    the release, the corpus and the setup, checked
     ledger rules                        the authoring rules, in full
     ledger style [show|list|set <id>]   the tone every entry is written in
-    ledger style rewrite                the procedure for moving an existing ledger to it
     ledger export [--out FILE]          the whole corpus as one JSON document
 
-  Writing (payload as JSON on stdin, or --file f.json; add --dry-run to preview)
+  Recording (payload as JSON on stdin, or --file f.json; add --dry-run to preview)
     ledger add <id>                     { audience, size, name, description, category?, dev_notes? }
     ledger update <id>                  { description, changes[], name?, size?, dev_notes?, add_changes[]? }
                                         (--name here is a rename the client is told about)
     ledger remove <id> --reason "..."
-    ledger other-change --audience user --description "..."
+    ledger note --audience user --description "..."
+                                        a change that belongs to no single feature
     ledger categories [list | add "Name" [--after "Other"] | rename "Old" "New" | remove "Name"]
-    ledger subcategory [list | add]     { id, category, name, intro }
-    ledger add/update/remove --backfilled            the product did not move this cycle,
+    ledger subcategories [list | add]   { id, category, name, intro }
+    ledger add/update/remove --backfilled            the product didn't move this cycle,
                                                      the record did — see \`ledger audit\`
 
-  Releases
-    ledger release list
-    ledger release cut --name "..." [--date YYYY-MM-DD] [--commit SHA] [--force]
-    ledger release amend <version> --commit SHA     fill in the commit on a release
-                                                    cut before commits were recorded
-                                        records the commit it was cut at, so two
-                                        editions on one day stay tellable apart
+  Releasing
+    ledger cut --name "..." [--date YYYY-MM-DD] [--commit SHA] [--skip CHECKS] [--no-pdf] [--run AGENT]
+                                        runs every check, prints the edition into the client
+                                        directory, and opens the next release. A refusal lists
+                                        every open check; --skip audit,review passes named ones.
+                                        --run hands an open audit or review to an agent first,
+                                        then asks before cutting (--yes doesn't ask)
+    ledger preview [--open]             the open release as a draft PDF, never in the client directory
+    ledger build [v3 | all | draft] [--md] [--pdf] [--out DIR] [--html]
+                                        the Markdown docs, every cut edition not yet printed, and
+                                        the draft of the open release; or just the one named
+    ledger releases                     the timeline: every version, its date and its commit
+    ledger releases amend <version> --commit SHA
+                                        fill in the commit on a release cut before they were recorded
 
-  Auditing (the periodic sweep of the codebase against the record)
-    ledger audit [--full] [--since <sha>]     print the audit brief for a coding agent
-    ledger audit complete [--commit <sha>]    stamp the audited commit (default: HEAD)
-    ledger audit confirm <id>                 vouch for a reason an audit inferred
-    ledger audit log [--json]                 every audit so far
+  Agent tasks (each prints a prompt for a coding agent; delivery options below)
+    ledger bootstrap [--no-audit]       survey the codebase and write the baseline
+    ledger audit [--full] [--since SHA] find what shipped without the ledger hearing about it
+    ledger audit complete [--commit SHA]    stamp the audited commit (default: HEAD)
+    ledger audit confirm <id>           vouch for a reason an audit inferred
+    ledger audit log [--json]           every audit so far
+    ledger review                       read the release as the client will, before the cut
+    ledger review complete              stamp what was reviewed
+    ledger style rewrite                bring every entry into the project's tone
 
-  Reviewing (reading the release as the client will, before it's cut)
-    ledger review                             print the review brief for a coding agent
-    ledger review complete                    stamp what was reviewed; \`release cut\` refuses
-                                              an edition changed since its last review
-
-  Redrafting (starting the corpus again from scratch, keeping the client's record)
-    ledger redraft start [--force]            archive the corpus in .ledger/archive/, open the next
-                                              version on an empty one; numbering carries on
-    ledger redraft check                      print the brief: check the new corpus against the old
-    ledger redraft complete [--note "..."]    stamp the check; until then \`build\` warns and
-                                              \`release cut\` refuses
-    ledger redraft                            where the redraft stands, and the next step
-
-  Output
-    ledger build [--md] [--pdf] [--version N|all] [--out DIR]
-                                        an archived version prints from its archive
+  Redrafting (writing the corpus again from scratch, keeping the client's record)
+    ledger redraft                      where a redraft stands, and the next step
+    ledger redraft start [--force]      archive the corpus in .ledger/archive/, open the next version empty
+    ledger redraft check                agent task: check the new corpus against the old one
+    ledger redraft complete [--note "..."]  stamp the check, with the note the client reads
 
   Setup
     ledger init [--product "Name"] [--accent "#hex"] [--logo path] [--agents auto|none|claude,agents,...]
                 [--style google|govuk|plain-language|ste] [--commit-pdfs]
-    ledger bootstrap [--no-audit]       prints the baseline-survey prompt for your coding agent
-                                        (the survey is a full sweep, so the prompt ends by
-                                        recording one; --no-audit leaves that out)
+    ledger completion zsh|bash|fish     shell completion; the script says how to load it
 
   Editing the words (no command — the corpus is yours to edit)
     .ledger/features/<id>.json          a name, a description, dev notes, the text of a change
                                         bullet. Edit in place, then run \`ledger status\`.
     .ledger/subcategories.json          sub-section headings and their overviews
     .ledger/config.json                 product name, tagline, document titles
-                                        (an area's name: \`ledger categories rename\`)
     .ledger/other-changes.json          the product-wide notes
-                                        Adding, dropping or re-dating a history *entry* stays with
-                                        the CLI. \`ledger rules\` draws the line.
 
-  Global: --dir PATH (point at a .ledger directory), --json where offered.
-          --prompt-only on a command that prints a prompt for a coding agent (bootstrap,
-          style rewrite, audit, review, redraft check): the prompt alone, ready to pipe,
-          e.g. \`ledger review --prompt-only | pbcopy\`.
-          --help (or -h) after any command: its lines of this help, and nothing run.
-          An option the command doesn't take is an error, and nothing is run.
-  Full docs: the README in this package, or \`ledger rules\`.
+${DELIVERY_HELP}
+
+  Global: --dir PATH (point at a .ledger directory), --json where offered, --help after any
+          command. An option a command doesn't take is an error, and nothing is run.
+  Exit codes: 0 done · 1 error · 2 a mistake in the command line · 3 a check said no
+  Guides: the docs/ directory of this package, starting from its README.
 `;
-
-/**
- * Which commands print a prompt for a coding agent, by subcommand (undefined
- * is the bare command). Each prints an explanation for the person first, then
- * COPY_RULE, then the prompt, so `--prompt-only` is one mechanism for all of
- * them rather than a flag each command has to remember to honour.
- */
-const PROMPT_COMMANDS = {
-  bootstrap: [undefined],
-  style: ["rewrite"],
-  audit: [undefined, "brief"],
-  review: [undefined, "brief"],
-  redraft: ["check"],
-};
 
 /**
  * The options each command reads, by subcommand where it has them (the key a
  * bare command dispatches to is its default). Anything else is refused before
- * the command runs: `--dryrun` on `release cut` must not cut a release, and
+ * the command runs: `--dryrun` on `cut` must not cut a release, and
  * `--catgory` on `list` must not quietly list everything.
  *
- * `--dir` is taken everywhere, and `--prompt-only` has its own check below.
- * A subcommand missing from its table is left to the command, which refuses
- * it with its usage line.
+ * `--dir` is taken everywhere, and the delivery options wherever a command
+ * prints a prompt. A subcommand missing from its table is left to the
+ * command, which refuses it with its usage line.
  */
-const GLOBAL_FLAGS = ["dir", "prompt-only"];
+const GLOBAL_FLAGS = ["dir"];
+const DELIVERY_FLAGS = ["print", "prompt-only", "copy", "run"];
 const FLAGS = {
   init: ["root", "product", "tagline", "prepared-for", "logo", "accent", "agents", "style", "commit-pdfs", "force", "gitignore"],
   bootstrap: ["audit"],
@@ -184,20 +204,29 @@ const FLAGS = {
   update: ["file", "description", "change", "add-change", "name", "size", "category", "subcategory", "dev-notes",
     "backfilled", "reason-inferred", "dry-run"],
   remove: ["reason", "backfilled", "reason-inferred", "dry-run"],
-  "other-change": ["file", "audience", "description", "dry-run"],
+  note: ["file", "audience", "description", "dry-run"],
   categories: { default: "list", list: [], add: ["after", "before", "dry-run"], rename: ["dry-run"], remove: ["dry-run"] },
-  subcategory: { default: "list", list: [], add: ["file", "id", "category", "name", "intro", "dry-run"] },
+  subcategories: { default: "list", list: [], add: ["file", "id", "category", "name", "intro", "dry-run"] },
 
-  release: { default: "list", list: [], cut: ["name", "date", "commit", "force", "dry-run"], amend: ["commit", "force", "dry-run"] },
+  cut: ["name", "date", "commit", "skip", "force", "pdf", "html", "out", "run", "yes", "dry-run"],
+  releases: { default: "list", list: [], amend: ["commit", "force", "dry-run"] },
   audit: { default: "brief", brief: ["full", "since"], complete: ["commit", "full", "since", "dry-run"],
     confirm: ["version", "dry-run"], log: ["json"] },
   review: { default: "brief", brief: [], complete: ["dry-run"] },
   redraft: { default: "status", status: [], start: ["force", "dry-run"], check: [], complete: ["note", "dry-run"] },
 
   build: ["md", "pdf", "version", "out", "html"],
+  preview: ["out", "html", "open"],
+  completion: [],
 };
 
+const NEGATED = ["cut pdf", "bootstrap audit", "init gitignore"];
+
+const BOOLEANS = ["dry-run", "json", "history", "changed", "md", "pdf", "html", "open", "force", "quiet", "commit-pdfs",
+  "backfilled", "reason-inferred", "full", "print", "prompt-only", "copy", "yes"];
+
 function checkFlags(command, flags, positional) {
+  const task = taskFor(command, positional[0]);
   let spec = FLAGS[command];
   let label = `ledger ${command}`;
   if (!Array.isArray(spec)) {
@@ -206,61 +235,22 @@ function checkFlags(command, flags, positional) {
     if (positional[0]) label += ` ${sub}`;
     spec = spec[sub];
   }
-  const unknown = Object.keys(flags).filter((f) => !spec.includes(f) && !GLOBAL_FLAGS.includes(f));
+  const allowed = [...spec, ...GLOBAL_FLAGS, ...(task ? DELIVERY_FLAGS : [])];
+  const unknown = Object.keys(flags).filter((f) => !allowed.includes(f));
   if (!unknown.length) return;
 
+  const delivery = unknown.find((f) => DELIVERY_FLAGS.includes(f));
+  if (delivery && !spec.includes(delivery)) {
+    usage(`--${delivery} is for the commands that print a prompt: ${PROMPT_COMMANDS.join(", ")}`);
+  }
   const lines = unknown.map((f) => {
-    const near = spec.find((s) => editDistance(s, f) <= 2);
+    const near = nearest(f, allowed);
     return `unknown option --${f} for \`${label}\`${near ? ` — did you mean --${near}?` : ""}`;
   });
-  const takes = spec.length ? `it takes ${spec.map((s) => `--${s}`).join(", ")}` : "it takes no options";
-  fail(`${lines.join("\n")}\n  (${takes}; nothing was run — \`${label} --help\` for more)`);
-}
-
-function editDistance(a, b) {
-  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
-  for (let i = 1; i <= a.length; i++) {
-    const row = [i];
-    for (let j = 1; j <= b.length; j++) {
-      row[j] = Math.min(prev[j] + 1, row[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
-    }
-    prev = row;
-  }
-  return prev[b.length];
-}
-
-/**
- * Runs a prompt command with stdout held back, then prints only what follows
- * the rule. The explanation is for someone reading a terminal, and piping it
- * into a clipboard would put it in front of the agent. Its warnings (the lines
- * that start with "!") still matter to the person, so they go to stderr, which
- * a pipe leaves on screen.
- */
-async function promptOnly(run) {
-  const chunks = [];
-  const write = process.stdout.write;
-  process.stdout.write = (chunk, ...rest) => {
-    chunks.push(String(chunk));
-    const cb = rest.find((x) => typeof x === "function");
-    if (cb) cb();
-    return true;
-  };
-  try {
-    await run();
-  } finally {
-    process.stdout.write = write;
-  }
-  const text = chunks.join("");
-  const at = text.indexOf(COPY_RULE);
-  if (at === -1) fail("this command printed no prompt, so there is nothing for --prompt-only to keep");
-
-  let warning = false;
-  for (const line of text.slice(0, at).split("\n")) {
-    if (line.startsWith("!")) warning = true;
-    else if (!line.startsWith("  ")) warning = false;
-    if (warning) process.stderr.write(`${line}\n`);
-  }
-  process.stdout.write(text.slice(at + COPY_RULE.length).replace(/^\s*\n/, ""));
+  // Options that only make sense switched off are shown the way they're typed.
+  const shown = (f) => (NEGATED.includes(`${command} ${f}`) ? `--no-${f}` : `--${f}`);
+  const takes = spec.length ? `it takes ${spec.map(shown).join(", ")}` : "it takes no options";
+  usage(`${lines.join("\n")}\n  (${takes}; nothing was run — \`${label} --help\` for more)`);
 }
 
 /**
@@ -268,7 +258,7 @@ async function promptOnly(run) {
  * by the command name at the start of each, with their continuation lines.
  * Taken from HELP rather than written a second time, so the two can't drift.
  */
-function commandHelp(name) {
+function commandHelp(name, sub) {
   const lines = HELP.split("\n");
   const picked = [];
   let taking = false;
@@ -285,15 +275,35 @@ function commandHelp(name) {
     if (taking) picked.push(line);
   }
   if (!picked.length) return null;
-  return `${picked.join("\n")}\n\n  Global: --dir PATH, --json where offered` +
-    `${PROMPT_COMMANDS[name] ? ", --prompt-only (the prompt alone, ready to pipe)" : ""}.\n` +
+  const prompts = taskFor(name, sub) || ["bootstrap", "audit", "review"].includes(name);
+  return `${picked.join("\n")}\n${prompts ? `\n${DELIVERY_HELP}\n` : ""}\n  Global: --dir PATH, --json where offered.\n` +
     "  `ledger --help` lists every command.\n";
 }
 
+/**
+ * Where a word that isn't a command most likely belongs: a near-miss of a
+ * command, or a subcommand typed without the command it lives under
+ * (`ledger amend` → `ledger releases amend`).
+ */
+const SUBCOMMANDS = {
+  amend: ["releases amend"], complete: ["audit complete", "review complete", "redraft complete"],
+  confirm: ["audit confirm"], log: ["audit log"], start: ["redraft start"], rewrite: ["style rewrite"],
+  draft: ["preview", "build draft"], publish: ["cut"], release: ["cut"], print: ["build"], check: ["status"],
+};
+
+function unknownCommand(word) {
+  const near = nearest(word, [...Object.keys(COMMANDS), "help"]);
+  const homes = SUBCOMMANDS[word];
+  const hint = near ? ` — did you mean \`ledger ${near}\`?`
+    : homes ? ` — did you mean ${homes.map((h) => `\`ledger ${h}\``).join(" or ")}?` : "";
+  usage(`unknown command "${word}"${hint}\n  (\`ledger help\` lists every command)`);
+}
+
 export async function main(argv) {
-  const first = argv[0];
-  if (!first || first === "--help" || first === "-h" || first === "help") {
-    process.stdout.write(HELP);
+  let first = argv[0];
+  if (!first) return status.cmdOverview({ flags: {}, help: HELP });
+  if (first === "--help" || first === "-h" || first === "help") {
+    process.stdout.write((argv[1] && commandHelp(argv[1], argv[2])) || HELP);
     return;
   }
   if (first === "--version" || first === "-v") {
@@ -304,36 +314,123 @@ export async function main(argv) {
     process.stdout.write(`${readJson(path.join(here, "..", "package.json")).version}\n`);
     return;
   }
+  if (first === "__complete") return complete(argv.slice(1));
+
+  for (const alias of ALIASES) {
+    if (alias.from.every((w, i) => argv[i] === w)) {
+      const was = argv.slice(0, alias.from.length).join(" ");
+      argv = [...alias.to, ...argv.slice(alias.from.length)];
+      const now = alias.to.join(" ");
+      process.stderr.write(`note: \`ledger ${was}\` is now \`ledger ${now}\` — the old name still works.\n`);
+      first = argv[0];
+      break;
+    }
+  }
 
   if (RETIRED[first]) fail(`\`ledger ${first}\` is now ${RETIRED[first]}`);
 
   const fn = COMMANDS[first];
-  if (!fn) fail(`unknown command "${first}" — run \`ledger --help\``);
+  if (!fn) unknownCommand(first);
 
   // Before anything is parsed or run: `ledger add --help` must never read a
-  // payload, and `ledger release cut --help` must never cut. Anywhere after
-  // the command counts, so `ledger audit complete --help` is help too.
+  // payload, and `ledger cut --help` must never cut. Anywhere after the
+  // command counts, so `ledger audit complete --help` is help too.
   const rest = argv.slice(1);
   if (rest.some((a) => a === "--help" || a === "-h" || a.startsWith("--help="))) {
-    process.stdout.write(commandHelp(first) ?? HELP);
+    process.stdout.write(commandHelp(first, rest[0]) ?? HELP);
     return;
   }
 
-  const { flags, positional } = parseArgs(rest, {
-    booleans: ["dry-run", "json", "history", "changed", "md", "pdf", "force", "quiet", "commit-pdfs",
-      "backfilled", "reason-inferred", "full", "prompt-only"],
-  });
-  if (flags["prompt-only"]) {
-    if (!PROMPT_COMMANDS[first]?.includes(positional[0])) {
-      const which = Object.entries(PROMPT_COMMANDS)
-        .flatMap(([c, subs]) => subs.filter((x) => x !== "brief").map((x) => `ledger ${c}${x ? ` ${x}` : ""}`));
-      fail(`--prompt-only is for the commands that print a prompt: ${which.join(", ")}`);
-    }
-  }
+  const { flags, positional } = parseArgs(rest, { booleans: BOOLEANS });
   checkFlags(first, flags, positional);
-  if (flags["prompt-only"]) {
-    await promptOnly(() => fn({ flags, positional }));
+
+  const task = taskFor(first, positional[0]);
+  const mode = task ? deliveryMode(flags) : null;
+  if (mode) {
+    process.exitCode = await deliver(mode, task, flags, { openProject });
     return;
   }
   await fn({ flags, positional });
 }
+
+/* ---- shell completion -------------------------------------------------- */
+
+const COMPLETION = {
+  zsh: `#compdef ledger
+# ledger completion for zsh. Add to ~/.zshrc:  source <(ledger completion zsh)
+_ledger() {
+  local -a candidates
+  candidates=("\${(@f)$(ledger __complete "\${(@)words[2,CURRENT]}" 2>/dev/null)}")
+  compadd -a candidates
+}
+compdef _ledger ledger
+`,
+  bash: `# ledger completion for bash. Add to ~/.bashrc:  eval "$(ledger completion bash)"
+_ledger() {
+  local candidates
+  candidates=$(ledger __complete "\${COMP_WORDS[@]:1:COMP_CWORD}" 2>/dev/null)
+  local IFS=$'\\n'
+  COMPREPLY=($(compgen -W "$candidates" -- "\${COMP_WORDS[COMP_CWORD]}"))
+}
+complete -F _ledger ledger
+`,
+  fish: `# ledger completion for fish. Save as ~/.config/fish/completions/ledger.fish,
+# or run:  ledger completion fish | source
+complete -c ledger -f -a '(ledger __complete (commandline -opc)[2..-1] (commandline -ct))'
+`,
+};
+
+async function cmdCompletion({ positional }) {
+  const shell = positional[0];
+  if (!COMPLETION[shell]) usage(`usage: ledger completion zsh|bash|fish`);
+  process.stdout.write(COMPLETION[shell]);
+}
+
+/**
+ * The candidates for the last word of a partial command line, one per line.
+ * Every shell's script asks this rather than carrying its own copy of the
+ * commands, so completion can't drift from what the CLI accepts.
+ */
+function complete(words) {
+  const say = (list) => process.stdout.write(list.length ? `${list.join("\n")}\n` : "");
+  const current = words[words.length - 1] ?? "";
+  const before = words.slice(0, -1);
+  const command = before[0];
+
+  if (!command) return say(Object.keys(COMMANDS));
+  const spec = FLAGS[command];
+  if (!spec) return say([]);
+  const subs = Array.isArray(spec) ? [] : Object.keys(spec).filter((k) => k !== "default" && k !== spec.default && k !== "brief");
+  const sub = subs.includes(before[1]) ? before[1] : undefined;
+
+  const previous = before[before.length - 1];
+  if (previous === "--run") return say(Object.keys(AGENTS));
+  if (previous === "--skip") return say(release.CHECK_IDS);
+
+  if (current.startsWith("-")) {
+    const own = Array.isArray(spec) ? spec : spec[sub ?? spec.default] ?? [];
+    const delivery = taskFor(command, sub) ? DELIVERY_FLAGS.filter((f) => f !== "prompt-only") : [];
+    return say([...own, ...delivery, ...GLOBAL_FLAGS].map((f) => (NEGATED.includes(`${command} ${f}`) ? `--no-${f}` : `--${f}`)));
+  }
+  if (before.length === 1 && subs.length) return say(subs);
+  if (command === "completion") return say(Object.keys(COMPLETION));
+  if (command === "style" && sub === "set") return say([...Object.keys(STYLES), CUSTOM_STYLE_ID]);
+  if (["show", "update", "remove"].includes(command) || (command === "audit" && sub === "confirm")) {
+    return say(featureIds());
+  }
+  if (command === "build" && before.length === 1) {
+    const versions = (() => { try { return openProject({}).releases.versions; } catch { return []; } })();
+    return say(["all", "draft", ...versions.map((v) => `v${v}`)]);
+  }
+  return say([]);
+}
+
+function featureIds() {
+  try {
+    findLedgerDir();
+    return openProject({}).featureSet.features().map((f) => f.id);
+  } catch {
+    return [];
+  }
+}
+

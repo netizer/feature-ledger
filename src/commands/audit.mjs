@@ -1,5 +1,5 @@
 import { openProject } from "../store.mjs";
-import { fail, today, longDate, COPY_RULE } from "../util.mjs";
+import { fail, today, longDate, COPY_BLOCK } from "../util.mjs";
 import * as git from "../git.mjs";
 
 const out = (s) => process.stdout.write(`${s}\n`);
@@ -35,7 +35,7 @@ export async function cmdAudit({ flags, positional }) {
  *
  * Only paths that could say something about the product count: a commit that
  * writes nothing but `.ledger/` and the generated docs is not unaudited work,
- * and counting it would make the `release cut` gate fire on the audit's own
+ * and counting it would make the `ledger cut` gate fire on the audit's own
  * commit every time.
  *
  * With no audit ever recorded there is nothing to measure drift from, so this
@@ -81,11 +81,11 @@ export function unauditedLine(report) {
 
 /** The same gap as a state rather than a problem, for `ledger status`. Work
  *  landing between audits is the normal condition: the audit is periodic, and
- *  only `release cut` needs it done. Phrased as a warning, it read as "run the
+ *  only `ledger cut` needs it done. Phrased as a warning, it read as "run the
  *  audit now" to people and agents alike. */
 export function unauditedSince(report) {
   return `${report.commits} commit${report.commits === 1 ? "" : "s"} and ${report.paths} ` +
-    `file${report.paths === 1 ? "" : "s"} since, due for a sweep before the next release cut`;
+    `file${report.paths === 1 ? "" : "s"} since, due for a sweep before the next \`ledger cut\``;
 }
 
 /**
@@ -171,7 +171,7 @@ function complete(flags) {
   out(`recorded a ${entry.mode} audit${commit ? ` at ${git.shortSha(commit)}` : ""} (${entry.date})`);
   out(total
     ? `  ${counts.added} added, ${counts.changed} changed, ${counts.removed} removed as already in place`
-    : "  nothing was found that the ledger didn't already have");
+    : "  nothing turned up from before the last cut (anything newer is recorded as this release's work)");
   if (unconfirmed) {
     out(`  ${unconfirmed} inferred reason${unconfirmed === 1 ? "" : "s"} still to confirm — \`ledger status\` lists them`);
   }
@@ -310,7 +310,7 @@ function brief(flags) {
   out("finds, stamps the audited commit, and ends by listing the reasons it had to");
   out("take from commit messages for you to confirm.");
   out("");
-  out(COPY_RULE);
+  out(COPY_BLOCK);
   out("");
 
   /* ---- the part for the agent ---- */
@@ -333,7 +333,7 @@ function brief(flags) {
   p("write has to clear the same bar and be in the same voice as the ones already");
   p("there: one entry is one capability someone using the product would name.");
   p("Guardrails, defaults, plumbing and polish go inside the capability they belong");
-  p("to, or in as `dev`, or as `ledger other-change` — never as an entry of their own.");
+  p("to, or in as `dev`, or as `ledger note` — never as an entry of their own.");
   p("Never read or edit the JSON under .ledger/; use `ledger list` and `ledger show`.");
   p("");
   p("Give the same care to the names. Most readers go down the contents list and");
@@ -430,7 +430,7 @@ function brief(flags) {
   p("   `ledger audit confirm <id>` accepts a reason as it stands, and that rewriting");
   p("   the bullet by hand in .ledger/features/<id>.json does the same thing — delete");
   p("   the entry's \"reason_inferred\" line once the sentence is theirs. Until then");
-  p("   `ledger status` and `ledger release cut` both keep reporting them as unconfirmed.");
+  p("   `ledger status` and `ledger cut` both keep reporting them as unconfirmed.");
 
   out(lines.join("\n"));
 }

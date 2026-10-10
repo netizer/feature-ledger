@@ -23,5 +23,10 @@
     "version": 2,
     "audience": "user",
     "description": "Every command refuses an option it does not take, and runs nothing. The error names the option, suggests the one you probably meant, and lists the options that the command takes. For example, ledger release cut --dryrun stops with \"did you mean --dry-run?\" instead of cutting the release."
+  },
+  {
+    "version": 2,
+    "audience": "user",
+    "description": "The commands read as words you can guess: ledger cut, ledger releases and ledger subcategories replace ledger release cut, ledger release list and ledger subcategory, and --print replaces --prompt-only. The old names still work and say what they are called now. A mistyped command is answered with the closest one, the exit code tells a mistake (2) from a check that said no (3), and ledger completion adds tab completion to zsh, bash and fish."
   }
 ]

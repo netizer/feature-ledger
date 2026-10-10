@@ -186,7 +186,7 @@ export class Project {
     if (!current.future) {
       fail(
         `the latest release (v${current.version}) is already shipped, so there's nowhere to record a change — ` +
-        "run `ledger release cut` to open the next one",
+        "run `ledger cut` to open the next one",
       );
     }
     return current.version;
@@ -195,7 +195,7 @@ export class Project {
   /**
    * The versions that are real editions. The in-progress release is one only
    * once something has been recorded against it: a release opened by
-   * `release cut` and not yet written to would print an edition identical to
+   * `ledger cut` and not yet written to would print an edition identical to
    * the one just shipped, which is not a document anybody wants handed to a
    * client. The very first release is always an edition, empty or not —
    * there is nothing behind it to fall back to. After a redraft the same is
@@ -230,7 +230,7 @@ export class Project {
   }
 
   /** The latest redraft whose new corpus hasn't been checked against the old
-   *  one yet, or null. `ledger build` warns and `release cut` refuses on it. */
+   *  one yet, or null. `ledger build` warns and `ledger cut` refuses on it. */
   get pendingRedraft() {
     const last = this.redrafts.length ? this.redrafts[this.redrafts.length - 1] : null;
     return last && !last.reconciled ? last : null;

@@ -7,7 +7,7 @@ import { fail, isBlank } from "../util.mjs";
  * for) whoever reads the ledger. `status: "released"` ones have already
  * happened (name + date set); at most one trailing `status: "future"` release
  * stands for work in progress and carries no date yet. Everything an agent
- * writes lands on that future release; `ledger release cut` is what turns it
+ * writes lands on that future release; `ledger cut` is what turns it
  * into a real one and opens the next.
  *
  * A released one also records the commit it was cut at, wherever the project

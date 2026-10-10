@@ -198,4 +198,4 @@ Finish with a short note for me, and nothing else to do:
 Then stop. What you hand me is a draft: I'll rewrite the wording myself in
 `.ledger/features/<id>.json`, and `ledger update <id>` and
 `ledger remove <id> --reason "…"` cover anything that has actually moved.
-Rebuilding is `ledger build`.
+`ledger preview` prints a draft of whatever is open.

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { writeJson, exists, fail, isBlank, COPY_RULE } from "../util.mjs";
+import { writeJson, exists, fail, isBlank, COPY_BLOCK } from "../util.mjs";
 import { LEDGER_DIRNAME, DEFAULT_CONFIG, DEFAULT_BRAND, COMMITTED_CLIENT_DIR, pdfsAreCommitted } from "../store.mjs";
 import { resolveStyle, styleTitle, styleLine, STYLES, CUSTOM_STYLE_ID } from "../style.mjs";
 import * as git from "../git.mjs";
@@ -167,14 +167,16 @@ export async function cmdInit({ flags }) {
 
   out("");
   out("Next:");
-  out(`  1. npx ledger bootstrap        # prints a survey prompt to hand to your coding agent`);
+  out(`  1. ledger bootstrap             # prints a survey prompt to hand to your coding agent`);
+  out(`     (or \`ledger bootstrap --run claude\` to hand it over directly — codex and gemini work too)`);
   out(`  2. …the agent runs it to the end on its own: one entry per capability at v1 (areas`);
-  out(`      only if the product needs them), then it cuts the baseline and builds the edition`);
+  out(`      only if the product needs them), then it cuts the baseline, which prints its edition`);
   out(`  3. read the result and edit it — the words are yours: open .ledger/features/<id>.json and`);
   out(`      change, add to or cut anything that isn't how you'd say it to this client. \`ledger update\``);
-  out(`      and \`ledger remove\` for anything that actually moved, then \`ledger status\` and \`ledger build\``);
+  out(`      and \`ledger remove\` for anything that actually moved, then \`ledger status\` and \`ledger preview\``);
   out("");
-  out("From then on the agent records each change against the open release, and `ledger release cut` mints the next edition.");
+  out("From then on the agent records each change against the open release, and `ledger cut` mints the next edition.");
+  out("Run `ledger` on its own at any point: it says where things stand and what to run next.");
 }
 
 /** The one-command install into whichever agent files a project already has.
@@ -250,7 +252,7 @@ export async function cmdBootstrap({ flags }) {
       .replaceAll("{product}", product)
       .replaceAll("{style_line}", styleLine(style))
       .replaceAll("{audit_block}", auditBlock(flags, projectRoot, redraft))
-      .replaceAll("{copy_rule}", COPY_RULE),
+      .replaceAll("{copy_rule}", COPY_BLOCK),
   );
 }
 
@@ -265,12 +267,15 @@ work on this codebase started:
 git log --reverse --format=%ad --date=short | head -1
 \`\`\`
 
-{audit_block}Then cut the release and print it:
+{audit_block}Then cut the release. The cut prints its PDF edition as well:
 
 \`\`\`
-ledger release cut --name "Baseline" --date <that date, or today if there's no history>
-ledger build
+ledger cut --name "Baseline" --date <that date, or today if there's no history>
 \`\`\`
+
+If it refuses, it lists every check that's open and what to run for each.
+If only the PDF fails (no browser on this machine), cut with \`--no-pdf\` and
+say so in your summary.
 
 Version 1 has no predecessor, so its edition prints as a plain inventory with
 nothing flagged as new or changed — which is exactly right for a snapshot of
@@ -279,7 +284,7 @@ highlights only what actually moved.`;
 
 /**
  * A survey run inside a redraft stops before the cut. The old corpus has to be
- * read against the new one first (`ledger redraft check`), and `release cut` refuses
+ * read against the new one first (`ledger redraft check`), and `ledger cut` refuses
  * until it has been. It is also told not to read the archive: a survey that
  * starts from the old structure reproduces it, and a new structure is the
  * reason for redrafting at all.
@@ -317,7 +322,7 @@ step that checks the new corpus against the old one.
  * The survey IS a full audit — the agent has just read the whole codebase
  * against the record — so the prompt ends by recording one. Without this the
  * tool has no point to measure drift from, `ledger status` reports the
- * codebase as never checked, and the `release cut` gate stays silent until
+ * codebase as never checked, and the `ledger cut` gate stays silent until
  * somebody runs `ledger audit` by hand.
  *
  * Recorded before the cut on purpose, so the audit is logged against the

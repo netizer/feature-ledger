@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { openProject } from "../store.mjs";
-import { fail, today, longDate, COPY_RULE } from "../util.mjs";
+import { fail, today, longDate, COPY_BLOCK } from "../util.mjs";
 import { unauditedReport, unauditedLine } from "./audit.mjs";
 import * as git from "../git.mjs";
 
@@ -22,7 +22,7 @@ const out = (s) => process.stdout.write(`${s}\n`);
  * Like `audit`, the command prints a brief rather than doing the work, and
  * does the cheap deterministic half first: what arrived this cycle, which
  * entries are in it, and a few mechanical hints about where the drafts show.
- * `review complete` then stamps what was read, and `release cut` refuses an
+ * `review complete` then stamps what was read, and `ledger cut` refuses an
  * edition whose client-facing entries changed after that.
  */
 export async function cmdReview({ flags, positional }) {
@@ -74,7 +74,7 @@ const clip = (s, n) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
  * `ok` when there is nothing to review: no release in progress, a first
  * edition (there is no earlier one to compare it with, so it prints nothing as
  * new or changed), or nothing client-facing recorded yet — the empty-release
- * guard in `release cut` already covers that one.
+ * guard in `ledger cut` already covers that one.
  */
 export function unreviewedReport(project) {
   const current = project.releases.current;
@@ -141,7 +141,7 @@ function complete(flags) {
   }
   project.recordReview(entry);
   out(`recorded a review of v${version} (${entry.date}) covering ${targets.size} client-facing entr${targets.size === 1 ? "y" : "ies"}`);
-  out("A later `ledger add`, `update` or hand-edit to one of them asks for another before `ledger release cut`.");
+  out("A later `ledger add`, `update` or hand-edit to one of them asks for another before `ledger cut`.");
 }
 
 function shapeProblems(project, version) {
@@ -261,7 +261,7 @@ function brief(flags) {
   out("and with each other. It changes wording, never what the ledger says the product");
   out("does. It stamps the review, and ends by listing what it couldn't settle without you.");
   out("");
-  out(COPY_RULE);
+  out(COPY_BLOCK);
   out("");
 
   /* ---- the part for the agent ---- */
@@ -288,7 +288,7 @@ function brief(flags) {
   p("");
   p("You are editing words, not recording work. Every change you make is a hand-edit");
   p("of .ledger/features/<id>.json, or of .ledger/other-changes.json for the");
-  p("product-wide notes. Do not run `ledger add`, `update`, `remove` or `other-change`:");
+  p("product-wide notes. Do not run `ledger add`, `update`, `remove` or `note`:");
   p("those record that the product moved, and nothing about the product moves in a");
   p("review.");
   p("");
@@ -359,7 +359,7 @@ function brief(flags) {
     }
     for (const c of others) {
       const terms = unseenTerms([c.description], vocabulary);
-      if (terms.length) hints.push([{ id: "other-change", currentName: clip(c.description, 40) }, [`names what ${P} never mentioned: ${terms.slice(0, 6).join(", ")}`]]);
+      if (terms.length) hints.push([{ id: "product-wide note", currentName: clip(c.description, 40) }, [`names what ${P} never mentioned: ${terms.slice(0, 6).join(", ")}`]]);
     }
     if (hints.length) {
       p("## Where the drafts probably show");
@@ -505,7 +505,7 @@ function brief(flags) {
   p("  entry, never change a \"version\", and never touch releases.json, audits.json or");
   p("  reviews.json.");
   p("- Leave a \"reason_inferred\" flag where it is. Only the human can confirm a reason.");
-  p("- Don't run `ledger build` or `ledger release cut`.");
+  p("- Don't run `ledger build` or `ledger cut`.");
   p("");
   p("## When you're done");
   p("");

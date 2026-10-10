@@ -97,7 +97,7 @@ and it is not part of a retone — tell me instead.
    show me the area you just did before moving on.
 
 **Then the parts that are not features.** Sub-section headings and overviews
-(`ledger subcategory list`, edited in `.ledger/subcategories.json`), any
+(`ledger subcategories list`, edited in `.ledger/subcategories.json`), any
 product-wide notes in `.ledger/other-changes.json`, and the product's one-line
 description in `.ledger/config.json`, if it has one.
 
