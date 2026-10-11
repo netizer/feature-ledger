@@ -1,0 +1,15 @@
+{
+  "id": "edition-summary",
+  "audience": "user",
+  "category": "The documents it produces",
+  "size": "Medium",
+  "history": [
+    {
+      "version": 3,
+      "name": "Summary of changes",
+      "description": "From the second edition on, the page after the cover sums up what differs from the edition before it, as short numbered lists: what's new and what changed, and when there are any, what is already in place, what is no longer available, and the product-wide notes. Each item in the first three lists is one sentence, followed by numbered links to the entries it sums up, so one item can cover several entries, and an entry a client wouldn't miss can be left out. The command ledger summary prints a brief for a coding agent to write those lists from what the ledger already says, without reading the code. ledger summary complete checks that every client-facing entry in the release is either covered or deliberately left out, then records what the summary was written from. An entry recorded, changed or removed after that puts the summary out of date: ledger status says so, a draft edition says so on its summary page, and ledger cut waits until it is written again. A first edition, and the first edition after a redraft, have no earlier edition to compare with, so they print no summary.",
+      "changes": null,
+      "dev_notes": "src/summary.mjs holds the model: summaryTargets, summaryReportFor (missing, never completed, entries added, changed or dropped since the stamp, entries neither covered nor quiet, ids that are no entry), summaryLine, and the entry fingerprint the review shares. src/commands/summary.mjs is the brief and `summary complete`; TASKS.summary in src/prompt.mjs checks the report after an agent runs. Summaries live in .ledger/summaries.json, one object per release (Project.summaryOf and saveSummary in src/store.mjs); `entries` is a per-entry sha256 of the words the client reads. LedgerHtml.summaryHtml in src/render/ledger-html.mjs prints each item with links to id=\"f-<id>\", falls back to entry names when a release has no summary, and adds a draft note when the open release's summary isn't up to date. The heading and intro are docs.pdf.summary_title and summary_intro in config.json."
+    }
+  ]
+}

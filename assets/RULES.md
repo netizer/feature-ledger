@@ -198,6 +198,37 @@ A feature that is **new** in the open release has no "before" at all, however
 many times it moved while it was being built. Update it with the full new
 `description` and no `changes`; `ledger update` refuses a change note on it.
 
+### The summary
+
+Every edition after the first opens with short numbered lists of what differs
+from the edition before it: *What's new*, *What changed* and, when there are
+any, *Already in place*. They aren't part of any entry, and recording a change
+never asks for them. They are written once per release, from the whole
+release, with `ledger summary`, and kept in `.ledger/summaries.json`.
+
+Each item is one sentence, followed in the edition by numbered links to the
+entries it sums up (`covers`). One item can cover several entries: changes
+that follow from something new are part of that item, not items of their own.
+An entry a client wouldn't miss goes in `quiet` instead. Every client-facing
+entry in the release is in one or the other.
+
+- **One sentence that stands on its own**, usually under fifteen words, saying
+  which part of the product it is about in the words someone using it would
+  use. It starts with a capital letter, never with a command or a file name.
+- **The level a client cares about.** *Clients can book before the exact
+  address is known*, not which form asks for what.
+- **For a change, the old and the new state when both fit.** *The event
+  details reminder goes out two weeks and one week before the event, instead
+  of once.*
+- An item may say why, or who it helps, when the entries don't. The developer
+  reads the summary before the client does, and corrects it.
+
+`ledger summary complete` checks that the summary accounts for every entry
+and records what it was written from. An entry recorded, changed or removed
+after that puts it out of date, and `ledger cut` refuses until it is written
+again. `ledger preview --run` writes it first when it is out of date. Editing
+an item's text by hand doesn't put it out of date; the review reads it.
+
 ### Better words for the same thing
 
 Not this section's business. A copy fix isn't a change: the product didn't
@@ -306,6 +337,7 @@ And elsewhere in `.ledger/`:
 | `subcategories.json` | A sub-section's `name` and `intro`. |
 | `config.json` | Product name, tagline, and the `docs` block that overrides document titles and intros. |
 | `other-changes.json` | The `description` of a product-wide note. |
+| `summaries.json` | A summary item's `text`, its `covers`, and `quiet`. Not `date`, `commit` or `entries`: `ledger summary complete` writes those. |
 | `STYLE.md`, `theme.css` | Prose and CSS. They were always yours. |
 
 Renaming an **area** is the exception: `ledger categories rename "Old" "New"`,
@@ -322,8 +354,8 @@ Not much, and it's where a hand-edit would be either invisible or wrong:
   `ledger update` and `ledger remove` resolve it, and `ledger update` is also
   what refuses a change that never says why it happened — the rule that makes
   this document worth reading rather than a diff.
-- **`releases.json`, and the stamps in `audits.json`, `reviews.json` and
-  `redrafts.json`.** A timeline edited by hand stops matching the editions
+- **`releases.json`, and the stamps in `audits.json`, `reviews.json`,
+  `summaries.json` and `redrafts.json`.** A timeline edited by hand stops matching the editions
   already handed over, and a stamp set without the work behind it hides exactly
   what it exists to catch. A redraft's `note` is the exception: it is wording.
   So are a release's `display_version`, the number printed on its edition in

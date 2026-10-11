@@ -33,6 +33,26 @@ and the draft. `ledger build v3` prints one edition, `ledger build all` reprints
 every edition with the current wording, and `--html` writes HTML instead of PDF
 (the fast loop when you're tuning `theme.css`).
 
+## The summary page
+
+From the second edition on, the page after the cover lists what differs from
+the last edition as short numbered lists, each under a plain heading in the
+colour its entries wear: *What's new*, *What changed*, *Already in place*, *No
+longer available*, and the product-wide notes. The first three are the
+release's summary, written with `ledger summary`: each item is a sentence that
+reads on its own, followed by numbered links, `[1] [2] [3]`, to the entries it
+sums up. A removal is listed by its name, and a product-wide note by its first
+sentence. The first edition, and the first after a redraft, have nothing to
+compare with and print no summary.
+
+A draft whose summary is missing or out of date says so in a note at the top
+of the page, and lists the entries by name where there is no summary at all.
+
+The heading, the sentence under it and the first two list headings are
+`summary_title`, `summary_intro`, `summary_new` and `summary_updated` in the
+`docs.pdf` block of `.ledger/config.json`. `{date}` in the intro becomes
+the last edition's date.
+
 ## Where they go
 
 `ledger init` asks once:

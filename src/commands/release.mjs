@@ -5,6 +5,7 @@ import { fail, usage, nearest, isBlank, today, longDate, EXIT, UserError } from 
 import { color, mark } from "../ui.mjs";
 import { unauditedReport, unauditedLine, unconfirmedReasons } from "./audit.mjs";
 import { unreviewedReport, unreviewedLine } from "./review.mjs";
+import { summaryReport, summaryLine } from "../summary.mjs";
 import { redraftReport, redraftSteps } from "./redraft.mjs";
 import { editionFile, printEdition } from "./build.mjs";
 import { runTask } from "../prompt.mjs";
@@ -149,10 +150,11 @@ function resolveCutCommit(project, flags) {
  * still be missing what the client was told. Unaudited work comes before the
  * empty-release check because when both fire they have one cause — work
  * landed and the ledger never heard about it — and the audit is what fixes
- * it. The review comes after both, because each of them can send someone off
- * to record more, and whatever is recorded is what a review has to read.
+ * it. The summary comes next, because it is written from what was recorded.
+ * The review comes after all of them, because each can send someone off to
+ * record or write more, and whatever is written is what a review has to read.
  */
-export const CHECK_IDS = ["redraft", "audit", "content", "review", "moment"];
+export const CHECK_IDS = ["redraft", "audit", "content", "summary", "review", "moment"];
 
 export function cutChecks(project, { date = today(), commit = undefined } = {}) {
   const current = project.releases.current;
@@ -164,6 +166,7 @@ export function cutChecks(project, { date = today(), commit = undefined } = {}) 
   const touched = project.featureSet.features().filter((f) => f.touchedAt(version)).length;
   const other = project.featureSet.otherChanges({ version }).length;
   const unreviewed = unreviewedReport(project);
+  const summary = summaryReport(project);
   const previous = project.releases.predecessorOf(version);
   // Only once there is something to cut: straight after a cut, HEAD is the
   // commit it was cut at, and saying so as a second ✗ under "nothing recorded"
@@ -193,6 +196,12 @@ export function cutChecks(project, { date = today(), commit = undefined } = {}) 
           .filter(Boolean).join(" and ") + ` recorded against v${version}`
         : `nothing recorded against v${version}, so its edition would be ${version > 1 ? `identical to v${version - 1}` : "empty"}`,
       fix: "record the release's work with `ledger add` / `ledger update` — or `ledger audit`, if it landed without the ledger",
+    },
+    {
+      id: "summary",
+      ok: summary.ok,
+      line: summaryLine(summary),
+      fix: "ledger summary      (or `ledger summary --run <agent>` to hand it to one)",
     },
     {
       id: "review",
@@ -267,10 +276,10 @@ async function confirm(question) {
  * nothing was cut. `--no-pdf` cuts without printing, for a CI job or a
  * container, and `ledger build vN` prints it later.
  *
- * `--run <agent>` hands whatever of the audit and the review is still open to
- * that agent, one after the other, checks what each left behind, and then
- * asks before it cuts (`--yes` doesn't ask). Only with the flag: nothing is
- * ever handed to an agent unasked.
+ * `--run <agent>` hands whatever of the audit, the summary and the review
+ * is still open to that agent, one after the other, checks what each left
+ * behind, and then asks before it cuts (`--yes` doesn't ask). Only with the
+ * flag: nothing is ever handed to an agent unasked.
  */
 export async function cmdCut({ flags }) {
   let project = openProject(flags);
@@ -286,7 +295,7 @@ export async function cmdCut({ flags }) {
 
   let handedOver = false;
   if (flags.run !== undefined && flags.run !== false) {
-    for (const id of ["audit", "review"]) {
+    for (const id of ["audit", "summary", "review"]) {
       const check = cutChecks(project, { date }).find((ch) => ch.id === id);
       if (check.ok || skipped.includes(id)) continue;
       out(`${mark(false)} ${id}: ${check.line}`);

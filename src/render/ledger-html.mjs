@@ -2,6 +2,7 @@ import { escapeHtml as h, longDate } from "../util.mjs";
 import { wording, redraftBody } from "../wording.mjs";
 import { resolveBrand, mastheadHtml } from "./brand.mjs";
 import { fontFaceCss, SYMBOL_FACE } from "./fonts.mjs";
+import { summaryReportFor, summaryLine } from "../summary.mjs";
 
 /**
  * The client-facing "feature ledger" for one specific release — an archival
@@ -27,6 +28,10 @@ export function renderLedgerHtml({ project, version, label }) {
 }
 
 const SIZE_LEVELS = { big: 3, medium: 2, small: 1 };
+
+/** Up to the first full stop that ends a sentence, not one inside "e.g." or
+ *  a file name: it has to be followed by a space and a capital. */
+const firstSentence = (text) => text.trim().split(/(?<=[.!?])\s+(?=[A-Z“"(])/)[0];
 
 /* Anchors for the three sections that close the document. Named rather than
  * numbered because, unlike the areas, they aren't part of the product's
@@ -208,6 +213,11 @@ class LedgerHtml {
 
   /* ---- fragments ------------------------------------------------------ */
 
+  /** Anchor an entry answers to, so its line in the summary can link to it. */
+  featureId(id) {
+    return `f-${id}`;
+  }
+
   categoryNumber(i) {
     return String(i + 1).padStart(2, "0");
   }
@@ -287,11 +297,74 @@ class LedgerHtml {
     const was = s.renamedFrom ? `<span class="was">previously &ldquo;${h(s.renamedFrom)}&rdquo;</span>` : "";
     const tag = badge ? `<span class="tag tag-${badge}">${h(this.badgeLabel(badge))}</span>` : "";
 
-    return `<div class="${classes}"><div class="content">` +
+    return `<div class="${classes}" id="${h(this.featureId(f.id))}"><div class="content">` +
       `<div class="badges">${this.sizeChip(f.size)}${tag}</div>` +
       `<div class="body"><div class="name">${h(s.name)}${was}</div>` +
       `<div class="desc">${h(s.description)}</div>` +
       `${badge && f.firstVersion !== this.version ? this.changesPanel(s) : ""}</div></div></div>`;
+  }
+
+  /**
+   * The page that follows the cover: what this edition prints as news, as
+   * short numbered lists under plain headings ("What's new", "What changed"),
+   * so a reader can see what differs from the last edition without reading
+   * the ledger for its stripes.
+   *
+   * The lists are the release's summary (src/summary.mjs): each item is a
+   * sentence written to be read on its own, followed by numbered links to the
+   * entries it sums up, in the order it names them. An entry the summary left
+   * out still prints in the ledger, striped, and links to nothing here.
+   *
+   * Removals and product-wide notes list themselves. A removal's item is the
+   * name of what went, which under "No longer available" says all a list
+   * needs to; the reason is one link away. A note's is its first sentence,
+   * which is where the style guides put the point.
+   *
+   * An edition with no summary (one cut with the check skipped, or a draft)
+   * lists each entry by its name instead: it says less, but leaving them out
+   * would say nothing had changed. A draft also says, on the page, when its
+   * summary is missing or out of date, so a preview passed around can't be
+   * mistaken for one whose summary has caught up.
+   */
+  summaryHtml({ removed, goneEarlier, other, predDateLabel }) {
+    if (!this.predecessor) return "";
+    const w = this.words.pdf;
+    const rows = this.categoryRows.flatMap(([, r]) => r);
+    const printed = new Set(rows.map((r) => r.feature.id));
+    const item = (href, text) => `<li><a href="#${h(href)}">${h(text)}</a></li>`;
+    const byName = (badge) => rows.filter((r) => r.badge === badge)
+      .map((r) => item(this.featureId(r.feature.id), r.state.name));
+    const written = this.project.summaryOf(this.version);
+    const curated = (key) => (written?.[key] ?? []).map((it) => {
+      const refs = (it.covers ?? []).filter((id) => printed.has(id))
+        .map((id, n) => `<a class="ref" href="#${h(this.featureId(id))}">[${n + 1}]</a>`).join("");
+      return `<li>${h(it.text)}${refs ? ` <span class="refs">${refs}</span>` : ""}</li>`;
+    });
+    const entries = written ? curated : (badge) => byName({ new: "new", changed: "updated", in_place: "backfilled" }[badge]);
+
+    const groups = [
+      ["new", w.summary_new, entries("new")],
+      ["updated", w.summary_updated, entries("changed")],
+      ["backfilled", this.words.tags.backfilled, entries("in_place")],
+      ["removed", "No longer available", removed.map(([f]) => item(CLOSING_IDS.removed, f.currentName))],
+      ["gone", this.words.tags.backfilled_removed, goneEarlier.map(([f]) => item(CLOSING_IDS.goneEarlier, f.currentName))],
+      ["other", "Also since last time", other.map((c) => item(CLOSING_IDS.other, firstSentence(c.description)))],
+    ].filter(([, , items]) => items.length);
+    if (!groups.length) return "";
+
+    const report = this.release.future ? summaryReportFor(this.project, this.version) : null;
+    const draftNote = report && !report.ok
+      ? `<p class="draft-note">Draft: ${h(report.missing
+        ? "no summary has been written for this edition yet, so its entries are listed by name."
+        : `${summaryLine(report).replace(/^the summary/, "this summary")}.`)}</p>`
+      : "";
+    const intro = w.summary_intro.replaceAll("{date}", predDateLabel ? ` (${predDateLabel})` : "");
+    return `<section class="summary">
+    <h2>${h(w.summary_title)}</h2>
+    <p class="sub">${h(intro)}</p>${draftNote}
+    ${groups.map(([key, label, items]) => `<div class="sum-group is-${key}">` +
+      `<h3><i></i>${h(label)}</h3><ol>${items.join("")}</ol></div>`).join("\n    ")}
+  </section>`;
   }
 
   /* ---- the document --------------------------------------------------- */
@@ -373,6 +446,8 @@ class LedgerHtml {
       `<li><a href="#${id}"><span class="num">&mdash;</span><span class="nm">${h(title)}</span>` +
       `<span class="ct">${count}</span></a></li>`).join("");
 
+    const summary = this.summaryHtml({ removed, goneEarlier, other, predDateLabel });
+
     const sinceBlock = this.predecessor ? `
       <div class="split-label">Since the last edition${predDateLabel ? `, ${predDateLabel}` : ""}</div>
       <div class="since">
@@ -389,7 +464,7 @@ class LedgerHtml {
         <b>What's changed since the last edition${predDateLabel ? ` (${predDateLabel})` : ""}:</b>
         every entry below is highlighted to show what's different. A green stripe marks a brand-new feature;
         a blue stripe marks an existing feature that was materially reworked, with its own
-        <b>What changed</b> note.${stats.backfilled > 0 ? ` A grey stripe marks a capability that was already
+        <b>What changed</b> note.${summary ? " The page after this one sums up what's different." : ""}${stats.backfilled > 0 ? ` A grey stripe marks a capability that was already
         part of ${h(this.brand.name)} and is listed here for the first time, rather than something built this
         time.` : ""} Anything without a stripe hasn't changed.
         <div class="legend">
@@ -489,6 +564,8 @@ ${this.project.themeCss()}
       ${sinceBlock}
     </div>
   </header>
+
+  ${summary}
 
   ${this.set.unstructured ? "" : `<div class="contents">
     <div class="kicker">Contents</div>
@@ -674,6 +751,38 @@ const STYLES = `
   .since .is-updated .n { color: var(--blue-deep); } .since .is-updated .l { color: var(--blue-deep); }
   .since .is-backfilled .n { color: var(--slate-deep); } .since .is-backfilled .l { color: var(--slate-deep); }
   .since .is-same .n { color: var(--ink-ghost); } .since .is-same .l { color: var(--ink-faint); }
+
+  /* ---- What's different ----
+     Read, not scanned: plain headings and numbered sentences at body size,
+     with nothing beside them to compare. Each heading carries the stripe its
+     entries wear in the ledger, so the page is visibly an index of the
+     highlights rather than a fourth way of drawing them. The whole sentence is
+     the link, so it stays the same ink as the text around it. */
+  .summary { padding-top: 14px; border-top: 2px solid var(--accent); margin-bottom: 34px; }
+  .summary h2 { font-family: var(--font-display); font-size: 15pt; font-weight: 700; }
+  .summary p.sub { margin: 3px 0 0; font-size: 9pt; color: var(--ink-faint); max-width: var(--measure); }
+  .sum-group { margin-top: 22px; }
+  .sum-group h3 {
+    display: flex; align-items: center; gap: 9px; break-after: avoid;
+    font-family: var(--font-display); font-size: 12.5pt; font-weight: 700;
+  }
+  .sum-group h3 i { width: 4px; height: 15px; border-radius: 2px; display: inline-block; }
+  .sum-group.is-new h3 { color: var(--green-deep); } .sum-group.is-new h3 i { background: var(--green); }
+  .sum-group.is-updated h3 { color: var(--blue-deep); } .sum-group.is-updated h3 i { background: var(--blue); }
+  .sum-group.is-backfilled h3, .sum-group.is-gone h3 { color: var(--slate-deep); }
+  .sum-group.is-backfilled h3 i, .sum-group.is-gone h3 i { background: var(--slate); }
+  .sum-group.is-removed h3, .sum-group.is-other h3 { color: var(--accent-deep); }
+  .sum-group.is-removed h3 i, .sum-group.is-other h3 i { background: var(--accent-deep); }
+  .summary ol { margin: 8px 0 0; padding-left: 26px; max-width: var(--measure); }
+  .summary li { break-inside: avoid; margin-bottom: 5px; padding-left: 4px; color: var(--ink); }
+  .summary li::marker { color: var(--ink-faint); font-variant-numeric: tabular-nums; font-size: 9.5pt; }
+  .summary a { color: inherit; text-decoration: none; }
+  .summary .refs { white-space: nowrap; font-size: 8.5pt; }
+  .summary a.ref { color: var(--accent-deep); font-variant-numeric: tabular-nums; margin-left: 2px; }
+  .summary p.draft-note {
+    margin: 10px 0 0; padding: 6px 10px; max-width: var(--measure); font-size: 9pt;
+    background: var(--accent-pale); color: var(--accent-deep); border-radius: 3px;
+  }
 
   /* ---- Contents ---- */
   .contents { padding-top: 14px; border-top: 2px solid var(--accent); margin-bottom: 34px; break-inside: avoid; }

@@ -5,8 +5,9 @@ and every operation is a CLI command. Two things connect it to an agent:
 
 1. **A stanza** in the agent's instruction file, so it records features as it
    builds them.
-2. **Agent tasks** — `bootstrap`, `audit`, `review`, `redraft check` and
-   `style rewrite` — which prepare a prompt for an agent to work through.
+2. **Agent tasks** — `bootstrap`, `audit`, `summary`, `review`,
+   `redraft check` and `style rewrite` — which prepare a prompt for an agent
+   to work through.
 
 ## Delivering an agent task
 
@@ -59,9 +60,12 @@ Resume the session:  claude --resume 7744d0d3-482a-4ac2-9fd1-0e1580121146
   questions or finish what it couldn't. Ctrl-C stops the agent, and you still
   get the resume command.
 
-`ledger cut --name "…" --run claude` hands whichever of the audit and the
-review is still open to the agent, one after the other, then shows you the
-agent's notes and asks before it cuts. `--yes` cuts without asking.
+`ledger cut --name "…" --run claude` hands whichever of the audit, the summary
+and the review is still open to the agent, one after the other, then shows you
+the agent's notes and asks before it cuts. `--yes` cuts without asking.
+`ledger preview --run claude` hands over only the summary, and only when it's
+out of date: the summary is written from the ledger alone, so it's cheap
+enough for a daily draft.
 
 ### The agents it knows
 

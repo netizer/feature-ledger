@@ -64,6 +64,16 @@ export const TASKS = {
       return checks;
     },
   },
+  summary: {
+    label: "summary",
+    brief: async (flags) => (await import("./commands/summary.mjs")).cmdSummary({ flags, positional: [] }),
+    snapshot: () => ({}),
+    async verify(p) {
+      const { summaryReport, summaryLine } = await import("./summary.mjs");
+      const r = summaryReport(p);
+      return [{ ok: r.ok, line: summaryLine(r) }];
+    },
+  },
   review: {
     label: "review",
     brief: async (flags) => (await import("./commands/review.mjs")).cmdReview({ flags, positional: [] }),
@@ -105,14 +115,15 @@ const movedSince = (p, before) => p.featureSet.features()
 
 /** The task a command line names, or null when it doesn't print a prompt. */
 export function taskFor(command, sub) {
-  if (TASKS[command] && (command === "bootstrap" || command === "audit" || command === "review") &&
+  if (TASKS[command] && ["bootstrap", "audit", "summary", "review"].includes(command) &&
       (sub === undefined || sub === "brief")) return command;
   const key = `${command} ${sub}`;
   return TASKS[key] ? key : null;
 }
 
 /** Every command line that prints a prompt, for messages that list them. */
-export const PROMPT_COMMANDS = ["ledger bootstrap", "ledger audit", "ledger review", "ledger redraft check", "ledger style rewrite"];
+export const PROMPT_COMMANDS = ["ledger bootstrap", "ledger audit", "ledger summary", "ledger review", "ledger redraft check",
+  "ledger style rewrite"];
 
 /**
  * Runs a brief with stdout held back, and splits what it printed at the rule.

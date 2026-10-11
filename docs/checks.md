@@ -1,6 +1,6 @@
 # Keeping it honest: the checks
 
-`ledger cut` refuses to print an edition until five things are true. It works
+`ledger cut` refuses to print an edition until six things are true. It works
 all of them out every time, and a refusal lists the whole set, each with the
 command that fixes it. `ledger` and `ledger status` show the same list without
 trying to cut.
@@ -10,19 +10,21 @@ trying to cut.
 | `redraft` | a redrafted corpus hasn't been checked against the one it replaced | the steps `ledger redraft` prints |
 | `audit` | code landed since the last audit | `ledger audit` |
 | `content` | nothing is recorded against the open release, so its edition would repeat the last one | recording the work, or `ledger audit` |
+| `summary` | the release has no summary, or an entry was recorded, changed or removed since it was written, or it leaves an entry out of both `covers` and `quiet` | `ledger summary` |
 | `review` | a client-facing entry changed since the release was last reviewed | `ledger review`, or `ledger review complete` if you read it yourself |
 | `moment` | the release would stand for the same day *and* the same commit as the one before | cutting at a later commit (`--commit`) |
 
 `--skip audit,review` passes the checks you name, and only those. `--force`
-skips all five; prefer `--skip`, so the one you meant is the only one you
+skips all six; prefer `--skip`, so the one you meant is the only one you
 passed. A refused cut exits with code 3.
 
 The order is deliberate. Until a redrafted corpus is checked, anything the
 others ask is asked of a corpus that may still be missing what the client was
 told. Unaudited work comes before the empty-release check, because when both
 fire they have one cause — work landed and the ledger never heard about it.
-The review comes after both, because either can send someone off to record
-more, and whatever is recorded is what a review has to read.
+The summary comes next, because it's written from what was recorded. The
+review comes last, because any of the others can send someone off to record or
+write more, and whatever is written is what a review has to read.
 
 ## The audit
 
@@ -124,12 +126,56 @@ places the drafts probably show. The agent changes wording only. It never
 changes what the ledger says the product does, never invents a reason, and
 hands back whatever it couldn't settle as a numbered list of questions.
 
-`ledger review complete` refuses while a new entry still carries a change note
-or an updated one has none, then records a fingerprint of every client-facing
-entry it covered. From then on the tool knows which entries moved since. The
+`ledger review complete` refuses while a new entry still carries a change note,
+an updated one has none, or the summary doesn't account for every entry, then
+records a fingerprint of every client-facing entry it covered, and of the
+summary. From then on the tool knows which entries moved since. The
 fingerprint covers only what the client reads, so editing dev notes or
 confirming an inferred reason doesn't ask for another review. A first edition
 isn't checked at all.
+
+The review reads the summary against the entries as it leaves them, so
+recording it also records those entries as what the summary was written from.
+Otherwise a review that rewords an entry would put the summary out of date,
+and writing the summary again would put the review out of date.
+
+## The summary
+
+From the second edition on, the page after the cover lists what differs from
+the edition before, as short numbered lists: *What's new*, *What changed*, and
+when there are any, *Already in place*, *No longer available* and the
+product-wide notes. It's the page to read when there's no time for the rest,
+so it lists what is worth knowing, not everything that moved.
+
+The first three lists are the release's summary, in `.ledger/summaries.json`.
+Each item is one sentence, followed by numbered links to the entries it sums
+up (`covers`). One item can cover several entries, so three changes that all
+follow from one new capability read as that capability. An entry nobody would
+miss goes in `quiet`. Every client-facing entry in the release is in one or the
+other.
+
+```bash
+ledger summary              # the prompt, for a coding agent
+ledger summary --run claude
+ledger summary complete     # check it accounts for every entry, and stamp it
+```
+
+The prompt carries the text of every entry in the release, so the agent reads
+nothing else, not even the code: it is cheap enough to run every day. It
+writes the summary again as a whole, keeping what still holds of the one
+before, and it may say why something changed, or who it helps, when the
+entries don't. It ends with a list of what it left out and every reason it
+supplied, for the developer to check before the client reads it.
+
+`ledger summary complete` records a fingerprint of each entry it was written
+from. An entry recorded, changed or removed after that puts the summary out of
+date, and `ledger status` names it. Editing an item's text by hand doesn't: the
+review reads the summary, and a reworded one asks for another review.
+
+`ledger preview --run claude` writes the summary first when it's out of date,
+and nothing else: a preview is for seeing what the release says so far, and an
+audit or a review belongs to the cut. Without `--run`, the draft still prints,
+with a note on its summary page saying the summary hasn't caught up.
 
 ## Starting over: the redraft
 

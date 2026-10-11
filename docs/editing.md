@@ -73,6 +73,7 @@ Elsewhere in `.ledger/`:
 | `subcategories.json` | A sub-section's `name` and `intro`. |
 | `config.json` | Product name, tagline, and the `docs` block that overrides document titles and intros. |
 | `other-changes.json` | The `description` of a product-wide note. |
+| `summaries.json` | A summary item's `text`, its `covers`, and `quiet`. `ledger summary complete` writes `date`, `commit` and `entries`. |
 | `releases.json` | A release's `display_version` and `redraft` (see [documents.md](documents.md#carrying-on-from-earlier-reports) and [checks.md](checks.md#a-redraft-done-by-hand)). Nothing else in the file. |
 | `STYLE.md`, `theme.css` | Prose and CSS. They were always yours. |
 
@@ -88,8 +89,8 @@ Not much, and only where a hand-edit would be invisible or wrong.
   lands on is what every New/Changed tag is computed from, and which release is
   open isn't visible from inside the file. That's `ledger add`, `update` and
   `remove`, and `update` is also what refuses a change that never says *why*.
-- **`releases.json`, and the stamps in `audits.json`, `reviews.json` and
-  `redrafts.json`.** A timeline edited by hand stops matching the editions
+- **`releases.json`, and the stamps in `audits.json`, `reviews.json`,
+  `summaries.json` and `redrafts.json`.** A timeline edited by hand stops matching the editions
   already handed over, and a stamp set without the sweep behind it makes a gap
   permanently invisible. The exceptions are a redraft's `note`, and a release's
   `display_version` and `redraft`. The same goes for `.ledger/archive/`: the old

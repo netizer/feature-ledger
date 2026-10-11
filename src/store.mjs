@@ -19,6 +19,8 @@ export const LEDGER_DIRNAME = ".ledger";
  *     other-changes.json   changes belonging to no single feature
  *     audits.json          every audit so far, and the commit each was run against
  *     reviews.json         every review of a release before it was cut, and what it read
+ *     summaries.json       per release, the short lists its edition opens with, and the
+ *                          entries they were written from
  *     redrafts.json        every time the corpus was rewritten from scratch, and whether
  *                          the new one has been checked against the old
  *     archive/<label>/     the corpus a redraft set aside, read-only
@@ -138,6 +140,7 @@ export class Project {
     this.indexPath = path.join(ledgerDir, "index.json");
     this.auditsPath = path.join(ledgerDir, "audits.json");
     this.reviewsPath = path.join(ledgerDir, "reviews.json");
+    this.summariesPath = path.join(ledgerDir, "summaries.json");
     this.redraftsPath = path.join(ledgerDir, "redrafts.json");
     this.archiveDir = path.join(ledgerDir, ARCHIVE_DIRNAME);
     this.featuresDir = path.join(ledgerDir, "features");
@@ -156,6 +159,7 @@ export class Project {
     this.index = readOptional(this.indexPath, { order: [] }).order ?? [];
     this.audits = readOptional(this.auditsPath, { audits: [] }).audits ?? [];
     this.reviews = readOptional(this.reviewsPath, { reviews: [] }).reviews ?? [];
+    this.summaries = readOptional(this.summariesPath, { summaries: [] }).summaries ?? [];
     this.redrafts = readOptional(this.redraftsPath, { redrafts: [] }).redrafts ?? [];
 
     const files = exists(this.featuresDir)
@@ -319,6 +323,22 @@ export class Project {
     this.assertWritable();
     this.reviews.push(entry);
     writeJson(this.reviewsPath, { reviews: this.reviews });
+  }
+
+  /**
+   * The summary written for one release, or null. One per release, not a log
+   * like the reviews: an edition prints the lists it was cut with, and nothing
+   * asks what an earlier draft of them said.
+   */
+  summaryOf(version) {
+    return this.summaries.find((s) => s.version === version) ?? null;
+  }
+
+  saveSummary(summary) {
+    this.assertWritable();
+    this.summaries = [...this.summaries.filter((s) => s.version !== summary.version), summary]
+      .sort((a, b) => a.version - b.version);
+    writeJson(this.summariesPath, { summaries: this.summaries });
   }
 
   saveIndex() {

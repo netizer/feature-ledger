@@ -26,6 +26,7 @@
     "codebase-audit",
     "release-review",
     "redraft-the-ledger",
-    "agent-handoff"
+    "agent-handoff",
+    "edition-summary"
   ]
 }

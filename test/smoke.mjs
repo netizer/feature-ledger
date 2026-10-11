@@ -44,9 +44,20 @@ function assert(label, cond) {
 }
 
 const feature = (o) => JSON.stringify(o);
+
+// Writes a release's summary the way an agent would, by hand, replacing any
+// earlier one, and returns what the command given makes of it.
+function writeSummary(version, lists, { cwd = dir, then = ["summary", "complete"], expect = "ok" } = {}) {
+  const file = path.join(cwd, ".ledger/summaries.json");
+  const all = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")).summaries : [];
+  fs.writeFileSync(file, JSON.stringify({ summaries: [...all.filter((x) => x.version !== version), { version, ...lists }] }, null, 2));
+  return then ? run(then, { cwd, expect }) : "";
+}
 // `status --quiet` is silent on a sound corpus — apart from asking for a
-// review, which any release with work in it does until one is recorded.
-const quietWarnings = (o) => o.split("\n").filter((l) => l.trim() && !/(been|was) reviewed/.test(l)).join("\n");
+// summary and a review, which any release with work in it does until both are
+// recorded.
+const quietWarnings = (o) => o.split("\n")
+  .filter((l) => l.trim() && !/(been|was) reviewed|has no summary yet|summary of v\d+.* is out of date/.test(l)).join("\n");
 
 log(`workspace: ${dir}\n`);
 
@@ -151,9 +162,13 @@ assert(
 run(["update", "alpha", "--subcategory", ""]);
 for (const id of ["c1", "c2", "c3", "c4"]) {
   run(["add", id], {
-    stdin: feature({ audience: "user", category: "First area", subcategory: "cluster", size: "Small", name: `Cluster ${id}`, description: `The ${id} part of the cluster.` }),
+    stdin: feature({ audience: "user", category: "First area", subcategory: "cluster", size: "Small", name: `Cluster ${id}`,
+      description: `The ${id} part of the cluster.` }),
   });
 }
+// A team-only entry never reaches the client, so the summary never has to account for it.
+run(["add", "tooling"], { stdin: feature({ audience: "dev", category: "Second area", size: "Small",
+  name: "Tooling", description: "An internal script." }) });
 run(["status"]);
 run(["check"], { expect: "fail" });   // merged into `status`, and says so
 run(["doctor"], { expect: "fail" });
@@ -207,15 +222,80 @@ fs.writeFileSync(c3Path, JSON.stringify({ ...c3, history: [{ ...c3.history[0], c
 assert("a stray change note on a new entry is flagged", run(["status", "--quiet"]).includes("c3 is new in v2 but carries"));
 assert("…and the review can't be recorded over it", run(["review", "complete"], { expect: "fail" }).includes("c3 is new in v2"));
 fs.writeFileSync(c3Path, `${JSON.stringify(c3, null, 2)}\n`);
+// ---- The summary ----
+// From the second edition on, the edition opens with short lists of what's
+// different, written once for the whole release rather than once per entry.
+assert("a release with no summary is reported", run(["status", "--quiet"]).includes("v2 has no summary yet"));
+assert("…as an open cut check, pointing at `ledger summary`",
+  /✗ summary +v2 has no summary/.test(run(["status"])) && run(["status"]).includes("→ ledger summary"));
+assert("…and the review, which reads it, won't be recorded without one",
+  run(["review", "complete"], { expect: "fail" }).includes("no complete summary"));
+const summaryBrief = run(["summary"]);
+assert("`ledger summary` carries the text of every entry, so the agent reads nothing else",
+  summaryBrief.includes("c4  —  Cluster c4") && summaryBrief.includes("The adjacent one was the question every user asked next") &&
+  summaryBrief.includes("Don't read the code"));
+assert("…and asks for consequences to be folded into what caused them", summaryBrief.includes("Fold consequences into their cause"));
+assert("…and nothing that only the team reads", !summaryBrief.includes("Tooling"));
+const v2Summary = {
+  new: [{ text: "The cluster handles four new parts.", covers: ["c1", "c2", "c3", "c4"] }],
+  changed: [{ text: "Alpha covers the adjacent thing as well as the alpha one.", covers: ["alpha"] }],
+  quiet: ["beta"],
+};
+assert("an entry the summary neither covers nor leaves out is refused",
+  writeSummary(2, { ...v2Summary, quiet: [] }, { expect: "fail" }).includes("not in \"quiet\": beta"));
+assert("…and so is an id that's no entry in the release",
+  writeSummary(2, { ...v2Summary, quiet: ["beta", "tooling"] }, { expect: "fail" }).includes("not a client-facing entry in v2: tooling"));
+assert("…and an item that won't read as a sentence of its own",
+  writeSummary(2, { ...v2Summary, changed: [{ text: "ledger alpha covers more.", covers: ["alpha"] }] }, { expect: "fail" })
+    .includes("starts with a lower-case letter"));
+assert("…and one that sums up no entry",
+  writeSummary(2, { ...v2Summary, changed: [{ text: "Alpha covers more." }] }, { expect: "fail" }).includes("needs \"covers\""));
+// Any command can be the agent; this one writes the summary and stamps it, the way an agent would.
+const writer = path.join(dir, "write-summary.cjs");
+const summaryAgent = (lists) => {
+  fs.writeFileSync(writer, `const fs = require("node:fs"); const { spawnSync } = require("node:child_process");
+process.stdin.resume(); process.stdin.on("end", () => {
+  fs.writeFileSync(${JSON.stringify(path.join(dir, ".ledger/summaries.json"))},
+    JSON.stringify({ summaries: [{ version: 2, ...${JSON.stringify(lists)} }] }, null, 2));
+  spawnSync("node", [${JSON.stringify(BIN)}, "summary", "complete"], { stdio: "ignore" });
+});`);
+  return `node ${JSON.stringify(writer)}`;
+};
+const handed = run(["summary", "--run", summaryAgent(v2Summary)]);
+assert("`ledger summary --run` hands it to an agent and checks it accounts for the release",
+  handed.includes("✓ the summary of v2 accounts for all 6 entries"));
+assert("…and the stamp says what it was written from",
+  Object.keys(JSON.parse(fs.readFileSync(path.join(dir, ".ledger/summaries.json"), "utf8")).summaries[0].entries).length === 6);
+assert("`summary complete` prints the lists as the edition will",
+  run(["summary", "complete"]).includes("1. The cluster handles four new parts.  [c1, c2, c3, c4]"));
 run(["review", "complete"]);
 assert("a recorded review quiets the warning", !run(["status", "--quiet"]).includes("reviewed"));
+// The summary is client-facing text, so rewording it asks for another read…
+const summariesPath = path.join(dir, ".ledger/summaries.json");
+const reword = (edit) => {
+  const all = JSON.parse(fs.readFileSync(summariesPath, "utf8"));
+  edit(all.summaries[0]);
+  fs.writeFileSync(summariesPath, JSON.stringify(all, null, 2));
+};
+reword((x) => { x.changed[0].text = "alpha covers the adjacent thing too."; });
+assert("an item hand-edited into lower case is reported", run(["status", "--quiet"]).includes("won't read as a sentence"));
+reword((x) => { x.changed[0].text = "Alpha covers the adjacent thing too."; });
+assert("…and a reworded summary asks for another review", /changed since v2 was reviewed.*summary/.test(run(["status", "--quiet"])));
+assert("…but doesn't put the summary itself out of date", !run(["status", "--quiet"]).includes("out of date"));
+run(["review", "complete"]);
 // A later edit to what the client reads asks for another look, by name.
 const a = JSON.parse(fs.readFileSync(path.join(dir, ".ledger/features/alpha.json"), "utf8"));
 a.history[1].changes = [a.history[1].changes[0]];
 fs.writeFileSync(path.join(dir, ".ledger/features/alpha.json"), `${JSON.stringify(a, null, 2)}\n`);
 assert("an entry edited after the review is named", /changed since v2 was reviewed.*alpha/.test(run(["status", "--quiet"])));
 assert("…and the brief marks it", /\* updated\s+alpha/.test(run(["review"])));
+assert("…and the summary written from it is out of date", /summary of v2, written .*, is out of date: 1 changed since \(alpha\)/
+  .test(run(["status", "--quiet"])));
 run(["review", "complete"]);
+// The review read the summary against the entries as it left them, so it
+// brings the summary's record up to date; otherwise each would keep putting
+// the other out of date.
+assert("a review brings the summary's record up to date", !run(["status", "--quiet"]).includes("out of date"));
 
 const list = run(["list"]);
 assert("list marks this release's work", list.includes("changed v2") && list.includes("new v2"));
@@ -275,11 +355,44 @@ run(["build", "--pdf", "--html", "--version", "1"]);
 assert("a backfilled entry leaves an already-issued edition untouched", fs.readFileSync(v1Path, "utf8") === v1Before);
 
 run(["build", "--pdf", "--html"]);
+const stale = fs.readFileSync(path.join(dir, "docs/generated/Testbed-Feature-Ledger_2-draft.html"), "utf8");
+assert("a draft says on its summary page when the summary hasn't caught up",
+  stale.includes('class="draft-note"') && stale.includes("recorded since (always-there)"));
+// A daily preview brings the summary up to date first when asked to, and
+// hands over nothing else.
+const caughtUp = run(["preview", "--html", "--run",
+  summaryAgent({ ...v2Summary, in_place: [{ text: "Something the product could always do is on the record.", covers: ["always-there"] }] })]);
+assert("`ledger preview --run` has an agent bring the summary up to date before it prints",
+  caughtUp.includes("Handing the summary to") && caughtUp.includes("✓ the summary of v2 accounts for all 7 entries") &&
+  !caughtUp.includes("Handing the review"));
+assert("…and hands nothing over when the summary is already up to date",
+  !run(["preview", "--html", "--run", summaryAgent(v2Summary)]).includes("Handing"));
+fs.rmSync(writer);
+run(["build", "--pdf", "--html"]);
 run(["build", "--md"]);
 const v2 = fs.readFileSync(path.join(dir, "docs/generated/Testbed-Feature-Ledger_2-draft.html"), "utf8");
 assert("the third register draws in its own colour", v2.includes("tag-backfilled") && v2.includes("ALREADY IN PLACE"));
 assert("…and never puts the internal key in front of a client", !v2.includes(">BACKFILLED<"));
 assert("a removal found late is reported, apart from this cycle's news", v2.includes("No longer present"));
+// The page after the cover: the release's summary, each item followed by links to the entries it sums up.
+const summary = v2.slice(v2.indexOf('<section class="summary">'), v2.indexOf("</section>"));
+assert("the edition opens with a summary of what's different", summary.includes("different in this edition"));
+assert("…as numbered lists of items, each followed by numbered links to the entries it covers",
+  summary.includes("<ol>") && summary.includes("<li>The cluster handles four new parts. <span class=\"refs\">" +
+    '<a class="ref" href="#f-c1">[1]</a><a class="ref" href="#f-c2">[2]</a><a class="ref" href="#f-c3">[3]</a>' +
+    '<a class="ref" href="#f-c4">[4]</a></span></li>') && v2.includes('id="f-c4"'));
+assert("…leaving out what it left out", !summary.includes("f-beta"));
+assert("…and, once it has caught up, no draft note", !summary.includes("draft-note"));
+assert("…under plain headings", summary.includes("<h3><i></i>What&#39;s new</h3>") && summary.includes("<h3><i></i>What changed</h3>"));
+// gamma, the one removal this cycle, was team-only, so it has no group here.
+assert("…grouped the way the ledger colours them",
+  ["is-new", "is-updated", "is-backfilled", "is-gone", "is-other"].every((g) => summary.includes(`sum-group ${g}`)) &&
+  !summary.includes("is-removed"));
+assert("…with a removal listed by the name of what went, not its reason",
+  summary.includes('<a href="#closing-gone-earlier">Solo</a>') && !summary.includes("No longer part of the product."));
+assert("…and nothing that only the team reads", !summary.includes("Tooling"));
+assert("a first edition has nothing to summarize",
+  !fs.readFileSync(v1Path, "utf8").includes('class="summary"'));
 const md2 = fs.readFileSync(path.join(dir, "docs/generated/FEATURES.md"), "utf8");
 assert("the living docs use the same words", md2.includes("Already in place]"));
 assert(
@@ -370,6 +483,8 @@ run(["add", "kept-one"], {
   stdin: feature({ audience: "user", size: "Medium", name: "Kept one", description: "Does the kept thing." }),
 });
 run(["build", "--pdf", "--html"], { cwd: kept });
+assert("a first edition needs no summary, and the brief says why",
+  run(["summary"], { cwd: kept, expect: "fail" }).includes("prints as an inventory"));
 assert(
   "…and a draft never lands there, under a name that says it's a draft",
   !fs.existsSync(path.join(kept, "docs/client")) &&
@@ -387,14 +502,14 @@ fs.rmSync(kept, { recursive: true, force: true });
 // output, and three briefs marking it three ways teach them to look for three
 // different things.
 const RULE = "═════════════════════  COPY EVERYTHING BELOW THIS LINE  ═════════════════════";
-for (const brief of [["bootstrap"], ["style", "rewrite"], ["audit"], ["review"]]) {
+for (const brief of [["bootstrap"], ["style", "rewrite"], ["audit"], ["summary"], ["review"]]) {
   assert(`\`ledger ${brief.join(" ")}\` marks where the prompt starts, the same way`,
     run(brief, { cwd: dir }).includes(RULE));
 }
 
 // …and every one of them can print the prompt alone, ready to pipe into a
 // clipboard: nothing above the rule, and not the rule itself.
-for (const brief of [["bootstrap"], ["style", "rewrite"], ["audit"], ["review"]]) {
+for (const brief of [["bootstrap"], ["style", "rewrite"], ["audit"], ["summary"], ["review"]]) {
   const only = run([...brief, "--prompt-only"], { cwd: dir });
   assert(`\`ledger ${brief.join(" ")} --prompt-only\` prints just the prompt`,
     !only.includes(RULE) && !only.includes("Copy it whole") && only.trim().length > 200);
@@ -566,6 +681,7 @@ run(["add", "two"], {
   stdin: feature({ audience: "user", size: "Small", name: "Two", description: "Does the two thing." }),
 });
 run(["audit", "complete"], { cwd: repo });
+writeSummary(3, { new: [{ text: "Does the two thing.", covers: ["two"] }] }, { cwd: repo });
 // Audited, but not yet read as one release against the edition before it.
 assert(
   "an unreviewed release can't be cut",
@@ -587,7 +703,7 @@ assert("…but not when the day and the code are both the same",
   run(["cut", "--name", "Again", "--date", "2026-02-01", "--no-pdf"], { cwd: repo, expect: "fail" })
     .includes("would stand for the same moment"));
 assert("…which --skip allows, as a deliberate re-issue",
-  run(["cut", "--name", "Again", "--date", "2026-02-01", "--skip", "moment,review", "--no-pdf"], { cwd: repo }).includes("cut v4"));
+  run(["cut", "--name", "Again", "--date", "2026-02-01", "--skip", "moment,summary,review", "--no-pdf"], { cwd: repo }).includes("cut v4"));
 assert("the timeline lists each release's commit", /[0-9a-f]{7}  Same day, later/.test(run(["releases"], { cwd: repo })));
 // Every ledger that predates commits has a timeline of nulls, so they have to
 // be fillable in after the fact — otherwise the field only ever works forward.
@@ -670,6 +786,7 @@ run(["cut", "--name", "Reorganized", "--date", "2026-04-01", "--no-pdf"], { cwd:
 assert("the timeline lists the archived release where it came from",
   run(["releases"], { cwd: rd }).includes("archived in .ledger/archive/v1/"));
 run(["add", "later"], { cwd: rd, stdin: feature({ audience: "user", size: "Small", name: "Later", description: "Does a later thing." }) });
+writeSummary(3, { new: [{ text: "Does a later thing.", covers: ["later"] }] }, { cwd: rd });
 run(["review", "complete"], { cwd: rd });
 run(["build", "--pdf", "--html", "--version", "3"], { cwd: rd });
 const after = fs.readFileSync(path.join(rd, "docs/generated/Redrafted-Feature-Ledger_3-draft.html"), "utf8");

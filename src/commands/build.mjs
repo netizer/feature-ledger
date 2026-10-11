@@ -3,11 +3,13 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { openProject } from "../store.mjs";
 import { fail, usage, titleSlug } from "../util.mjs";
-import { color } from "../ui.mjs";
+import { color, mark } from "../ui.mjs";
 import { MarkdownRenderer } from "../render/markdown.mjs";
 import { renderLedgerHtml } from "../render/ledger-html.mjs";
 import { htmlToPdf } from "../render/pdf.mjs";
 import { redraftReport, redraftSteps, rangeLabel } from "./redraft.mjs";
+import { summaryReport, summaryLine } from "../summary.mjs";
+import { runTask } from "../prompt.mjs";
 
 const out = (s) => process.stdout.write(`${s}\n`);
 const warn = (s) => process.stdout.write(`  ! ${s}\n`);
@@ -165,13 +167,30 @@ export async function printEdition(project, version, flags = {}) {
  * The open release as a draft PDF: the document as it would print if it were
  * cut now, never in the client directory. `--open` hands it to the system
  * viewer.
+ *
+ * `--run <agent>` has the agent write the summary first when it is out of
+ * date, and only that. A preview is for seeing, day to day, what the release
+ * says so far; an audit or a review costs a read of the code or of the whole
+ * release, and belongs to the cut. Without the flag the draft still prints,
+ * and says on its summary page that the summary hasn't caught up.
  */
 export async function cmdPreview({ flags }) {
-  const project = openProject(flags);
+  let project = openProject(flags);
   const open = project.releases.current;
   if (!open.future) fail(`v${open.version} is already cut, and there is no open release to preview`);
   if (!project.recordedAt(open.version) && project.releases.versions.length > 1) {
     out(`v${open.version} has nothing recorded yet, so this draft reads the same as the v${open.version - 1} edition.`);
+  }
+  const summary = summaryReport(project);
+  if (!summary.ok && flags.run !== undefined && flags.run !== false) {
+    out(`${mark(false)} summary: ${summaryLine(summary)}`);
+    out("");
+    const code = await runTask("summary", flags, { openProject });
+    out("");
+    if (code) out(`${color().yellow("!")} the summary didn't finish (see above); printing the draft with it as it stands.`);
+    project = openProject(flags);
+  } else if (!summary.ok) {
+    out(`${color().yellow("!")} ${summaryLine(summary)}. \`ledger preview --run\` has an agent write it first.`);
   }
   const { target } = await printEdition(project, open.version, flags);
   out(`wrote v${open.version} ${color().yellow("· DRAFT, not cut")} → ${rel(target)}`);

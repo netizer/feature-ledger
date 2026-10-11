@@ -69,6 +69,7 @@ subcategories.json   sub-section headings
 other-changes.json   changes belonging to no single feature
 audits.json          every audit so far, and the commit each was run against
 reviews.json         every review of a release, and a fingerprint of what it read
+summaries.json       per release, the lists its edition opens with, and what they were written from
 redrafts.json        every redraft, and whether the new corpus was checked against the old
 archive/v1-v4/       a corpus a redraft set aside, read-only; its editions print from it
 STYLE.md             optional, the project's own tone as prose

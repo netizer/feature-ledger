@@ -35,9 +35,11 @@ ledger — a client-facing record of what your product does, kept in the repo
                                         runs every check, prints the edition into the client
                                         directory, and opens the next release. A refusal lists
                                         every open check; --skip audit,review passes named ones.
-                                        --run hands an open audit or review to an agent first,
-                                        then asks before cutting (--yes doesn't ask)
-    ledger preview [--open]             the open release as a draft PDF, never in the client directory
+                                        --run hands an open audit, summary or review to an
+                                        agent first, then asks before cutting (--yes doesn't ask)
+    ledger preview [--open] [--run AGENT]
+                                        the open release as a draft PDF, never in the client directory.
+                                        --run has an agent write the summary first, if it's out of date
     ledger build [v3 | all | draft] [--md] [--pdf] [--out DIR] [--html]
                                         the Markdown docs, every cut edition not yet printed, and
                                         the draft of the open release; or just the one named
@@ -51,6 +53,9 @@ ledger — a client-facing record of what your product does, kept in the repo
     ledger audit complete [--commit SHA]    stamp the audited commit (default: HEAD)
     ledger audit confirm <id>           vouch for a reason an audit inferred
     ledger audit log [--json]           every audit so far
+    ledger summary                      write the short lists of what's new and what changed that
+                                        the edition opens with, from what the ledger already says
+    ledger summary complete             check the summary accounts for every entry, and stamp it
     ledger review                       read the release as the client will, before the cut
     ledger review complete              stamp what was reviewed
     ledger style rewrite                bring every entry into the project's tone
@@ -73,7 +78,7 @@ ledger — a client-facing record of what your product does, kept in the repo
     .ledger/config.json                 product name, tagline, document titles
     .ledger/other-changes.json          the product-wide notes
 
-  Delivering a prompt (bootstrap, audit, review, redraft check, style rewrite)
+  Delivering a prompt (bootstrap, audit, summary, review, redraft check, style rewrite)
     (default)        an explanation for you, then the prompt to paste into a fresh agent session
     --print          the prompt alone, ready to pipe: `ledger review --print | pbcopy`
     --copy           the prompt, straight onto the clipboard

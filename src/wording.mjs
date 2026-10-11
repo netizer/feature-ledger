@@ -90,6 +90,13 @@ export function wording(config) {
         `Everything ${product} does today, in plain language.`,
       ) + " Each entry is one capability you could ask for by name, sized so the biggest pieces stand out.",
       colophon: `Prepared for ${config.prepared_for}; every entry describes behaviour that is built and running.`,
+      // The page after the cover, from the second edition on, and the
+      // headings of its first two lists. {date} is " (March 4, 2026)", the
+      // last edition's date, or nothing.
+      summary_title: "What's different in this edition",
+      summary_intro: "What differs from the last edition{date}, in short. The numbers after an item link to the entries it sums up.",
+      summary_new: "What's new",
+      summary_updated: "What changed",
     },
   };
 

@@ -7,6 +7,7 @@ import { probeBrowser } from "../render/pdf.mjs";
 import { resolveStyle, styleTitle } from "../style.mjs";
 import { unauditedReport, unauditedSince, unconfirmedReasons } from "./audit.mjs";
 import { unreviewedReport, unreviewedLine } from "./review.mjs";
+import { summaryReport, summaryLine, textProblems } from "../summary.mjs";
 import { shortSha } from "../git.mjs";
 import { redraftReport, redraftSteps, rangeLabel } from "./redraft.mjs";
 import { cutChecks, renderChecks } from "./release.mjs";
@@ -300,6 +301,23 @@ function collectWarnings(project) {
   const unreviewed = unreviewedReport(project);
   if (!unreviewed.ok) {
     warnings.push(`${unreviewedLine(unreviewed)}. \`ledger review\` prints the brief; \`ledger cut\` refuses until then.`);
+  }
+
+  const summary = summaryReport(project);
+  if (!summary.ok) {
+    warnings.push(`${summaryLine(summary)}. \`ledger summary\` prints the brief; \`ledger cut\` refuses until then.`);
+  }
+  // An edition's opening page prints these exactly as written, and nothing
+  // about them puts the summary out of date, so they are only ever said here.
+  if (summary.summary) {
+    const faulty = textProblems(summary.summary);
+    if (faulty.length) {
+      warnings.push(
+        `${faulty.length} item${faulty.length === 1 ? "" : "s"} in the summary of v${summary.version} won't read as a sentence ` +
+        `of ${faulty.length === 1 ? "its" : "their"} own: ${faulty.map(([text, problems]) => `“${text.slice(0, 50)}${text.length > 50 ? "…" : ""}” ` +
+        `(${problems.join(", ")})`).join("; ")}. Reword one that opens on a command or a file name, in .ledger/summaries.json.`,
+      );
+    }
   }
 
   // A "What changed" note on something the client has never seen describes a

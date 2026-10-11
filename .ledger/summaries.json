@@ -1,0 +1,36 @@
+{
+  "summaries": [
+    {
+      "version": 3,
+      "new": [
+        {
+          "text": "Each edition opens with a short summary of what's new and what changed, written by a coding agent from the ledger.",
+          "covers": [
+            "edition-summary",
+            "release-editions",
+            "agent-handoff",
+            "release-review"
+          ]
+        }
+      ],
+      "changed": [
+        {
+          "text": "A draft edition can bring its summary up to date first, with ledger preview --run.",
+          "covers": [
+            "pdf-edition"
+          ]
+        }
+      ],
+      "quiet": [],
+      "date": "2026-10-12",
+      "commit": "e12f2dcb8565c30d29a0efee9df6f8e74e59eee1",
+      "entries": {
+        "release-review": "e8f2d7a8fa26a87b",
+        "agent-handoff": "e89aa377a8a873c0",
+        "release-editions": "ec10772fc0d32721",
+        "pdf-edition": "b15647fff1f3ec3b",
+        "edition-summary": "339fa6e1cda01761"
+      }
+    }
+  ]
+}

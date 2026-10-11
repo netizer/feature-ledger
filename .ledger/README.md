@@ -16,6 +16,7 @@ document handed over stays in the repo.
 | `other-changes.json` | Changes belonging to no single feature. |
 | `audits.json` | Every audit so far, and the commit each one covered. Written by `ledger audit complete`. |
 | `reviews.json` | Every review of a release before it was cut, and a fingerprint of what it read. Written by `ledger review complete`. |
+| `summaries.json` | Per release, the short lists of what's new and what changed that its edition opens with, and a fingerprint of the entries they were written from. Written with `ledger summary`. |
 | `redrafts.json` | Every time the corpus was written again from scratch, and when the new one was checked against the old. Written by `ledger redraft`. |
 | `archive/<label>/` | A corpus a redraft set aside, read-only. The editions it produced are printed from it. |
 | `theme.css` | Optional. Appended last to the PDF's stylesheet, for a one-off nudge. |
@@ -39,7 +40,9 @@ document is computed from, and `ledger update` refuses a change that never
 says why it happened.
 
 **Leave `releases.json`, `audits.json`, `reviews.json`, `redrafts.json` and
-`archive/` alone** (a redraft's `note` is wording, and yours). The
+`archive/` alone** (a redraft's `note` is wording, and yours). In
+`summaries.json`, the items, their `covers` and `quiet` are yours; the stamp
+is not. The
 timeline has to keep matching the editions already handed over, and an audit
 or review stamp set without the work behind it hides exactly what it exists
 to catch. `index.json` is in between:

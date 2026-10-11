@@ -72,8 +72,11 @@ what to run:
 ```
 
 `ledger audit` finds work that shipped without the ledger hearing about it.
+`ledger summary` writes the short lists of what's new and what changed that
+the edition opens with, from what the ledger already says, so a reader can see
+what moved without reading the rest.
 `ledger review` reads the release the way the client will, against the edition
-they already have. Both are agent tasks, so you can hand them over too, or let
+they already have. All three are agent tasks, so you can hand them over too, or let
 the cut do it:
 
 ```bash

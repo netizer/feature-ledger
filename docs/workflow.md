@@ -90,6 +90,9 @@ know. `ledger update` refuses a change to an existing feature without one. That
 refusal is deliberate, and it's the single most valuable thing the CLI does.
 
 `ledger` or `ledger status` shows what the open release has collected so far.
+`ledger preview --run claude` prints it as a draft PDF, having the agent bring
+the summary on its first page up to date first. The summary is written from
+the ledger alone, never from the code, so that's cheap enough to do daily.
 
 ## A feature was built without an agent
 
@@ -121,18 +124,19 @@ mistaken for one, or committed as one.
 | --- | --- | --- |
 | 1 | `ledger`: says whether the release is ready, and what's in the way | runs |
 | 2 | `ledger audit`, if code landed since the last one | agent task |
-| 3 | `ledger review`: the agent reads the release against the edition the client already has, fixes the wording, and records the review | agent task |
-| 4 | `ledger cut --name "Sprint 6 demo"`: runs every check, prints the PDF into the client directory, and opens the next release | runs |
-| 5 | Commit `.ledger/` (and `docs/client/`, if you keep the PDFs) | git |
+| 3 | `ledger summary`: the agent writes the short lists of what's new and what changed that the edition opens with, from what the entries already say | agent task |
+| 4 | `ledger review`: the agent reads the release against the edition the client already has, fixes the wording, and records the review | agent task |
+| 5 | `ledger cut --name "Sprint 6 demo"`: runs every check, prints the PDF into the client directory, and opens the next release | runs |
+| 6 | Commit `.ledger/` (and `docs/client/`, if you keep the PDFs) | git |
 
-Steps 2 to 4 in one command, with an agent doing the agent tasks:
+Steps 2 to 5 in one command, with an agent doing the agent tasks:
 
 ```bash
 ledger cut --name "Sprint 6 demo" --run claude
 ```
 
-It hands whichever of the audit and the review is still open to the agent, one
-after the other, checks what each left behind, then shows you the agent's notes
+It hands whichever of the audit, the summary and the review is still open to
+the agent, one after the other, checks what each left behind, then shows you the agent's notes
 and asks before it cuts. `--yes` cuts without asking, for when nobody is at a
 terminal.
 
@@ -147,6 +151,7 @@ $ ledger cut --name "Sprint 6 demo"
   ✗ audit    23 commits since the last audit (a1b3f9c, September 12, 2026), changing 41 files …
              → ledger audit        (or `ledger audit --run <agent>` to hand it to one)
   ✓ content  14 entries recorded against v6
+  ✓ summary  the summary of v6 accounts for all 14 entries, and none has changed since …
   ✗ review   2 client-facing entries have changed since v6 was reviewed on September 25, 2026 …
              → ledger review       (or `ledger review complete`, if you have read them yourself)
   ✓ moment   cutting at 3f9c21a on 2026-10-10

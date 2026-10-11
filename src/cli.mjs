@@ -12,6 +12,7 @@ import * as status from "./commands/status.mjs";
 import * as style from "./commands/style.mjs";
 import * as audit from "./commands/audit.mjs";
 import * as review from "./commands/review.mjs";
+import * as summary from "./commands/summary.mjs";
 import * as redraft from "./commands/redraft.mjs";
 
 const COMMANDS = {
@@ -36,6 +37,7 @@ const COMMANDS = {
   releases: release.cmdReleases,
   audit: audit.cmdAudit,
   review: review.cmdReview,
+  summary: summary.cmdSummary,
   redraft: redraft.cmdRedraft,
 
   build: build.cmdBuild,
@@ -92,7 +94,7 @@ titles in config.json. \`ledger rules\` has the section on editing by hand.`,
                                    document footnotes the old name on its own, as it always did.`,
 };
 
-const DELIVERY_HELP = `  Delivering a prompt (bootstrap, audit, review, redraft check, style rewrite)
+const DELIVERY_HELP = `  Delivering a prompt (bootstrap, audit, summary, review, redraft check, style rewrite)
     (default)        an explanation for you, then the prompt to paste into a fresh agent session
     --print          the prompt alone, ready to pipe: \`ledger review --print | pbcopy\`
     --copy           the prompt, straight onto the clipboard
@@ -131,9 +133,11 @@ const HELP = `ledger — a client-facing record of what your product does, kept 
                                         runs every check, prints the edition into the client
                                         directory, and opens the next release. A refusal lists
                                         every open check; --skip audit,review passes named ones.
-                                        --run hands an open audit or review to an agent first,
-                                        then asks before cutting (--yes doesn't ask)
-    ledger preview [--open]             the open release as a draft PDF, never in the client directory
+                                        --run hands an open audit, summary or review to an
+                                        agent first, then asks before cutting (--yes doesn't ask)
+    ledger preview [--open] [--run AGENT]
+                                        the open release as a draft PDF, never in the client directory.
+                                        --run has an agent write the summary first, if it's out of date
     ledger build [v3 | all | draft] [--md] [--pdf] [--out DIR] [--html]
                                         the Markdown docs, every cut edition not yet printed, and
                                         the draft of the open release; or just the one named
@@ -147,6 +151,9 @@ const HELP = `ledger — a client-facing record of what your product does, kept 
     ledger audit complete [--commit SHA]    stamp the audited commit (default: HEAD)
     ledger audit confirm <id>           vouch for a reason an audit inferred
     ledger audit log [--json]           every audit so far
+    ledger summary                      write the short lists of what's new and what changed that
+                                        the edition opens with, from what the ledger already says
+    ledger summary complete             check the summary accounts for every entry, and stamp it
     ledger review                       read the release as the client will, before the cut
     ledger review complete              stamp what was reviewed
     ledger style rewrite                bring every entry into the project's tone
@@ -213,10 +220,11 @@ const FLAGS = {
   audit: { default: "brief", brief: ["full", "since"], complete: ["commit", "full", "since", "dry-run"],
     confirm: ["version", "dry-run"], log: ["json"] },
   review: { default: "brief", brief: [], complete: ["dry-run"] },
+  summary: { default: "brief", brief: [], complete: ["dry-run"] },
   redraft: { default: "status", status: [], start: ["force", "dry-run"], check: [], complete: ["note", "dry-run"] },
 
   build: ["md", "pdf", "version", "out", "html"],
-  preview: ["out", "html", "open"],
+  preview: ["out", "html", "open", "run"],
   completion: [],
 };
 
@@ -275,7 +283,7 @@ function commandHelp(name, sub) {
     if (taking) picked.push(line);
   }
   if (!picked.length) return null;
-  const prompts = taskFor(name, sub) || ["bootstrap", "audit", "review"].includes(name);
+  const prompts = taskFor(name, sub) || ["bootstrap", "audit", "summary", "review"].includes(name);
   return `${picked.join("\n")}\n${prompts ? `\n${DELIVERY_HELP}\n` : ""}\n  Global: --dir PATH, --json where offered.\n` +
     "  `ledger --help` lists every command.\n";
 }
@@ -286,9 +294,10 @@ function commandHelp(name, sub) {
  * (`ledger amend` → `ledger releases amend`).
  */
 const SUBCOMMANDS = {
-  amend: ["releases amend"], complete: ["audit complete", "review complete", "redraft complete"],
+  amend: ["releases amend"], complete: ["audit complete", "summary complete", "review complete", "redraft complete"],
   confirm: ["audit confirm"], log: ["audit log"], start: ["redraft start"], rewrite: ["style rewrite"],
   draft: ["preview", "build draft"], publish: ["cut"], release: ["cut"], print: ["build"], check: ["status"],
+  headline: ["summary"], headlines: ["summary"], highlights: ["summary"],
 };
 
 function unknownCommand(word) {

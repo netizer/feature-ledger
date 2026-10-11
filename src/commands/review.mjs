@@ -1,7 +1,9 @@
-import crypto from "node:crypto";
 import { openProject } from "../store.mjs";
 import { fail, today, longDate, COPY_BLOCK } from "../util.mjs";
 import { unauditedReport, unauditedLine } from "./audit.mjs";
+import {
+  entryWords, fingerprint, printsSummary, summaryTargets, accountingProblems, summaryItems, ordered, currentFingerprints,
+} from "../summary.mjs";
 import * as git from "../git.mjs";
 
 const out = (s) => process.stdout.write(`${s}\n`);
@@ -36,34 +38,35 @@ export async function cmdReview({ flags, positional }) {
 
 /**
  * Everything the client edition prints as news at `version`: the user-facing
- * entries written at it, and the product-wide notes. Team-only entries are
- * left out on purpose — they never reach the client, and a gate that fired on
- * a dev note would be one people learn to --force past.
+ * entries written at it, the product-wide notes, and the summary the edition
+ * opens with. Team-only entries are left out on purpose — they never reach
+ * the client, and a gate that fired on a dev note would be one people learn
+ * to --force past.
  *
  * Each is fingerprinted by the words the client reads, not by the file, so
  * confirming an inferred reason or editing dev notes does not ask for another
- * review, while a new bullet, a rewritten description or a new entry does.
+ * review, while a new bullet, a rewritten description, a reworded summary
+ * item or a new entry does. The summary is fingerprinted by what it prints,
+ * not by its stamp, so `ledger summary complete` alone asks for nothing.
  */
 function reviewTargets(project, version) {
   const targets = new Map();
   for (const f of project.featureSet.features({ audience: "user" })) {
     const h = f.entryAt(version);
     if (!h) continue;
-    const words = h.removed
-      ? { removed: true, reason: h.reason, backfilled: Boolean(h.backfilled) }
-      : { name: h.name ?? null, description: h.description, changes: h.changes ?? null, backfilled: Boolean(h.backfilled) };
-    targets.set(f.id, { label: f.currentName, hash: fingerprint(words) });
+    targets.set(f.id, { label: f.currentName, hash: fingerprint(entryWords(h)) });
   }
   for (const c of project.featureSet.otherChanges({ version })) {
     if (c.audience !== "user") continue;
     const hash = fingerprint({ other: c.description });
     targets.set(`other:${hash}`, { label: `product-wide note “${clip(c.description, 50)}”`, hash });
   }
+  const summary = project.summaryOf(version);
+  if (summary) {
+    const items = summaryItems(summary).map(({ list, text, covers }) => ({ list, text, covers }));
+    targets.set("summary", { label: "the summary", hash: fingerprint({ summary: items, quiet: summary.quiet ?? [] }) });
+  }
   return targets;
-}
-
-function fingerprint(words) {
-  return crypto.createHash("sha256").update(JSON.stringify(words)).digest("hex").slice(0, 16);
 }
 
 const clip = (s, n) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
@@ -110,11 +113,18 @@ export function unreviewedLine(report) {
 /* ---- review complete --------------------------------------------------- */
 
 /**
- * Stamps what the review read. It refuses the two shapes that are wrong on
- * their face, whatever the prose says, so a review cannot be recorded over
- * them: a feature new in this release carrying a "What changed" note (it has
- * no "before" for the client), and one marked changed with nothing saying
- * what changed.
+ * Stamps what the review read. It refuses the shapes that are wrong on their
+ * face, whatever the prose says, so a review cannot be recorded over them: a
+ * feature new in this release carrying a "What changed" note (it has no
+ * "before" for the client), one marked changed with nothing saying what
+ * changed, and a summary that doesn't account for the release, since the
+ * review reads the summary too.
+ *
+ * The reviewer reads the summary against the entries as they left them, so
+ * recording the review also records those entries as what the summary was
+ * written from. Without that, a review that rewords an entry would put the
+ * summary out of date, and rewriting the summary would put the review out of
+ * date in turn.
  */
 function complete(flags) {
   const project = openProject(flags);
@@ -141,6 +151,11 @@ function complete(flags) {
   }
   project.recordReview(entry);
   out(`recorded a review of v${version} (${entry.date}) covering ${targets.size} client-facing entr${targets.size === 1 ? "y" : "ies"}`);
+  const summary = project.summaryOf(version);
+  if (summary?.entries) {
+    project.saveSummary(ordered({ ...summary, entries: currentFingerprints(project, version) }));
+    out("The summary was read with them, so it is recorded as written from the entries as they stand now.");
+  }
   out("A later `ledger add`, `update` or hand-edit to one of them asks for another before `ledger cut`.");
 }
 
@@ -153,6 +168,14 @@ function shapeProblems(project, version) {
       problems.push(`${f.id} is new in v${version} but still carries "changes" — set it to null, and move anything worth keeping into the description`);
     } else if (f.firstVersion < version && !h.changes?.length) {
       problems.push(`${f.id} is marked changed in v${version} with no bullet — say what changed, or delete its v${version} entry if nothing did`);
+    }
+  }
+  if (printsSummary(project, version) && summaryTargets(project, version).length) {
+    const summary = project.summaryOf(version);
+    if (!summary?.entries) {
+      problems.push(`v${version} has no complete summary to read — \`ledger summary\` writes it, and the review reads it last`);
+    } else {
+      for (const p of accountingProblems(project, version, summary)) problems.push(`the summary: ${p}`);
     }
   }
   return problems;
@@ -455,6 +478,26 @@ function brief(flags) {
     p(`  for a feature whose history starts at ${N}.`);
     p("- With the whole release in view, check that the size and the area still fit.");
     p("");
+    p("## The summary");
+    p("");
+    p(`The ${N} edition opens with short numbered lists of what differs from ${P}:`);
+    p("\"What's new\", \"What changed\" and \"Already in place\". They are the summary for");
+    p(`${N} in .ledger/summaries.json: each item has its \"text\" and \"covers\", the ids of`);
+    p("the entries it sums up, and \"quiet\" lists the entries left out on purpose. Many");
+    p("readers read only that page, so read it last, once the entries are settled:");
+    p("");
+    p("- Each item agrees with the entries it covers as you left them. One written for a");
+    p("  bullet you dropped or merged says something the ledger no longer does.");
+    p("- An item may give a reason or a benefit the entries don't state. Keep it if the");
+    p("  entries bear it out, fix it if they contradict it, and list it in your report");
+    p("  either way.");
+    p("- If you merged or deleted an entry, take its id out of \"covers\" and \"quiet\", and");
+    p("  make sure every entry in the release is still in one or the other.");
+    p("- Edit only \"text\", \"covers\" and \"quiet\". \"date\", \"commit\" and \"entries\" are");
+    p("  written by the CLI; `ledger review complete` brings them up to date.");
+    p("- If it needs more than a touch, `ledger summary --print` is the brief for writing");
+    p("  it again as a whole.");
+    p("");
     p("## Grey entries (\"already in place\")");
     p("");
     p("The capability was already in the product before this cycle; only the record is");
@@ -503,7 +546,7 @@ function brief(flags) {
   p(`  entry; deleting the ${N} object of an updated entry whose net change is nothing;`);
   p("  and deleting the file of a new entry merged into another. Never add a history");
   p("  entry, never change a \"version\", and never touch releases.json, audits.json or");
-  p("  reviews.json.");
+  p("  reviews.json. In summaries.json, only the items, their \"covers\" and \"quiet\".");
   p("- Leave a \"reason_inferred\" flag where it is. Only the human can confirm a reason.");
   p("- Don't run `ledger build` or `ledger cut`.");
   p("");
@@ -511,7 +554,8 @@ function brief(flags) {
   p("");
   p("1. Run `ledger status`. It validates every file you touched. Fix what it reports.");
   p("2. Run `ledger review complete`. It refuses while a new entry still carries a");
-  p("   change note or an updated one has none, and names them.");
+  p("   change note, an updated one has none, or the summary leaves an entry out of");
+  p("   both \"covers\" and \"quiet\", and names them.");
   p("3. Then print a short report for the human:");
   p("   - per entry, one line for each bullet you dropped because its \"before\" never");
   p("     shipped, and for each group of bullets you merged;");
