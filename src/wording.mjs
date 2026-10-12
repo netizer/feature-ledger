@@ -49,7 +49,7 @@ export function wording(config) {
         "Implementation notes on parts of the system a client never sees." +
         " For client-facing features and their implementation notes, read the extended feature list.",
     },
-    // The two labels for the third register: an entry the audit found late,
+    // The two labels for the third register: an entry recorded late,
     // where the product did not move this cycle — the record did. Green and
     // blue say the software changed; these say the document caught up. They
     // are worded as reassurance rather than confession, because the reader is
@@ -97,6 +97,12 @@ export function wording(config) {
       summary_intro: "What differs from the last edition{date}, in short. The numbers after an item link to the entries it sums up.",
       summary_new: "What's new",
       summary_updated: "What changed",
+      // The two halves of every edition after the first: what moved, in
+      // full, and everything else, one line each.
+      changed_title: "What's new and what changed",
+      changed_intro: "Every capability added, changed or listed for the first time in this edition, in full.",
+      rest_title: `Everything else ${product} does`,
+      rest_intro: "Unchanged since the last edition, one line each.",
     },
   };
 

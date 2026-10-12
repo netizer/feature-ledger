@@ -39,16 +39,20 @@
       "quiet": [
         "saved-addresses"
       ],
-      "date": "2026-10-12",
-      "commit": "847e774421c3c0ae8e7776fa9f3718faf1b06e48",
-      "inputs": {
-        "delivery-window-picker": "6571a05005b5f1b2",
-        "substitutions": "2161abb021e3043a",
-        "saved-addresses": "715f6ec32fc1f90b",
-        "pick-scan": "bfb8201faf3fb1b1",
-        "pick-reassign": "b364acea63970982",
-        "pick-timer": "bbe23e937a160eb2",
-        "pick-print": "cde78790d3a4b758"
+      "prepared": {
+        "date": "2026-10-12",
+        "commit": null,
+        "entries": {
+          "delivery-window-picker": 2,
+          "substitutions": 0,
+          "basket-recovery": 1,
+          "saved-addresses": 1,
+          "pick-scan": 0,
+          "pick-reassign": 0,
+          "pick-timer": 0,
+          "pick-print": 0
+        },
+        "notes": 1
       }
     }
   ]

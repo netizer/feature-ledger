@@ -4,16 +4,16 @@
 what {product} does. So this prints the brief, and whichever agent you use
 runs it.
 
-It runs start to finish on its own. The agent surveys, decides the areas,
-writes every entry, cuts the baseline and prints it — without stopping to ask
-you anything. Editing comes after, and what you get back is a **draft**: read
-the finished document, then open `.ledger/features/<id>.json` and rewrite
+It runs start to finish on its own. The agent surveys, decides the areas and
+writes every entry — without stopping to ask you anything — then stops short
+of the cut and commits nothing. What you get back is a **draft**: read it with
+`ledger preview`, then open `.ledger/features/<id>.json` and rewrite
 anything that isn't how you'd say it to this client — the wrong word, a
 sentence it invented, a detail they shouldn't be reading, or the sentence it
 had no way of knowing. That records nothing and marks nothing as changed.
-`ledger change <id>` and `ledger remove <id> --why "…"` are for anything
-where the product itself has moved since. The agent finishes by listing the
-entries it was least sure about, so you know where to look first.
+When it reads right, commit it and run the `ledger cut` the agent gives you,
+which prints the first edition. The agent finishes by listing the entries it
+was least sure about, so you know where to look first.
 
 The prompt itself is everything under the rule below. Copy it whole, from
 there to the end of this output, into a fresh agent session in the project
@@ -155,10 +155,12 @@ yourself.
    `category` out entirely when the ledger has no areas. Hold every `name` to
    **The names** above before you move on: it is the part of the entry most
    readers will ever actually read.
-3. Give it `paths`: the globs its code lives in, as you just read it
-   (`"paths": ["src/billing/**"]`). Prefer a directory or a pattern to a list
-   of files; a module several capabilities share belongs to each of them.
-   Later audits and previews read the code through these.
+3. Give it `how_to_see`: plain instructions a client follows to check the
+   claim for themselves, read off the routes and labels in the code. For
+   example: "Open Settings → Delivery and choose *Book ahead*; dates up to four
+   weeks out are selectable." Where you can't tell how someone would reach it,
+   leave it out and put the id on your list of open questions: a guess here is
+   an instruction that doesn't work.
 4. Size each entry — **Big** for a capability the product is chosen for,
    **Medium** for a capability in its own right inside a bigger one, **Small**
    for one narrow enough to describe in a line. The scale ranks entries within
@@ -170,11 +172,8 @@ yourself.
 6. Run `ledger status` at the end of each batch, fix anything it reports, and
    move straight on to the next batch.
 
-When every batch is done, run `ledger paths`. Every product file should belong
-to an entry. A file that doesn't is either part of a capability (claim it:
-`ledger own <id> '<glob>'`), a capability you missed (record it), or not
-product code at all — tests, fixtures, tooling — which you mark with
-`ledger own --ignore '<glob>'`.
+When every batch is done, go over the codebase once more for a capability you
+missed: a route, a screen, a command or a job that no entry describes.
 
 Where you can't tell from the code what something is *for* — as opposed to
 what it does — write the reading the code best supports, and keep the entry's
@@ -199,13 +198,14 @@ Finish with a short note for me, and nothing else to do:
 - How many entries you recorded, and the areas you settled on — or why you
   left the ledger unfiled.
 - **The open questions**: every entry where you couldn't tell what something
-  was *for*, one line each, with the id and the reading you went with. This is
-  the list I'll work through first, so don't pad it with entries you're
-  confident about, and don't leave one off because it's probably fine.
+  was *for*, or how a reader would reach it, one line each, with the id and
+  the reading you went with. This is the list I'll work through first, so
+  don't pad it with entries you're confident about, and don't leave one off
+  because it's probably fine.
 - Anything you found and deliberately left out, if a reasonable person might
   have expected it in the document.
+- The `ledger cut` command from Step 4, ready to run.
 
-Then stop. What you hand me is a draft: I'll rewrite the wording myself in
-`.ledger/features/<id>.json`, and `ledger change <id>` and
-`ledger remove <id> --why "…"` cover anything that has actually moved.
-`ledger preview` prints a draft of whatever is open.
+Then stop, without committing. What you hand me is a draft: I'll read it with
+`ledger preview`, rewrite the wording myself in `.ledger/features/<id>.json`,
+commit it, and cut it.

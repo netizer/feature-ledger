@@ -39,17 +39,23 @@ something about it changed; absent versions mean "still whatever the last entry
 said". That's what makes "what did this look like at version N?" answerable, and
 why an old edition still reproduces exactly what was presented then.
 
-**Facts are recorded; text for the client is composed.** Alongside its states,
+**Facts are recorded; text for the client is prepared.** Alongside its states,
 a feature keeps **events**: what moved and why, as somebody recorded them while
-the work landed. The "What changed" notes and the summary an edition prints are
-composed once per release from the two states and the events between, so they
-describe only differences the client will see. See
-[checks.md](checks.md#recording-facts-composing-text).
+the work landed. The "What changed" notes, the summary and the message an
+edition goes out with are written once per release, by `ledger prepare`, from
+the two states and the events between, so they describe only differences the
+client will see. See [releasing.md](releasing.md#facts-while-you-build-client-text-once-per-release).
 
-**A feature names its code.** Each entry's `paths` are globs over the
-repository. They let the ledger be checked against the code: the audit looks
-only at code the record doesn't account for, and the size readout says how
-much code moved under each entry.
+**A feature says how to see it.** Each state can carry `how_to_see`: plain
+instructions a client follows to check the claim themselves. It is versioned
+with the description, so an old edition reprints the instructions it was sent
+with.
+
+**Nothing maps code to features.** Commits are horizontal and features are
+vertical: shared files belong to many entries, cross-cutting work touches most
+files without being about them, and a feature grows without touching the files
+it started in. `ledger prepare` reads the code since the last edition as
+evidence for work nobody recorded, never as the source of client text.
 
 **Two audiences.** `user` features are what the client sees; `dev` features are
 what only the team cares about. `dev_notes` on a user feature is implementation
@@ -64,30 +70,38 @@ about how far down an entry may go.
 cycle, grey means already true and only now on the record. The first two are
 facts about the software, the third a fact about the record.
 
+**Short editions, nothing dropped.** From the second edition on, the PDF prints
+every new, updated, in-place and removed entry in full, and one line (name and
+first sentence) for each entry that didn't move. Reprinting every unchanged
+entry in full every time was most of an edition's length. `--full` prints them
+all in full.
+
 **Two highlight semantics, on purpose.** The living Markdown docs tag New and
 Changed only while the release is open, so a shipped release reads as a clean
 list. The PDF always diffs against its own predecessor, however old, because its
 job is reproducing what was in front of the client that day.
 
+**Released editions don't change.** A cut edition's notes are frozen in
+`compositions.json`, including the recorded lines it printed for want of a
+prepared note, so it reprints what was handed over.
+
 ## Layout of `.ledger/`
 
 ```
-config.json          product, the area list (= reading order), tone, wording overrides
+config.json          product, the area list (= reading order), tone, wording overrides, "schema": 3
 brand.json           logo, accent, fonts
 releases.json        the version timeline, each release with the commit it was cut at
-features/<id>.json   one feature: the code it lives in, its state at each version, and its events
+features/<id>.json   one feature: its state at each version (name, description, how to see it),
+                     its events (what changed and why), and dev notes
 index.json           the deliberate corpus order (ties within a size band)
 subcategories.json   sub-section headings
 other-changes.json   changes belonging to no single feature
-audits.json          every audit so far, and the commit each was run against
-compositions.json    per release, the "What changed" notes and the summary its edition prints,
-                     and what they were composed from
-questions.json       reasons nobody vouched for, and what a check doubted
+compositions.json    per release, the "What changed" notes, the summary and the message its
+                     edition goes out with, and what `ledger prepare` had read
 redrafts.json        every redraft, and whether the new corpus was checked against the old
 archive/v1-v4/       a corpus a redraft set aside, read-only; its editions print from it
 STYLE.md             optional, the project's own tone as prose
 theme.css            optional, appended last to the PDF stylesheet
-.cache/              gitignored; what the last `ledger preview` saw
 ```
 
 Everything here is committed. Which parts are yours to edit is in
@@ -96,6 +110,12 @@ entry something you can open and edit, and stops two branches adding features
 from conflicting.
 
 ## Not included, deliberately
+
+**A code-to-feature map, audits and questions as stores of their own.** See
+[releasing.md](releasing.md#deliberately-left-out).
+
+**Screenshots.** "How to see it" is plain instructions for now; screenshots are
+deferred, not rejected.
 
 **User flows.** The original this was extracted from also carried a step-by-step
 behavioural catalogue per feature, close to a test plan. It's valuable, and it's

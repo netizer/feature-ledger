@@ -204,14 +204,9 @@ function start(flags) {
   writeJson(project.subcategoriesPath, []);
   writeJson(project.otherChangesPath, []);
   writeJson(project.indexPath, { order: [] });
-  // Both logs describe the old corpus — which entries a review read, what an
-  // audit recorded — and are kept, whole, in the archive. The survey records
-  // the new corpus's first full sweep on its own.
-  writeJson(project.auditsPath, { audits: [] });
-  // What was composed, and what was asked, is about the old corpus's
-  // editions; both stay in the archive, with the editions they belong to.
+  // What was written for the old corpus's editions stays in the archive,
+  // with the editions it belongs to.
   if (exists(project.compositionsPath)) writeJson(project.compositionsPath, { compositions: [] });
-  if (exists(project.questionsPath)) writeJson(project.questionsPath, { questions: [] });
 
   const timeline = releases.releases
     .filter((r) => !r.future)
@@ -490,9 +485,8 @@ function brief(flags) {
   p("- Change what the ledger says only to make it true and complete. Every sentence you");
   p("  leave must be something a reader could confirm by using the product.");
   p(`- Every entry stays at ${N}. Don't run \`ledger change\` or \`ledger remove\`, and`);
-  p("  don't touch releases.json, redrafts.json or the archive. `ledger own` is fine:");
-  p("  an entry that takes over an old one's capability takes over its paths.");
-  p("- Don't run `ledger build` or `ledger cut`.");
+  p("  don't touch releases.json, redrafts.json or the archive.");
+  p("- Don't run `ledger build` or `ledger cut`, and don't commit.");
   p("");
   p("## The note for the client");
   p("");

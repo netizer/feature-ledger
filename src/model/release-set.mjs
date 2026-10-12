@@ -153,10 +153,11 @@ export class ReleaseSet {
   }
 
   toJSON() {
-    return this.releases.map(({ version, name, date, status, commit, archive, display_version, redraft }) => ({
+    return this.releases.map(({ version, name, date, status, commit, archive, display_version, redraft, layout }) => ({
       version, name, date, status, commit: commit ?? null, ...(archive ? { archive } : {}),
       ...(display_version != null ? { display_version } : {}),
       ...(redraft ? { redraft } : {}),
+      ...(layout ? { layout } : {}),
     }));
   }
 
@@ -184,6 +185,11 @@ export class ReleaseSet {
       }
       if (r.display_version != null && !(Number.isInteger(r.display_version) && r.display_version >= 1)) {
         fail(`release ${r.version}: "display_version" must be a whole number of 1 or more (got ${JSON.stringify(r.display_version)})`);
+      }
+      // An edition cut with `--full` printed every entry in full, and every
+      // reprint of it has to as well.
+      if (r.layout != null && r.layout !== "full") {
+        fail(`release ${r.version}: "layout" is "full" or left out (got ${JSON.stringify(r.layout)})`);
       }
       if (r.redraft != null && r.redraft !== true) {
         fail(`release ${r.version}: "redraft" is either true or left out (got ${JSON.stringify(r.redraft)})`);

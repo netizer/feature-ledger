@@ -3,14 +3,6 @@
   "audience": "user",
   "category": "The documents it produces",
   "size": "Big",
-  "paths": [
-    "src/commands/build.mjs",
-    "src/render/ledger-html.mjs",
-    "src/render/pdf.mjs",
-    "src/render/fonts.mjs",
-    "assets/fonts/**",
-    "src/wording.mjs"
-  ],
   "dev_notes": "src/render/ledger-html.mjs builds the document, src/render/pdf.mjs drives Chromium via playwright-core (channel chrome, msedge, chromium, or $LEDGER_CHROME). editionFile() and printEdition() in src/commands/build.mjs decide where a file goes: a released version goes to output.client_dir under pdf_name, the future one to output.dir with -draft appended; `ledger cut` and `ledger build` share them. `ledger build [v3|all|draft]` picks editions (`--version N` still works), `--html` writes the page instead of printing it. Contents entries are plain <a href=\"#id\"> anchors onto ids on the area heads (area-N) and the closing sections (closing-*); Chromium turns those into named destinations in the PDF. Fonts are static instances, not variable ones, or Chromium emits Type 3 glyphs that copy out shredded; after rendering, pdf.mjs asks Chromium (CSS.getPlatformFontsForNode) which font drew each element's text and fails the build if any is a system font; Noto Sans Symbols 2 is embedded last in both stacks for quoted UI icons. Before printing, releaseOversizedBlocks() in pdf.mjs lays the page out at Letter size and lifts break-inside: avoid from any block taller than a page, because Chromium otherwise pushes such a block to a fresh page and splits it there anyway, leaving a heading alone on an empty page; .cat-head, .sub-head and .feature .name keep break-after: avoid so a heading still travels with the first lines below it. The printed number comes from ReleaseSet.labelOf, which carries the nearest earlier display_version forward; it reaches the cover, footer, colophon, title, redraft note and pdf_name, and nothing else.",
   "history": [
     {
@@ -24,7 +16,7 @@
     },
     {
       "version": 3,
-      "description": "Each edition is a PDF: a front page with the masthead, the feature count and a note of what changed since the last edition, then short lists of what's new and what changed, a contents list that links into the document, and every entry in reading order. ledger cut prints it into the client folder. ledger preview prints the open release as a draft, kept apart and named so it can't be mistaken for an edition, and opens with the size of the release; with --run, a coding agent first composes what changed. Any edition can be reprinted with its entries as they stood that day."
+      "description": "Each edition is a PDF: a cover with the masthead and one line of what's new, updated and unchanged, then a summary page, then every entry that moved in full, with its note and how to see it, and one line for everything else. ledger cut prints it into the client folder, and --full prints every entry in full. ledger preview prints the open release as a draft, free and kept apart so it can't be mistaken for an edition, showing the changes as recorded wherever nothing is prepared yet."
     }
   ],
   "events": [
@@ -49,6 +41,14 @@
       "kind": "change",
       "what": "ledger preview opens with the size of the release and what moved since the last look, and a draft prints the recorded changes, marked as such, until they are composed.",
       "why": "A preview is how the size of the latest changes gets checked, and that shouldn't need a PDF or an agent. A draft with no notes at all hid the very changes it was printed to show.",
+      "why_from": "person",
+      "date": "2026-10-12"
+    },
+    {
+      "version": 3,
+      "kind": "change",
+      "what": "An edition prints every new, updated and removed entry in full, with how to see it, and one line for each entry that didn't move, and the cover shows one line of counts instead of the size bar. ledger preview no longer has an agent compose first: where nothing is prepared, it shows the changes as recorded.",
+      "why": "Reprinting every unchanged entry in full was most of an edition's length: this ledger's own second edition ran to 13 pages for 25 features. A preview is the free look at the release, and tokens are spent only when someone asks for them.",
       "why_from": "person",
       "date": "2026-10-12"
     }

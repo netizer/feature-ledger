@@ -3,9 +3,6 @@
   "audience": "user",
   "category": "Recording what the product does",
   "size": "Medium",
-  "paths": [
-    "src/commands/verify.mjs"
-  ],
   "dev_notes": "src/commands/verify.mjs: the brief lists every client-facing entry in the release with its paths, the files that moved under it since the last edition, its description and its composed note, then the summary items. The agent files findings with `ledger questions add`; `verify complete` stores `verified: { date, commit, fingerprint }` on the composition, the fingerprint covering the composed text and the entries' descriptions (verifyFingerprint in src/compose.mjs). The cut checks it only when config.json has \"checks\": { \"verify\": true }. `ledger review` is retired in src/cli.mjs with a pointer to compose and verify; `--skip review` maps to verify.",
   "history": [
     {
@@ -15,8 +12,8 @@
     },
     {
       "version": 3,
-      "name": "Checking an edition against the code",
-      "description": "The command ledger verify has a coding agent read every sentence an edition will print about the release, its descriptions, notes and summary, against the code each entry lives in. It edits nothing: whatever it can't confirm becomes a question, and ledger cut asks it before printing. The cut asks for a verify only once a project turns it on."
+      "removed": true,
+      "reason": "Checking the text against the code is the last step of ledger prepare now, with the developer there to fix the code or the text, instead of a separate step with a stamp of its own."
     }
   ],
   "events": [
@@ -33,6 +30,14 @@
       "kind": "change",
       "what": "It checks what the edition says against the code and reports what it doubts, instead of rewording the release in place, and the cut only asks for it once a project turns it on.",
       "why": "Composing the notes from the two editions removed the drafts the review existed to repair. What is left worth a second read is whether the text is true, and a check that edits nothing leaves every doubt with a person.",
+      "why_from": "person",
+      "date": "2026-10-12"
+    },
+    {
+      "version": 3,
+      "kind": "remove",
+      "what": "Reviewing a release before it goes out is no longer part of the product.",
+      "why": "Checking the text against the code is the last step of ledger prepare now, with the developer there to fix the code or the text, instead of a separate step with a stamp of its own.",
       "why_from": "person",
       "date": "2026-10-12"
     }

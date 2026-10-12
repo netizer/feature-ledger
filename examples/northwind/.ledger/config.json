@@ -18,34 +18,5 @@
     "dev": "DEV_FEATURES.md"
   },
   "docs": {},
-  "schema": 2,
-  "ignore": [
-    "test/**",
-    "tests/**",
-    "spec/**",
-    "**/__tests__/**",
-    "**/*.test.*",
-    "**/*.spec.*",
-    "**/*_test.*",
-    ".github/**",
-    ".gitignore",
-    ".gitattributes",
-    ".editorconfig",
-    "LICENSE*",
-    "package-lock.json",
-    "yarn.lock",
-    "pnpm-lock.yaml",
-    "Gemfile.lock",
-    "poetry.lock",
-    "Cargo.lock",
-    "go.sum",
-    "README*",
-    "CHANGELOG*",
-    "CLAUDE.md",
-    "AGENTS.md",
-    "GEMINI.md",
-    ".cursor/**",
-    ".windsurfrules",
-    ".claude/**"
-  ]
+  "schema": 3
 }

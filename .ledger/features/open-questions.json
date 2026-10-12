@@ -3,16 +3,12 @@
   "audience": "user",
   "category": "Recording what the product does",
   "size": "Small",
-  "paths": [
-    "src/questions.mjs",
-    "src/commands/questions.mjs"
-  ],
   "dev_notes": "questions.json holds them. A `why` question points at an event by index and checks its `what`; answering sets the event's why and why_from person, accepting only changes why_from, and neither of those alone puts a composition out of date unless the words change. A `legacy` question comes from a migrated reason_inferred on a released version and settles without touching anything printed. askInline() in src/commands/questions.mjs is what `ledger cut` calls at a TTY.",
   "history": [
     {
       "version": 3,
-      "name": "Questions only you can answer",
-      "description": "Reasons nobody recorded, reasons read off a commit message, and anything a check doubted are kept as questions until a person settles them. The command ledger questions lists them, and answering one puts the reason in your words; ledger cut asks the open ones one at a time before it prints."
+      "name": "Reasons nobody recorded",
+      "description": "A change whose reason nobody knows, or whose reason was read off a commit message, keeps that on the change until a person gives one. Bare ledger lists them, ledger prepare asks you about them in its session, and ledger cut says how many are left before it prints."
     }
   ]
 }

@@ -3,10 +3,6 @@
   "audience": "user",
   "category": "Setting up a ledger",
   "size": "Small",
-  "paths": [
-    "assets/RESTYLE.md",
-    "src/commands/style.mjs"
-  ],
   "dev_notes": "assets/RESTYLE.md, filled with the product name, the style section, the entry count and the area list.",
   "history": [
     {

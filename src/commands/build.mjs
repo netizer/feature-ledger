@@ -3,14 +3,13 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { openProject } from "../store.mjs";
 import { fail, usage, titleSlug } from "../util.mjs";
-import { color, mark } from "../ui.mjs";
+import { color } from "../ui.mjs";
 import { MarkdownRenderer } from "../render/markdown.mjs";
 import { renderLedgerHtml } from "../render/ledger-html.mjs";
 import { htmlToPdf } from "../render/pdf.mjs";
 import { redraftReport, redraftSteps, rangeLabel } from "./redraft.mjs";
-import { composeReport, composeLine } from "../compose.mjs";
-import { releaseDiff, sizeReadout, sinceLastLook, rememberLook } from "../diff.mjs";
-import { runTask } from "../prompt.mjs";
+import { prepareReport, prepareLine } from "../compose.mjs";
+import { readout } from "../diff.mjs";
 
 const out = (s) => process.stdout.write(`${s}\n`);
 const warn = (s) => process.stdout.write(`  ! ${s}\n`);
@@ -37,7 +36,7 @@ const rel = (p) => path.relative(process.cwd(), p) || p;
  * once it has something in it.
  */
 export async function cmdBuild({ flags, positional }) {
-  let project = openProject(flags);
+  const project = openProject(flags);
   const c = color();
 
   const redraft = redraftReport(project);
@@ -64,10 +63,6 @@ export async function cmdBuild({ flags, positional }) {
     }
   }
   if (!wantPdf) return;
-
-  // `--run` brings the open release's composition up to date before its
-  // draft prints, the same way `ledger preview --run` does.
-  if (flags.run !== undefined && flags.run !== false) project = await composeFirst(project, flags);
 
   const releases = project.releases;
   const open = releases.current.future ? releases.current : null;
@@ -154,13 +149,15 @@ export function editionFile(project, version, flags = {}) {
 /**
  * Prints one edition. `--html` writes the same document as HTML instead —
  * openable in a browser with devtools, which is the fast loop when tuning
- * theme.css.
+ * theme.css. `--full` prints every entry in full, the way a first edition
+ * does; an edition cut with it reprints that way on its own.
  */
 export async function printEdition(project, version, flags = {}) {
   const { target, source, release, draft } = editionFile(project, version, flags);
   if (release.archived) out(`v${version} is archived — printing it from .ledger/${release.archive}/`);
   const label = project.releases.printedAs(version);
-  const { html, warnings, fontsEmbedded } = renderLedgerHtml({ project: source, version, label });
+  const full = Boolean(flags.full) || release.layout === "full";
+  const { html, warnings, fontsEmbedded } = renderLedgerHtml({ project: source, version, label, full });
   for (const w of warnings) warn(w);
   fs.mkdirSync(path.dirname(target), { recursive: true });
   if (flags.html) fs.writeFileSync(target, html);
@@ -168,53 +165,29 @@ export async function printEdition(project, version, flags = {}) {
   return { target, draft };
 }
 
-/** Has an agent compose the open release when its composition is out of date, and only then. */
-async function composeFirst(project, flags) {
-  const report = composeReport(project);
-  if (report.ok) return project;
-  out(`${mark(false)} compose: ${composeLine(report)}`);
-  out("");
-  const code = await runTask("compose", flags, { openProject });
-  out("");
-  if (code) out(`${color().yellow("!")} the composition didn't finish (see above); printing the draft with it as it stands.`);
-  return openProject(flags);
-}
-
 /**
- * The open release, at a glance and as a draft PDF.
+ * The open release, at a glance and as the edition would print now. Free:
+ * no agent, nothing to pay for, so it can run as often as anyone likes.
  *
- * It opens with the size readout (src/diff.mjs): what the release holds,
- * weighed by size, how much code moved under each entry, and what moved
- * since the last look. That part is worked out from the corpus and git
- * alone, so it costs nothing; `--size` stops there. Then the draft, never
- * in the client directory, with `--open` handing it to the system viewer.
- *
- * `--run <agent>` composes first when the composition is out of date, and
- * only that: composing reads only the ledger, so it is cheap enough for every
- * day, while an audit or a verify reads the code and belongs to the cut.
- * Without the flag the draft still prints, its notes drawn as a draft from
- * the events, and says on its summary page that it hasn't been composed.
+ * It opens with the readout (src/diff.mjs): what the release holds, how many
+ * changes were recorded and how many `ledger prepare` hasn't read, and how
+ * much code moved since the last edition. Then the draft, laid out exactly
+ * as `ledger cut` will print it, never in the client directory. Where a note
+ * hasn't been prepared, the changes as recorded print instead, labelled so,
+ * so the size and content of the latest work is always visible.
  */
 export async function cmdPreview({ flags }) {
-  let project = openProject(flags);
+  const project = openProject(flags);
   const open = project.releases.current;
   if (!open.future) fail(`v${open.version} is already cut, and there is no open release to preview`);
 
-  const since = sinceLastLook(project);
-  out(sizeReadout(project, releaseDiff(project)));
-  if (since) out(`\n${since}`);
-  rememberLook(project);
-  if (flags.size) return;
+  out(readout(project));
   out("");
-
   if (!project.recordedAt(open.version) && project.releases.versions.length > 1) {
     out(`v${open.version} has nothing recorded yet, so this draft reads the same as the v${open.version - 1} edition.`);
   }
-  if (flags.run !== undefined && flags.run !== false) project = await composeFirst(project, flags);
-  else {
-    const report = composeReport(project);
-    if (!report.ok) out(`${color().yellow("!")} ${composeLine(report)}. \`ledger preview --run\` has an agent compose it first.`);
-  }
+  const report = prepareReport(project);
+  if (!report.ok && !report.nothing) out(`${color().yellow("!")} ${prepareLine(report)}; the draft shows those changes as recorded.`);
   const { target } = await printEdition(project, open.version, flags);
   out(`wrote v${open.version} ${color().yellow("· DRAFT, not cut")} → ${rel(target)}`);
   if (flags.open) {

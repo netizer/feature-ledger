@@ -13,13 +13,13 @@ $EDITOR .ledger/features/saved-baskets.json
   "audience": "user",
   "category": "Ordering",
   "size": "Medium",
-  "paths": ["app/models/basket.rb", "app/views/baskets/**"],
   "dev_notes": "The switch is a session swap, not a copy.",
   "history": [
     {
       "version": 4,
       "name": "Saved baskets",
-      "description": "A customer keeps more than one basket, such as the weekly shop and a party order, and switches between them without either losing its contents."
+      "description": "A customer keeps more than one basket, such as the weekly shop and a party order, and switches between them without either losing its contents.",
+      "how_to_see": "Open the basket menu and choose New basket; the first one stays in the list."
     }
   ]
 }
@@ -55,13 +55,13 @@ On any entry in a feature's `history`:
 | --- | --- |
 | `name` | What the feature is called. The newest entry's name is what it goes by; every document footnotes the previous one on its own. |
 | `description` | The whole present-tense text, in two or three sentences. `ledger status` says when one runs long for its size. |
+| `how_to_see` | How a reader checks the claim themselves. Carried forward to later versions until one sets its own. |
 
 At the top of the same file:
 
 | | |
 | --- | --- |
 | `dev_notes` | The team's detail. Delete the key to drop it. |
-| `paths` | The globs the capability's code lives in. `ledger own` does the same from the command line. |
 | `size` | `Big`, `Medium` or `Small`. |
 | `category`, `subcategory` | Must name one that already exists — `ledger status` refuses a typo rather than inventing an area. |
 | `id` | **Don't.** It's the filename and the identity that carries history across renames, and `index.json` orders by it. |
@@ -71,15 +71,15 @@ Elsewhere in `.ledger/`:
 | | |
 | --- | --- |
 | `subcategories.json` | A sub-section's `name` and `intro`. |
-| `compositions.json` | A release's "What changed" notes (`changes`, by entry id), a summary item's `text` and `covers`, and `quiet`. `ledger compose complete` writes `date`, `commit` and `inputs`, and `ledger verify complete` writes `verified`. |
-| `config.json` | Product name, tagline, `ignore` (files that aren't product code), `checks`, and the `docs` block that overrides document titles and intros. |
+| `compositions.json` | A release's "What changed" notes (`changes`, by entry id), a summary item's `text` and `covers`, `quiet`, and the `message`. `ledger prepare complete` writes `prepared`. |
+| `config.json` | Product name, tagline, and the `docs` block that overrides document titles and intros. |
 | `other-changes.json` | The `description` of a product-wide note. |
-| `releases.json` | A release's `display_version` and `redraft` (see [documents.md](documents.md#carrying-on-from-earlier-reports) and [checks.md](checks.md#a-redraft-done-by-hand)). Nothing else in the file. |
+| `releases.json` | A release's `display_version` and `redraft` (see [documents.md](documents.md#carrying-on-from-earlier-reports) and [releasing.md](releasing.md#a-redraft-done-by-hand)). Nothing else in the file. |
 | `STYLE.md`, `theme.css` | Prose and CSS. They were always yours. |
 
-A hand-edit of a composed note or summary item doesn't put the composition out
-of date, and the next `ledger compose` keeps it unless the entry it is about
-moves again.
+A hand-edit of a prepared note or summary item never counts as news since the
+last prepare, and the next `ledger prepare` keeps it unless the entry it is
+about moves again.
 
 Renaming an **area** is the exception, because its name is repeated on every
 feature filed under it: `ledger categories rename "Old" "New"` carries them all
@@ -94,11 +94,13 @@ Not much, and only where a hand-edit would be invisible or wrong.
   computed from, and which release is open isn't visible from inside the file.
   An event is a fact somebody recorded: what moved, and why. That's
   `ledger add`, `change` and `remove`, and `change` is also what refuses a
-  change that never says *why*.
-- **`releases.json`, `questions.json`, and the stamps in `audits.json`,
-  `compositions.json` and `redrafts.json`.** A timeline edited by hand stops matching the editions
-  already handed over, and a stamp set without the sweep behind it makes a gap
-  permanently invisible. The exceptions are a redraft's `note`, and a release's
+  change that never says *why*. The one exception: when someone gives the
+  reason for a change that had none, it goes into that event's `why`, with
+  `"why_from": "person"`. `ledger prepare` does this as it asks you.
+- **`releases.json`, and the stamps in `compositions.json` and
+  `redrafts.json`.** A timeline edited by hand stops matching the editions
+  already handed over, and the `prepared` stamp is what says which changes a
+  prepare has read. The exceptions are a redraft's `note`, and a release's
   `display_version` and `redraft`. The same goes for `.ledger/archive/`: the old
   editions print from it.
 - **Keeping `index.json` complete.** Every write adds a new id and prunes one

@@ -3,9 +3,6 @@
   "audience": "user",
   "category": "Recording what the product does",
   "size": "Small",
-  "paths": [
-    "src/commands/write.mjs"
-  ],
   "dev_notes": "src/commands/write.mjs cmdRemove. Removing a feature added in the same open release is refused: delete the file instead, since a client never saw it.",
   "history": [
     {

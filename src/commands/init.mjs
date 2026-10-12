@@ -4,8 +4,6 @@ import { fileURLToPath } from "node:url";
 import { writeJson, exists, fail, isBlank, COPY_BLOCK } from "../util.mjs";
 import { LEDGER_DIRNAME, DEFAULT_CONFIG, DEFAULT_BRAND, COMMITTED_CLIENT_DIR, pdfsAreCommitted } from "../store.mjs";
 import { resolveStyle, styleTitle, styleLine, STYLES, CUSTOM_STYLE_ID } from "../style.mjs";
-import * as git from "../git.mjs";
-import { DEFAULT_IGNORE } from "../paths.mjs";
 
 const PKG_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const asset = (name) => fs.readFileSync(path.join(PKG_ROOT, "assets", name), "utf8");
@@ -120,9 +118,6 @@ export async function cmdInit({ flags }) {
     // product and would quietly become the one nobody revisits; the first
     // survey of the codebase is what decides the areas.
     categories: [],
-    // Tests, lockfiles and CI say nothing about what the product does, so
-    // they never read as code no entry owns. See src/paths.mjs.
-    ignore: DEFAULT_IGNORE,
     style: styleFlag(flags),
     output: {
       ...DEFAULT_CONFIG.output,
@@ -167,21 +162,19 @@ export async function cmdInit({ flags }) {
   if (flags.gitignore !== false) {
     const added = addGitignore(root, config.output.dir);
     if (added) out(`added ${config.output.dir}/ to .gitignore (generated docs are build output — the corpus is what's committed)`);
-    // What the last `ledger preview` saw belongs to whoever looked.
-    addGitignore(root, `${path.relative(root, ledgerDir).split(path.sep).join("/")}/.cache`);
   }
 
   out("");
   out("Next:");
-  out(`  1. ledger bootstrap             # prints a survey prompt to hand to your coding agent`);
+  out(`  1. ledger bootstrap             # prints a survey prompt to paste into your coding agent`);
   out(`     (or \`ledger bootstrap --run claude\` to hand it over directly — codex and gemini work too)`);
-  out(`  2. …the agent runs it to the end on its own: one entry per capability at v1 (areas`);
-  out(`      only if the product needs them), then it cuts the baseline, which prints its edition`);
-  out(`  3. read the result and edit it — the words are yours: open .ledger/features/<id>.json and`);
-  out(`      change, add to or cut anything that isn't how you'd say it to this client. \`ledger change\``);
-  out(`      and \`ledger remove\` for anything that actually moved, then \`ledger status\` and \`ledger preview\``);
+  out(`  2. …the agent writes one entry per capability at v1 (areas only if the product needs`);
+  out(`      them), how to see each one, and stops for you to read it`);
+  out(`  3. read it with \`ledger preview\` and edit it — the words are yours: open`);
+  out(`      .ledger/features/<id>.json and change anything that isn't how you'd say it to this client`);
+  out(`  4. commit, then \`ledger cut --name "Baseline"\` prints the first edition`);
   out("");
-  out("From then on the agent records each change against the open release, and `ledger cut` mints the next edition.");
+  out("From then on the agent records each change as it works. Preview is free, prepare costs tokens, cut prints.");
   out("Run `ledger` on its own at any point: it says where things stand and what to run next.");
 }
 
@@ -237,7 +230,6 @@ export async function cmdBootstrap({ flags }) {
   let product = "the product";
   let config = DEFAULT_CONFIG;
   let ledgerDir = null;
-  let projectRoot = null;
   let redraft = null;
   try {
     const { openProject } = await import("../store.mjs");
@@ -245,7 +237,6 @@ export async function cmdBootstrap({ flags }) {
     product = project.config.product;
     config = project.config;
     ledgerDir = project.ledgerDir;
-    projectRoot = project.root;
     redraft = project.pendingRedraft;
   } catch {
     // Printing the prompt before `ledger init` is still useful.
@@ -257,31 +248,27 @@ export async function cmdBootstrap({ flags }) {
       .replaceAll("{baseline_step}", redraft ? redraftStep(redraft) : BASELINE_STEP)
       .replaceAll("{product}", product)
       .replaceAll("{style_line}", styleLine(style))
-      .replaceAll("{audit_block}", auditBlock(flags, projectRoot, redraft))
       .replaceAll("{copy_rule}", COPY_BLOCK),
   );
 }
 
-/** Step 4 of an ordinary survey: date the baseline and cut it. */
-const BASELINE_STEP = `## Step 4 — the baseline edition
+/** Step 4 of an ordinary survey: stop short of the cut, and say how to make it. */
+const BASELINE_STEP = `## Step 4 — stop before the cut
 
-When every capability is recorded and \`ledger status\` is clean, date the
-baseline from the repository rather than asking me — the first commit is when
-work on this codebase started:
+When every capability is recorded and \`ledger status\` is clean, work out the
+baseline's date from the repository rather than asking me — the first commit
+is when work on this codebase started:
 
 \`\`\`
 git log --reverse --format=%ad --date=short | head -1
 \`\`\`
 
-{audit_block}Then cut the release. The cut prints its PDF edition as well:
+Don't cut the release, and don't commit: I read the draft (\`ledger preview\`),
+edit it, commit it, and cut it myself. Put the command in your note for me:
 
 \`\`\`
 ledger cut --name "Baseline" --date <that date, or today if there's no history>
 \`\`\`
-
-If it refuses, it lists every check that's open and what to run for each.
-If only the PDF fails (no browser on this machine), cut with \`--no-pdf\` and
-say so in your summary.
 
 Version 1 has no predecessor, so its edition prints as a plain inventory with
 nothing flagged as new or changed — which is exactly right for a snapshot of
@@ -309,9 +296,9 @@ missed.
 Everything you recorded is at v${redraft.opens}, the next edition after the one the
 client already has. That is the right place for it.
 
-{audit_block}Do **not** cut the release, and do not run \`ledger build\`. The cut
-refuses until the redraft is checked, and the check comes after this work is
-committed.`;
+Do **not** cut the release, don't commit, and don't run \`ledger build\`. The
+cut refuses until the redraft is checked, and the check comes after I have
+committed this work.`;
 }
 
 function redraftIntro(redraft) {
@@ -322,34 +309,4 @@ When it's done, commit what it recorded, then run \`ledger redraft check\` for t
 step that checks the new corpus against the old one.
 
 `;
-}
-
-/**
- * The survey IS a full audit — the agent has just read the whole codebase
- * against the record — so the prompt ends by recording one. Without this the
- * tool has no point to measure drift from, `ledger status` reports the
- * codebase as never checked, and the `ledger cut` gate stays silent until
- * somebody runs `ledger audit` by hand.
- *
- * Recorded before the cut on purpose, so the audit is logged against the
- * release the entries actually went into rather than the empty one the cut
- * opens behind it. The commit is the one HEAD is at now, not whatever HEAD has
- * become by the time a long survey finishes.
- *
- * `--no-audit` leaves it out, for a survey that is deliberately partial.
- */
-function auditBlock(flags, root, redraft = null) {
-  if (flags.audit === false) return "";
-  const sha = root ? git.head(root) : null;
-  return [
-    "This survey **is** a full audit: you have just read the whole codebase",
-    `against the record. Record that ${redraft ? "before you stop" : "before you cut"}, so the tool knows the sweep`,
-    "happened and can tell later how much has landed since:",
-    "",
-    "```",
-    `ledger audit complete --full${sha ? ` --commit ${sha}` : ""}`,
-    "```",
-    "",
-    "",
-  ].join("\n");
 }

@@ -4,7 +4,6 @@ import { COPY_RULE, EXIT, UserError, fail, usage } from "./util.mjs";
 import { color, mark } from "./ui.mjs";
 import { resolveAgent } from "./agents/index.mjs";
 import { runAgent, describeCommand } from "./agents/runner.mjs";
-import { shortSha } from "./git.mjs";
 
 /**
  * The commands that print a prompt for a coding agent, and what each one is
@@ -14,94 +13,34 @@ import { shortSha } from "./git.mjs";
  * the prompt, so delivering one is one mechanism for all of them: printed
  * whole (the default), printed alone (`--print`), put on the clipboard
  * (`--copy`), or handed to an agent (`--run`). The last is the only one that
- * acts, so it is the only one that checks what the agent did — the stamp each
- * task ends by recording — and says so, rather than leaving that for the next
- * `ledger cut` to discover.
+ * acts, so it is the only one that checks what the agent did and says so. It
+ * only ever happens when someone typed `--run`: tokens are spent on purpose.
  *
  * Keyed by command and subcommand, as the command line names them.
  */
 export const TASKS = {
+  prepare: {
+    label: "preparation of the edition",
+    brief: async (flags) => (await import("./commands/prepare.mjs")).cmdPrepare({ flags, positional: [] }),
+    snapshot: () => ({}),
+    async verify(p) {
+      const { prepareReport, prepareLine, unknownReasons } = await import("./compose.mjs");
+      const r = prepareReport(p);
+      const checks = [{ ok: r.ok, line: r.ok ? prepareLine(r) : `${prepareLine(r)} — the agent stopped before \`ledger prepare complete\`` }];
+      const unknown = unknownReasons(p, p.releases.current.version).length;
+      if (unknown) checks.push({ ok: true, line: `${unknown} reason${unknown === 1 ? "" : "s"} still not vouched for — \`ledger\` lists them` });
+      return checks;
+    },
+  },
   bootstrap: {
     label: "baseline survey",
     brief: async (flags) => (await import("./commands/init.mjs")).cmdBootstrap({ flags, positional: [] }),
-    snapshot: (p) => ({ redraft: Boolean(p?.pendingRedraft), released: p ? released(p) : 0, audits: p?.audits.length ?? 0 }),
-    verify(p, before) {
+    snapshot: () => ({}),
+    verify(p) {
       const n = p.featureSet.features().length;
       if (!n) return [{ ok: false, line: "nothing was recorded — the ledger is still empty" }];
-      const checks = [{ ok: true, line: `${n} entr${n === 1 ? "y" : "ies"} recorded` }];
-      checks.push(p.audits.length > before.audits
-        ? { ok: true, line: "the survey is recorded as a full audit" }
-        : { ok: false, line: "the survey wasn't recorded as an audit (`ledger audit complete --full`)" });
-      if (!before.redraft) {
-        checks.push(released(p) > before.released
-          ? { ok: true, line: `the baseline is cut as v${p.releases.releases.filter((r) => r.released).at(-1).version}` }
-          : { ok: false, line: "the baseline wasn't cut — `ledger status` shows what is in the way" });
-      }
-      return checks;
-    },
-  },
-  audit: {
-    label: "audit",
-    brief: async (flags) => (await import("./commands/audit.mjs")).cmdAudit({ flags, positional: [] }),
-    snapshot: (p) => ({ audits: p.audits.length, entries: fingerprints(p), questions: p.questions.length }),
-    verify(p, before) {
-      if (p.audits.length <= before.audits) {
-        return [{ ok: false, line: "no audit was recorded — the agent stopped before `ledger audit complete`" }];
-      }
-      const a = p.lastAudit;
-      const b = a.backfilled ?? { added: 0, changed: 0, removed: 0 };
-      const inPlace = b.added + b.changed + b.removed;
-      const moved = movedSince(p, before.entries);
-      const checks = [{ ok: true, line: `${a.mode} audit recorded${a.commit ? ` at ${shortSha(a.commit)}` : ""}: ` +
-        (moved.length
-          ? `${moved.length} entr${moved.length === 1 ? "y" : "ies"} recorded or claimed code (${moved.join(", ")})` +
-            (inPlace ? `, ${inPlace} of them already in place before the last cut` : "")
-          : "nothing was missing from the ledger") }];
-      const asked = p.questions.length - before.questions;
-      if (asked > 0) {
-        checks.push({ ok: true, line: `${asked} reason${asked === 1 ? "" : "s"} read off commit messages, waiting for you — ` +
-          "`ledger questions` lists them" });
-      }
-      return checks;
-    },
-  },
-  compose: {
-    label: "composition",
-    brief: async (flags) => (await import("./commands/compose.mjs")).cmdCompose({ flags, positional: [] }),
-    snapshot: () => ({}),
-    async verify(p) {
-      const { composeReport, composeLine } = await import("./compose.mjs");
-      const r = composeReport(p);
-      return [{ ok: r.ok, line: composeLine(r) }];
-    },
-  },
-  verify: {
-    label: "check against the code",
-    brief: async (flags) => (await import("./commands/verify.mjs")).cmdVerify({ flags, positional: [] }),
-    snapshot: (p) => ({ questions: p.questions.length }),
-    async verify(p, before) {
-      const { verifyFingerprint } = await import("./compose.mjs");
-      const version = p.releases.current.version;
-      const v = p.compositionOf(version)?.verified;
-      const found = p.questions.length - before.questions;
-      return [v && v.fingerprint === verifyFingerprint(p, version)
-        ? { ok: true, line: `v${version} is verified${found > 0 ? `, with ${found} finding${found === 1 ? "" : "s"} for you (\`ledger questions\`)` : ", nothing found"}` }
-        : { ok: false, line: "the check wasn't recorded — the agent stopped before `ledger verify complete`" }];
-    },
-  },
-  "paths brief": {
-    label: "ownership survey",
-    brief: async (flags) => (await import("./commands/paths.mjs")).cmdPaths({ flags, positional: ["brief"] }),
-    snapshot: () => ({}),
-    async verify(p) {
-      const { coverage } = await import("./commands/paths.mjs");
-      const cov = coverage(p);
-      if (!cov) return [{ ok: false, line: "no git repository, so ownership can't be checked" }];
-      const lines = [cov.unowned.length
-        ? { ok: false, line: `${cov.unowned.length} product file${cov.unowned.length === 1 ? " is" : "s are"} still owned by no entry — \`ledger paths\`` }
-        : { ok: true, line: `every one of ${cov.product.length} product files is owned by an entry` }];
-      if (cov.dead.length) lines.push({ ok: false, line: `${cov.dead.length} entr${cov.dead.length === 1 ? "y has" : "ies have"} a glob that matches no file` });
-      return lines;
+      return [{ ok: true, line: `${n} entr${n === 1 ? "y" : "ies"} recorded — read it with \`ledger preview\`, edit it, commit it, ` +
+        (p.pendingRedraft ? "then run `ledger redraft check`" : "then `ledger cut --name \"Baseline\"`") }];
     },
   },
   "redraft check": {
@@ -124,24 +63,15 @@ export const TASKS = {
   },
 };
 
-const released = (p) => p.releases.releases.filter((r) => r.released).length;
-
-/** Every entry's file contents, to tell afterwards which ones an agent wrote. */
-const fingerprints = (p) => Object.fromEntries(p.featureSet.features().map((f) => [f.id, JSON.stringify(f.toJSON())]));
-const movedSince = (p, before) => p.featureSet.features()
-  .filter((f) => before[f.id] !== JSON.stringify(f.toJSON())).map((f) => f.id);
-
 /** The task a command line names, or null when it doesn't print a prompt. */
 export function taskFor(command, sub) {
-  if (TASKS[command] && ["bootstrap", "audit", "compose", "verify"].includes(command) &&
-      (sub === undefined || sub === "brief")) return command;
+  if (["bootstrap", "prepare"].includes(command) && (sub === undefined || sub === "brief")) return command;
   const key = `${command} ${sub}`;
   return TASKS[key] ? key : null;
 }
 
 /** Every command line that prints a prompt, for messages that list them. */
-export const PROMPT_COMMANDS = ["ledger bootstrap", "ledger audit", "ledger compose", "ledger verify", "ledger redraft check",
-  "ledger style rewrite", "ledger paths brief"];
+export const PROMPT_COMMANDS = ["ledger prepare", "ledger bootstrap", "ledger redraft check", "ledger style rewrite"];
 
 /**
  * Runs a brief with stdout held back, and splits what it printed at the rule.

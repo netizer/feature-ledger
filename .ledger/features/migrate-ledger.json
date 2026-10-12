@@ -3,15 +3,12 @@
   "audience": "user",
   "category": "Setting up a ledger",
   "size": "Small",
-  "paths": [
-    "src/commands/migrate.mjs"
-  ],
   "dev_notes": "Works on the raw JSON, since the model refuses schema 1. Released versions' bullets go verbatim into compositions.json; the open release's become `combined` events plus a draft composition, stamped only if the old summary and review fingerprints both still held (wasCurrent). dev_notes move to the feature; file paths they name become `paths`. Archives under .ledger/archive/ are migrated too. Idempotent: a schema 2 ledger is left alone.",
   "history": [
     {
       "version": 3,
       "name": "Upgrading an older ledger",
-      "description": "The command ledger migrate brings a ledger written by an earlier version of the tool over to the current one. Every edition already handed over prints exactly as before, and with --run a coding agent then says which code each entry lives in."
+      "description": "The command ledger migrate brings a ledger written by an earlier version of the tool over to the current one. Every edition already handed over prints exactly as before, and anything it can't carry over is listed word for word. A feature file in an older shape, merged in later, is refused until migrate converts it."
     }
   ]
 }

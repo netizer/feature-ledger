@@ -3,10 +3,6 @@
   "audience": "user",
   "category": "Recording what the product does",
   "size": "Medium",
-  "paths": [
-    "src/agents/**",
-    "src/prompt.mjs"
-  ],
   "dev_notes": "One file per agent in src/agents/ (claude.mjs, codex.mjs, gemini.mjs, custom.mjs), each with the headless command line, a parser for its event stream and its resume command; index.mjs is the registry and resolves --run (a bare --run reads $LEDGER_AGENT or config.json \"agent\"), runner.mjs spawns it in the project root with the prompt on stdin. src/prompt.mjs holds TASKS: how to call each brief and the stamp to check afterwards; an agent that exits without it returns exit code 3. Claude runs with acceptEdits and an allowlist of ledger and read-only git commands; Codex with --sandbox workspace-write. The Claude and Codex adapters were tested against the real CLIs; the Gemini one follows its documented headless mode and has not been run against a live install.",
   "history": [
     {
@@ -16,7 +12,7 @@
     },
     {
       "version": 3,
-      "description": "The commands that prepare work for a coding agent, bootstrap, audit, compose, verify, paths brief, redraft check and style rewrite, print a prompt for you to paste. Add --copy to put it on the clipboard, or --run claude, codex or gemini to hand it to that agent and wait. When the agent stops, you see its last message, whether it left what its task asks for, and the command that resumes its session. Nothing is handed to an agent unless you pass --run."
+      "description": "The commands that prepare work for a coding agent, prepare, bootstrap, redraft check and style rewrite, print a prompt for you to paste into your agent session. Add --copy to put it on the clipboard, or --run claude, codex or gemini to hand it to that agent and wait. When the agent stops, you see its last message, whether it left what its task asks for, and the command that resumes its session. Nothing is handed to an agent unless you pass --run."
     }
   ],
   "events": [
@@ -33,6 +29,14 @@
       "kind": "change",
       "what": "compose, verify and paths brief are agent tasks; summary and review are not.",
       "why": "Compose and verify replace the summary and the review, and saying which code each entry lives in needs something that can read the code.",
+      "why_from": "person",
+      "date": "2026-10-12"
+    },
+    {
+      "version": 3,
+      "kind": "change",
+      "what": "The agent tasks are prepare, bootstrap, redraft check and style rewrite.",
+      "why": "Audit, compose and verify are the steps of one prepare session now, and the paths brief went with the code map.",
       "why_from": "person",
       "date": "2026-10-12"
     }

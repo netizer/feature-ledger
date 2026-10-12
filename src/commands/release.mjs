@@ -1,28 +1,26 @@
 import fs from "node:fs";
 import path from "node:path";
 import { openProject, pdfsAreCommitted } from "../store.mjs";
-import { fail, usage, nearest, isBlank, today, longDate, EXIT, UserError } from "../util.mjs";
+import { fail, usage, isBlank, today, longDate, EXIT, UserError } from "../util.mjs";
 import { color, mark } from "../ui.mjs";
-import { unauditedReport, unauditedLine } from "./audit.mjs";
-import { composeReport, composeLine, verifyReport } from "../compose.mjs";
-import { openQuestions } from "../questions.mjs";
-import { askInline } from "./questions.mjs";
+import { prepareReport, prepareLine, unpreparedNotes, unknownReasons, frozenForCut, messageFor } from "../compose.mjs";
 import { redraftReport, redraftSteps } from "./redraft.mjs";
 import { editionFile, printEdition } from "./build.mjs";
-import { runTask } from "../prompt.mjs";
 import * as git from "../git.mjs";
 
 const out = (s) => process.stdout.write(`${s}\n`);
+const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+const list = (ids) => ids.slice(0, 5).join(", ") + (ids.length > 5 ? `, and ${ids.length - 5} more` : "");
 
 /** `ledger releases`: the timeline, and filling in a commit after the fact. */
 export async function cmdReleases({ flags, positional }) {
   const sub = positional[0] ?? "list";
-  if (sub === "list") return list(flags);
+  if (sub === "list") return listReleases(flags);
   if (sub === "amend") return amend(flags, positional.slice(1));
   fail("usage: ledger releases [amend <version> --commit <sha>]");
 }
 
-function list(flags) {
+function listReleases(flags) {
   const project = openProject(flags);
   for (const r of project.releases.releases) {
     // Only when it differs: a ledger that never set `display_version` lists as before.
@@ -39,23 +37,23 @@ function list(flags) {
     // The commit is what tells two editions cut on one day apart, so it goes
     // in the listing rather than only in the file.
     const at = r.commit ? `  ${git.shortSha(r.commit)}` : "";
-    out(`v${String(r.version).padStart(2)}  ${(when ?? "").padEnd(20)}${at.padEnd(10)} ${r.name ?? "(unnamed)"}  · ${touched} entr${touched === 1 ? "y" : "ies"}${printed}`);
+    out(`v${String(r.version).padStart(2)}  ${(when ?? "").padEnd(20)}${at.padEnd(10)} ${r.name ?? "(unnamed)"}  · ` +
+      `${plural(touched, "entry", "entries")}${r.layout === "full" ? " · printed in full" : ""}${printed}`);
   }
 }
 
 /**
  * Filling in the commit on a release that was cut before commits were
- * recorded — which is every release in every ledger that predates them, this
- * one included. Without this the field could only ever be set going forward,
- * and a timeline would stay half blank for the life of the project.
+ * recorded. Without this the field could only ever be set going forward, and
+ * a timeline would stay half blank for the life of the project.
  *
  * The in-progress release is refused on purpose: it has no commit because it
  * has not happened yet, and `ledger cut` is what gives it one.
  */
 function amend(flags, rest) {
   const project = openProject(flags);
-  const version = Number(rest[0]);
-  if (!Number.isInteger(version)) fail('usage: ledger releases amend <version> --commit <sha>');
+  const version = Number(String(rest[0] ?? "").replace(/^v/, ""));
+  if (!Number.isInteger(version)) fail("usage: ledger releases amend <version> --commit <sha>");
 
   const release = project.releases.at(version);
   if (release.archived) {
@@ -63,36 +61,18 @@ function amend(flags, rest) {
       "its commit is part of the record the client's edition was printed from");
   }
   if (release.future) {
-    fail(
-      `v${version} is the release in progress, so it has no commit yet — it gets one when ` +
-      "`ledger cut` turns it into a real moment.",
-    );
+    fail(`v${version} is the release in progress, so it has no commit yet — it gets one when ` +
+      "`ledger cut` turns it into a real moment.");
   }
-  if (isBlank(flags.commit) || flags.commit === true) {
-    fail(`amending a release needs --commit <sha> — the commit v${version} was cut at`);
-  }
+  if (isBlank(flags.commit) || flags.commit === true) fail(`amending a release needs --commit <sha> — the commit v${version} was cut at`);
   if (!git.available(project.root)) fail("--commit needs a git repository; this project has none");
 
   const sha = git.resolve(project.root, String(flags.commit));
   if (!sha) fail(`no commit ${flags.commit} in this repository`);
-  if (!git.isAncestor(project.root, sha)) {
-    fail(`${git.shortSha(sha)} isn't an ancestor of HEAD, so v${version} can't have been cut at it`);
-  }
-
-  // The same thing `cut` refuses: two editions standing for one moment.
-  const clash = project.releases.releases.find(
-    (r) => r.version !== version && r.released && r.date === release.date && r.commit === sha,
-  );
-  if (clash && !flags.force) {
-    fail(
-      `v${clash.version} (${clash.name}) already stands for ${release.date} at ${git.shortSha(sha)}, so the two ` +
-      "editions would be indistinguishable. Pass --force if that is really what happened.",
-    );
-  }
+  if (!git.isAncestor(project.root, sha)) fail(`${git.shortSha(sha)} isn't an ancestor of HEAD, so v${version} can't have been cut at it`);
 
   const had = release.commit;
   release.commit = sha;
-
   if (flags["dry-run"]) {
     out(JSON.stringify(project.releases.toJSON(), null, 2));
     out("(--dry-run: nothing written)");
@@ -100,23 +80,14 @@ function amend(flags, rest) {
   }
   project.releases.validate();
   project.saveReleases();
-  out(`v${version} — ${release.name} (${release.date}) was cut at ${git.shortSha(sha)}` +
-    (had ? `, was ${git.shortSha(had)}` : ""));
+  out(`v${version} — ${release.name} (${release.date}) was cut at ${git.shortSha(sha)}${had ? `, was ${git.shortSha(had)}` : ""}`);
 }
 
 /**
- * The commit this edition stands for.
- *
- * An edition is a snapshot of the product at a moment, and the date is too
- * coarse to name that moment: two demos in one day are ordinary, and a
- * document cut this morning and one cut this afternoon are two different
- * products. The commit is what says which. `--commit` cuts a release
- * retrospectively at a known point, verified the same way `ledger audit
- * complete` verifies its own — a sha this history has never seen is a typo,
- * not a release.
- *
- * Null outside a repository. That is a real project shape, not an error, and
- * everything downstream treats a missing commit as "not recorded".
+ * The commit this edition stands for. The date is too coarse to name a
+ * moment — two demos in one day are ordinary — so the commit is what says
+ * which state of the product an edition was printed from. Null outside a
+ * repository, which is a real project shape, not an error.
  */
 function resolveCutCommit(project, flags) {
   const root = project.root;
@@ -126,147 +97,114 @@ function resolveCutCommit(project, flags) {
     return null;
   }
   if (!asked) return git.head(root);
-
   const sha = git.resolve(root, asked);
   if (!sha) fail(`no commit ${asked} in this repository`);
-  if (!git.isAncestor(root, sha)) {
-    fail(`${git.shortSha(sha)} isn't an ancestor of HEAD, so this release can't have been cut at it`);
-  }
+  if (!git.isAncestor(root, sha)) fail(`${git.shortSha(sha)} isn't an ancestor of HEAD, so this release can't have been cut at it`);
   return sha;
 }
 
-/* ---- the checks a cut runs ---------------------------------------------- */
+/* ---- what a cut says before it cuts ------------------------------------ */
 
 /**
- * Everything that has to be true before a release is cut, each with what to
- * run when it isn't. All of them are worked out every time, and a refusal
- * shows the whole list: fixing the audit only to be told about the review on
- * the next attempt is how a gate teaches people to reach for --force.
+ * What stands between the open release and its edition, in two kinds.
  *
- * `ledger status` and bare `ledger` show the same list, so "is it ready?" can
- * be asked without trying to cut.
+ * A refusal is only what would print a *wrong* edition: a redrafted corpus
+ * not yet checked against the one it replaced (it may have lost what the
+ * client was told), and a release with nothing recorded (its edition would
+ * repeat the last one). A corpus that doesn't load is refused before any of
+ * this runs.
  *
- * In the order they matter. Until a redrafted corpus has been checked against
- * the one it replaced, anything the others ask is asked of a corpus that may
- * still be missing what the client was told. Unaudited work comes before the
- * empty-release check because when both fire they have one cause — work
- * landed and the ledger never heard about it — and the audit is what fixes
- * it. The composition comes next, because it is written from what was
- * recorded; the opt-in verify after it, because it reads what was composed.
- * Questions come last: every step before can open one.
+ * Everything else is a warning, said plainly before the cut asks to go
+ * ahead: what isn't done yet is the developer's call, not the tool's.
+ *
+ * `ledger`, `ledger status` and `ledger cut` all show this, so "is it ready?"
+ * can be asked without trying to cut.
  */
-export const CHECK_IDS = ["redraft", "audit", "content", "compose", "verify", "questions", "moment"];
-
-/** Checks that were renamed, so a `--skip` written against the old name still works. */
-const CHECK_ALIASES = { summary: "compose", review: "verify" };
-
-export function cutChecks(project, { date = today(), commit = undefined } = {}) {
+export function cutReport(project, { date = today(), commit = undefined } = {}) {
   const current = project.releases.current;
   const version = current.version;
-  if (commit === undefined) commit = git.available(project.root) ? git.head(project.root) : null;
+  const root = project.root;
+  const hasGit = git.available(root);
+  if (commit === undefined) commit = hasGit ? git.head(root) : null;
+  const refusals = [];
+  const warnings = [];
 
   const redraft = redraftReport(project);
-  const unaudited = unauditedReport(project);
+  if (!redraft.ok) refusals.push({ line: redraft.line, fix: redraftSteps(redraft, "") });
+
   const touched = project.featureSet.features().filter((f) => f.touchedAt(version)).length;
   const other = project.featureSet.otherChanges({ version }).length;
-  const composed = composeReport(project);
-  const verified = verifyReport(project);
-  const questions = openQuestions(project, { version });
-  const previous = project.releases.predecessorOf(version);
-  // Only once there is something to cut: straight after a cut, HEAD is the
-  // commit it was cut at, and saying so as a second ✗ under "nothing recorded"
-  // would only make an ordinary state look like a problem.
   const recorded = touched > 0 || other > 0;
-  const sameMoment = recorded && previous && previous.date === date && previous.commit && previous.commit === commit;
-  const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
-  const why = questions.filter((q) => q.kind === "why").length;
+  if (!recorded) {
+    refusals.push({
+      line: `nothing is recorded against v${version}, so its edition would be ${version > 1 ? `the same as v${version - 1}'s` : "empty"}`,
+      fix: "record the release's work: `ledger add` / `ledger change` (an agent that read the stanza does this itself)",
+    });
+  }
+  if (!recorded) return { version, refusals, warnings, recorded };
 
-  return [
-    {
-      id: "redraft",
-      ok: redraft.ok,
-      line: redraft.ok ? "no redraft waiting to be checked" : redraft.line,
-      fix: redraft.ok ? null : redraftSteps(redraft, ""),
-    },
-    {
-      id: "audit",
-      ok: unaudited.ok,
-      line: unaudited.ok ? unaudited.reason : `${unauditedLine(unaudited)}, so this edition may be missing what the client already has`,
-      fix: "ledger audit        (or `ledger audit --run <agent>` to hand it to one)",
-    },
-    {
-      id: "content",
-      ok: recorded,
-      line: recorded
-        ? [touched ? plural(touched, "entry", "entries") : null, other ? plural(other, "product-wide note", "product-wide notes") : null]
-          .filter(Boolean).join(" and ") + ` recorded against v${version}`
-        : `nothing recorded against v${version}, so its edition would be ${version > 1 ? `identical to v${version - 1}` : "empty"}`,
-      fix: "record the release's work with `ledger add` / `ledger change` — or `ledger audit`, if it landed without the ledger",
-    },
-    {
-      id: "compose",
-      ok: composed.ok,
-      line: composeLine(composed),
-      fix: "ledger compose      (or `ledger compose --run <agent>` to hand it to one)",
-    },
-    {
-      id: "verify",
-      ok: verified.ok,
-      line: verified.ok ? verified.reason : verified.line,
-      fix: "ledger verify       (or `ledger verify --run <agent>` to hand it to one)",
-    },
-    {
-      id: "questions",
-      ok: !questions.length,
-      line: questions.length
-        ? `${plural(questions.length, "question", "questions")} open on v${version}` +
-          (why ? ` (${plural(why, "reason nobody has vouched for", "reasons nobody has vouched for")})` : "")
-        : "nothing open",
-      fix: "ledger questions    (at a terminal, `ledger cut` asks them one at a time)",
-    },
-    {
-      id: "moment",
-      ok: !sameMoment,
-      line: sameMoment
-        ? `v${previous.version} (${previous.name}) was also cut on ${date} at ${git.shortSha(commit)} — the two editions would stand for the same moment`
-        : commit ? `cutting at ${git.shortSha(commit)} on ${date}` : `cutting on ${date} (no git repository, so no commit is recorded)`,
-      fix: "cut at a later commit (--commit), or `--skip moment` if you really are re-issuing it",
-    },
-  ].map((ch) => (ch.ok ? { ...ch, fix: null } : ch));
-}
-
-/** The checklist as the terminal shows it: one line per check, and under each
- *  one that's open, what to run. */
-export function renderChecks(checks, { indent = "  ", stream = process.stdout, skipped = [] } = {}) {
-  const lines = [];
-  for (const ch of checks) {
-    const skip = !ch.ok && skipped.includes(ch.id);
-    const m = skip ? color(stream).yellow("–") : mark(ch.ok, stream);
-    lines.push(`${indent}${m} ${ch.id.padEnd(9)} ${ch.line}${skip ? "  (skipped)" : ""}`);
-    if (!ch.ok && !skip && ch.fix) {
-      for (const [i, f] of ch.fix.split("\n").entries()) {
-        lines.push(`${indent}  ${" ".repeat(9)} ${color(stream).dim(i === 0 ? "→" : " ")} ${f}`);
-      }
+  const prepared = prepareReport(project, version);
+  if (!prepared.ok && !prepared.nothing) {
+    warnings.push({ id: "prepare", line: prepareLine(prepared), fix: "ledger prepare" });
+  }
+  const unprepared = unpreparedNotes(project, version);
+  if (unprepared.length) {
+    warnings.push({ id: "notes", line: `${plural(unprepared.length, "updated entry", "updated entries")} with no prepared note, ` +
+      `so ${unprepared.length === 1 ? "it prints its" : "they print their"} changes as recorded (${list(unprepared.map((f) => f.id))})`,
+    fix: "ledger prepare" });
+  }
+  const unknown = unknownReasons(project, version);
+  if (unknown.length) {
+    const nobody = unknown.filter((u) => u.event.why_from === "unknown").length;
+    warnings.push({ id: "reasons", line: `${plural(unknown.length, "reason")} nobody has vouched for` +
+      ` (${[nobody ? `${nobody} unknown` : null, unknown.length - nobody ? `${unknown.length - nobody} read off a commit message` : null].filter(Boolean).join(", ")}: ` +
+      `${list([...new Set(unknown.map((u) => u.feature.id))])})`,
+    fix: "ledger prepare asks you about them" });
+  }
+  if (hasGit) {
+    const ledgerRel = path.relative(root, project.ledgerDir).split(path.sep).join("/") || ".ledger";
+    const dirty = git.uncommitted(root);
+    const inLedger = dirty.filter((p) => p === ledgerRel || p.startsWith(`${ledgerRel}/`));
+    const code = dirty.filter((p) => !git.isLedgerPath(project.config, p));
+    if (inLedger.length) {
+      warnings.push({ id: "uncommitted", line: `${ledgerRel}/ has uncommitted changes (${list(inLedger)}), so the edition can't be traced to a commit`,
+        fix: `commit ${ledgerRel}/ first` });
+    }
+    if (code.length) {
+      warnings.push({ id: "uncommitted", line: `${plural(code.length, "file")} outside the ledger ${code.length === 1 ? "is" : "are"} uncommitted ` +
+        `(${list(code)}), so the commit this release records doesn't include ${code.length === 1 ? "it" : "them"}, and the next prepare ` +
+        "will read that work as new", fix: "commit the work the edition describes first" });
     }
   }
+  const previous = project.releases.predecessorOf(version) ?? (version > 1 ? project.releases.at(version - 1) : null);
+  if (previous && !previous.archived && previous.date === date && previous.commit && previous.commit === commit) {
+    warnings.push({ id: "moment", line: `v${previous.version} (${previous.name}) was also cut on ${date} at ${git.shortSha(commit)}, ` +
+      "so the two editions stand for the same moment", fix: "cut at a later commit (--commit), unless you are re-issuing it" });
+  }
+  return { version, refusals, warnings, recorded };
+}
+
+/** A cut report as the terminal shows it: one line each, and what to run under it. */
+export function renderReport(report, { indent = "  ", stream = process.stdout } = {}) {
+  const c = color(stream);
+  const lines = [];
+  const item = (m, it) => {
+    lines.push(`${indent}${m} ${it.line}`);
+    if (it.fix) for (const [i, f] of it.fix.split("\n").entries()) lines.push(`${indent}  ${c.dim(i === 0 ? "→" : " ")} ${f}`);
+  };
+  for (const r of report.refusals) item(mark(false, stream), r);
+  for (const w of report.warnings) item(c.yellow("!"), w);
   return lines.join("\n");
 }
 
-/** What `--skip` named, checked against the real ids, with `--force` as
- *  "every one of them". */
-function skippedChecks(flags) {
-  if (flags.force) return [...CHECK_IDS];
-  const asked = [].concat(flags.skip ?? []).filter((v) => v !== true).flatMap((v) => String(v).split(","))
-    .map((s) => s.trim()).filter(Boolean);
-  if ([].concat(flags.skip ?? []).includes(true)) usage(`--skip needs the checks to skip: ${CHECK_IDS.join(", ")}`);
-  for (const [i, id] of asked.entries()) {
-    if (CHECK_ALIASES[id]) { asked[i] = CHECK_ALIASES[id]; continue; }
-    if (!CHECK_IDS.includes(id)) {
-      const near = nearest(id, CHECK_IDS);
-      usage(`there is no check called "${id}"${near ? ` — did you mean ${near}?` : ""} (the checks: ${CHECK_IDS.join(", ")})`);
-    }
+/** The one command to run next, from the same report. */
+export function nextStep(project, report) {
+  if (report.refusals.length) {
+    const redraft = redraftReport(project);
+    return redraft.ok ? report.refusals[0].fix : redraft.steps[0];
   }
-  return asked;
+  if (report.warnings.some((w) => w.id === "prepare")) return "ledger prepare        (paste it into your agent session; it spends tokens)";
+  return 'ledger cut --name "…"   (prints the edition; `ledger preview` shows it first, for free)';
 }
 
 /* ---- ledger cut -------------------------------------------------------- */
@@ -281,25 +219,28 @@ async function confirm(question) {
   }
 }
 
+/** The file the message goes in: next to the edition, named after it. */
+export function messageFile(editionPath) {
+  return editionPath.replace(/\.(pdf|html)$/i, "") + "-message.txt";
+}
+
 /**
  * Cutting a release is the one moment the timeline moves: the open release
- * gets its real name and date, its edition is printed into the client
- * directory, and a fresh open release starts behind it. Every New/Changed tag
- * from the cycle just shipped goes quiet in the living docs on its own.
+ * gets its name, date and commit, its edition is printed into the client
+ * directory with the message to send beside it, and a fresh open release
+ * starts behind it.
+ *
+ * It refuses only what would print a wrong edition (see cutReport). Anything
+ * else is shown, and the cut asks before it goes ahead: at a terminal, a
+ * prompt; anywhere else, `--yes`.
  *
  * The edition is printed before anything is written, so a machine with no
  * browser can't leave a release cut with no document: if the print fails,
- * nothing was cut. `--no-pdf` cuts without printing, for a CI job or a
- * container, and `ledger build vN` prints it later.
- *
- * `--run <agent>` hands whatever of the audit, the composition and (when it is
- * on) the verify is still open to that agent, one after the other, checks
- * what each left behind, and then asks before it cuts (`--yes` doesn't ask).
- * Only with the flag: nothing is ever handed to an agent unasked. At a
- * terminal, the open questions are asked one at a time on the way.
+ * nothing was cut. `--no-pdf` cuts without printing; `ledger build vN` prints
+ * it later.
  */
 export async function cmdCut({ flags }) {
-  let project = openProject(flags);
+  const project = openProject(flags);
   if (!project.releases.current.future) {
     fail(`v${project.releases.current.version} is already shipped — there's nothing in progress to cut`);
   }
@@ -308,78 +249,44 @@ export async function cmdCut({ flags }) {
   }
   const date = flags.date === true || isBlank(flags.date) ? today() : String(flags.date);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) usage(`--date must be YYYY-MM-DD (got ${date})`);
-  const skipped = skippedChecks(flags);
-
-  let handedOver = false;
-  const version = project.releases.current.version;
-  const run = flags.run !== undefined && flags.run !== false;
-  const interactive = process.stdin.isTTY && !flags["dry-run"];
-  const hand = async (id) => {
-    const check = cutChecks(project, { date }).find((ch) => ch.id === id);
-    if (check.ok || skipped.includes(id)) return;
-    out(`${mark(false)} ${id}: ${check.line}`);
-    out("");
-    const code = await runTask(id, flags, { openProject });
-    out("");
-    if (code) {
-      throw new UserError(`${mark(false, process.stderr)} v${version} was NOT cut: the ${id} didn't ` +
-        "finish (see above). Resume the agent's session to finish it, then cut again.", EXIT.refused, { raw: true });
-    }
-    project = openProject(flags);
-    handedOver = true;
-  };
-  // A reason answered changes what the notes are composed from, so the open
-  // questions are asked before composing; a check against the code can open
-  // more, which are asked after it.
-  const ask = async () => {
-    if (!interactive || skipped.includes("questions") || !openQuestions(project, { version }).length) return;
-    await askInline(project, version);
-    out("");
-    project = openProject(flags);
-  };
-  if (run) await hand("audit");
-  await ask();
-  if (run) {
-    await hand("compose");
-    await hand("verify");
-    await ask();
-  }
 
   const current = project.releases.current;
+  const version = current.version;
   const commit = resolveCutCommit(project, flags);
-  const checks = cutChecks(project, { date, commit });
-  const open = checks.filter((ch) => !ch.ok && !skipped.includes(ch.id));
-  if (open.length) {
-    const err = process.stderr;
+  const report = cutReport(project, { date, commit });
+  const err = process.stderr;
+
+  if (report.refusals.length) {
     throw new UserError([
-      `${mark(false, err)} v${current.version} was NOT cut — ${open.length} check${open.length === 1 ? " is" : "s are"} open:`,
+      `${mark(false, err)} v${version} was NOT cut: its edition would be wrong.`,
       "",
-      renderChecks(checks, { stream: err, skipped }),
+      renderReport(report, { stream: err }),
       "",
-      "Nothing was written. Fix the above and cut again, or skip a check on purpose: " +
-        `--skip ${open.map((ch) => ch.id).join(",")}`,
+      "Nothing was written.",
     ].join("\n"), EXIT.refused, { raw: true });
   }
 
-  // An agent's last message is often a question only the person can answer
-  // ("this entry claims something nobody can use yet"), and the edition is
-  // what the client gets. So after handing work over, the cut waits to be told
-  // to go ahead — a prompt in a terminal, `--yes` anywhere else.
-  if (handedOver && !flags.yes && !flags["dry-run"]) {
-    const go = process.stdin.isTTY
-      ? await confirm(`Read the agent's notes above. Cut v${current.version} and print its edition now? [y/N] `)
-      : false;
-    if (!go) {
-      throw new UserError(`${mark(false, process.stderr)} v${current.version} was NOT cut: the checks pass now, and it is waiting ` +
-        `for you. Cut it with \`ledger cut --name ${JSON.stringify(flags.name)}\`` +
-        (process.stdin.isTTY ? "." : ", or pass --yes to cut straight after the agents when nobody is at a terminal."),
-      EXIT.refused, { raw: true });
+  if (report.warnings.length) {
+    out(`Before v${version} is cut:`);
+    out(renderReport(report));
+    out("");
+    if (!flags.yes && !flags["dry-run"]) {
+      const go = process.stdin.isTTY ? await confirm(`Cut v${version} and print its edition anyway? [y/N] `) : false;
+      if (!go) {
+        throw new UserError(`${mark(false, err)} v${version} was NOT cut. Nothing was written.` +
+          (process.stdin.isTTY ? "" : " Pass --yes to cut with the above when nobody is at a terminal."),
+        EXIT.refused, { raw: true });
+      }
     }
   }
 
-  const draftFile = flags.out ? null : editionFile(project, current.version, flags).target;
-  const touched = project.featureSet.features().filter((f) => f.touchedAt(current.version)).length;
-  const other = project.featureSet.otherChanges({ version: current.version }).length;
+  const draftFile = flags.out ? null : editionFile(project, version, flags).target;
+  const touched = project.featureSet.features().filter((f) => f.touchedAt(version)).length;
+  const other = project.featureSet.otherChanges({ version }).length;
+  // What the edition prints for an updated entry nobody prepared a note
+  // for, frozen with it, so it reprints exactly whatever happens afterwards.
+  const frozen = frozenForCut(project, version);
+  if (frozen) project.compositions = [...project.compositions.filter((x) => x.version !== version), frozen];
 
   current.name = flags.name;
   current.date = date;
@@ -387,8 +294,9 @@ export async function cmdCut({ flags }) {
   current.status = "released";
   current.future = false;
   current.released = true;
+  if (flags.full) current.layout = "full";
   project.releases.releases.push({
-    version: current.version + 1, name: null, date: null, commit: null,
+    version: version + 1, name: null, date: null, commit: null,
     status: "future", future: true, released: false,
   });
   project.releases.validate();
@@ -402,25 +310,28 @@ export async function cmdCut({ flags }) {
   let printed = null;
   if (flags.pdf !== false) {
     try {
-      printed = (await printEdition(project, current.version, flags)).target;
+      printed = (await printEdition(project, version, flags)).target;
     } catch (e) {
-      throw new UserError(`${mark(false, process.stderr)} v${current.version} was NOT cut: its edition couldn't be printed.\n` +
+      throw new UserError(`${mark(false, err)} v${version} was NOT cut: its edition couldn't be printed.\n` +
         `  ${String(e.message).split("\n").join("\n  ")}\n` +
-        `Fix that and cut again, or cut with --no-pdf and print it later with \`ledger build v${current.version}\`.`,
+        `Fix that and cut again, or cut with --no-pdf and print it later with \`ledger build v${version}\`.`,
       EXIT.error, { raw: true });
     }
   }
+  const message = messageFile(printed ?? editionFile(project, version, flags).target);
+  fs.mkdirSync(path.dirname(message), { recursive: true });
+  fs.writeFileSync(message, messageFor(project, version));
+  if (frozen) project.saveComposition(frozen);
   project.saveReleases();
   if (draftFile && fs.existsSync(draftFile)) fs.unlinkSync(draftFile);
 
-  const skippedOpen = checks.filter((ch) => !ch.ok).map((ch) => ch.id);
-  out(`${mark(true)} cut v${current.version} — ${current.name} (${date}${commit ? `, ${git.shortSha(commit)}` : ""}), covering ` +
-    `${touched} feature entr${touched === 1 ? "y" : "ies"}${other ? ` and ${other} other change${other === 1 ? "" : "s"}` : ""}` +
-    (skippedOpen.length ? `, skipping ${skippedOpen.join(", ")}` : ""));
-  out(printed
-    ? `  wrote ${path.relative(process.cwd(), printed) || printed}`
-    : `  no edition printed (--no-pdf) — \`ledger build v${current.version}\` prints it`);
-  out(`  v${current.version + 1} is now open; new work records against it.`);
+  const rel = (p) => path.relative(process.cwd(), p) || p;
+  out(`${mark(true)} cut v${version} — ${current.name} (${date}${commit ? `, ${git.shortSha(commit)}` : ""}), covering ` +
+    `${plural(touched, "entry", "entries")}${other ? ` and ${plural(other, "product-wide note")}` : ""}` +
+    (report.warnings.length ? `, with ${plural(report.warnings.length, "warning")}` : ""));
+  out(printed ? `  wrote ${rel(printed)}` : `  no edition printed (--no-pdf) — \`ledger build v${version}\` prints it`);
+  out(`  wrote ${rel(message)}, the message to send with it`);
+  out(`  v${version + 1} is now open; new work records against it.`);
   const ledgerRel = path.relative(project.root, project.ledgerDir) || ".ledger";
   out(`Next: commit ${ledgerRel}/` +
     (pdfsAreCommitted(project.config) ? ` and ${String(project.config.output.client_dir).replace(/\/+$/, "")}/` : "") + ".");

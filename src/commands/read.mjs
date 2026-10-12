@@ -93,12 +93,12 @@ export async function cmdShow({ flags, positional }) {
     out(`Name: ${state.name}`);
     if (state.renamedFrom) out(`Previously: ${state.renamedFrom}`);
     out(`Description: ${state.description}`);
+    out(`How to see it: ${state.how_to_see ?? "(not written yet)"}`);
     if (state.changes?.length && state.version === target) {
-      out(`What changed at v${state.version}${state.changes_draft ? " (as recorded, not yet composed)" : ""}:`);
+      out(`What changed at v${state.version}${state.changes_draft ? " (as recorded, not yet prepared)" : ""}:`);
       for (const c of state.changes) out(`  - ${c}`);
     }
   }
-  out(`Paths: ${f.paths.length ? f.paths.join(", ") : "none — `ledger own` says which code it lives in"}`);
   if (f.dev_notes) out(`Dev notes: ${f.dev_notes}`);
 
   const versions = f.history.map((h, i) => `v${h.version}${h.removed ? " removed" : i === 0 ? " new" : " changed"}`);
@@ -174,14 +174,13 @@ export async function cmdRules({ flags }) {
 export async function cmdExport({ flags }) {
   const project = openProject(flags);
   const doc = {
-    schema_version: 2,
+    schema_version: 3,
     product: project.config.product,
     releases: project.releases.toJSON(),
     categories: project.config.categories,
     subcategories: project.subcategories,
     other_changes: project.otherChangesList,
     compositions: project.compositions,
-    questions: project.questions,
     features: project.featureSet.features().map((f) => f.toJSON()),
   };
   if (flags.out) {

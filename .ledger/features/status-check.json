@@ -3,10 +3,6 @@
   "audience": "user",
   "category": "Reading the ledger",
   "size": "Medium",
-  "paths": [
-    "src/commands/status.mjs",
-    "src/commands/release.mjs"
-  ],
   "dev_notes": "src/commands/status.mjs: cmdStatus, and cmdOverview for bare `ledger` (the help when there is no .ledger/). Both take the checklist from cutChecks() in src/commands/release.mjs, so neither can disagree with what a cut would do; `status --json` carries it as `checks`. It replaced three commands — status, check and doctor — because whichever of them you hadn't run was where the problem was; `ledger check` and `ledger doctor` now fail with a pointer to it.",
   "history": [
     {
@@ -20,7 +16,7 @@
     },
     {
       "version": 3,
-      "description": "The command ledger status says at once what the open release holds, whether it is ready to cut, what the corpus holds and how much of the code belongs to an entry, and how the setup resolves. The readiness answer is the checklist ledger cut runs, and anything valid that would still print badly comes out as a warning. Bare ledger prints the short version and the next command. With --quiet it is silent when there is nothing to say, so a commit hook can run it."
+      "description": "The command ledger status says at once what the open release holds, whether ledger prepare has read everything recorded, what the cut would refuse or warn about, what the corpus holds, and how the setup resolves. Anything valid that would still print badly comes out as a warning. Bare ledger prints the short version, the reasons nobody has given, and the next command. With --quiet it is silent when there is nothing to say, so a commit hook can run it."
     }
   ],
   "events": [
@@ -29,6 +25,14 @@
       "kind": "change",
       "what": "It reports the composition, the open questions and how much of the code belongs to an entry, and warns about a description that runs long for its size and a glob that matches no file.",
       "why": "Those are the new ways a ledger drifts from its product, and a description past two or three sentences is where an edition stops being brief.",
+      "why_from": "person",
+      "date": "2026-10-12"
+    },
+    {
+      "version": 3,
+      "kind": "change",
+      "what": "Status shows what the cut would say, what it refuses and what it warns about, instead of a checklist of gates, and lists the reasons nobody has given; it no longer reports how much code belongs to an entry.",
+      "why": "The cut warns instead of gating, and the ledger no longer maps code to entries.",
       "why_from": "person",
       "date": "2026-10-12"
     }

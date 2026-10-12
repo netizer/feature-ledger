@@ -3,9 +3,6 @@
   "audience": "user",
   "category": "Recording what the product does",
   "size": "Small",
-  "paths": [
-    "src/commands/write.mjs"
-  ],
   "dev_notes": "src/commands/write.mjs cmdOtherChange, stored in .ledger/other-changes.json with a version and an audience. `ledger other-change` is an alias in src/cli.mjs.",
   "history": [
     {

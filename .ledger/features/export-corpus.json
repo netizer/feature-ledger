@@ -3,9 +3,6 @@
   "audience": "user",
   "category": "Reading the ledger",
   "size": "Small",
-  "paths": [
-    "src/commands/read.mjs"
-  ],
   "dev_notes": "src/commands/read.mjs cmdExport, schema_version 1. Wired into the CLI but absent from `ledger --help`.",
   "history": [
     {

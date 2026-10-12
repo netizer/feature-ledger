@@ -96,8 +96,8 @@ export class MarkdownRenderer {
       for (const [f, state] of gone) lines.push(`- **${f.currentName}**: ${state.reason}`);
     }
     // Withdrawn before the last cutoff and only now recorded. Kept apart from
-    // this release's news, and worded so it claims no date — the audit does no
-    // archaeology, so the release it went in is not known.
+    // this release's news, and worded so it claims no date: nothing records
+    // which release it went in.
     if (goneEarlier.length) {
       lines.push("", trailer(`${this.words.tags.backfilled_removed}, recorded here for the first time`), "");
       for (const [f, state] of goneEarlier) lines.push(`- **${f.currentName}**: ${state.reason}`);
@@ -111,7 +111,7 @@ export class MarkdownRenderer {
    * sub-section heading, rather than each bullet, carrying it.
    *
    * Two cases qualify: every feature arriving for the first time this cycle,
-   * and every feature being one an audit found late. Both are a single
+   * and every feature being one recorded late. Both are a single
    * statement about the section, so the heading can make it once. A list of
    * merely-changed entries never collapses: each one carries its own reason,
    * which is the part worth reading.
@@ -153,9 +153,10 @@ export class MarkdownRenderer {
     // document is meant to read as though written to one.
     let line = `- **[${tags.join(", ")}]** ${name}: ${state.description}`;
     if (touched && f.firstVersion !== this.target && state.changes?.length) {
-      line += state.changes_draft ? "\n\n  **What changed** *(as recorded, not yet composed)*:\n" : "\n\n  **What changed:**\n";
+      line += state.changes_draft ? "\n\n  **What changed** *(as recorded, not yet prepared)*:\n" : "\n\n  **What changed:**\n";
       line += state.changes.map((c) => `  - ${c}`).join("\n");
     }
+    if (state.how_to_see) line += `\n\n  *How to see it:* ${state.how_to_see}`;
     if (extended && state.dev_notes) line += `\n\n  *Dev notes:* ${state.dev_notes}`;
     return line;
   }

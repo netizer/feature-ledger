@@ -3,16 +3,12 @@
   "audience": "user",
   "category": "Reading the ledger",
   "size": "Medium",
-  "paths": [
-    "src/diff.mjs",
-    "src/commands/diff.mjs"
-  ],
   "dev_notes": "releaseDiff() in src/diff.mjs is the packet the readout, `diff --full`/`--json`, the compose brief and verify all read. Code churn is `git diff --numstat <previous release commit>` against the working tree plus untracked files, mapped through ownership. The last look is .ledger/.cache/last-look.json (gitignored), written by `ledger preview`; it fingerprints each entry's own words and counts its events, so composing doesn't read as a change.",
   "history": [
     {
       "version": 3,
       "name": "The size of the open release",
-      "description": "The command ledger diff shows how big the open release is: its new, updated and removed entries by size, a weight that counts the big ones for more, and how much code moved under each entry. It flags code that moved under an entry the release says nothing about, and an entry recorded as moved whose code didn't. It needs nothing but the ledger and git, and ledger preview opens with it, along with what moved since you last looked."
+      "description": "The command ledger preview opens with how big the open release is: its new, updated and removed entries by size, how many changes were recorded and how many of them ledger prepare hasn't read yet, and how many lines of code changed since the last edition's commit. It needs nothing but the ledger and git, so it costs nothing to run."
     }
   ]
 }

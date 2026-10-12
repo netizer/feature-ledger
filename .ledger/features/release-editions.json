@@ -3,10 +3,6 @@
   "audience": "user",
   "category": "The documents it produces",
   "size": "Big",
-  "paths": [
-    "src/commands/release.mjs",
-    "src/model/release-set.mjs"
-  ],
   "dev_notes": "src/commands/release.mjs: cutChecks() is the one list cut, status and bare `ledger` all show, and renderChecks() draws it. The PDF is printed before releases.json is saved, so a failed print leaves nothing cut; --no-pdf skips it. A refusal is a raw UserError with exit code 3. The commit comes from HEAD, or from --commit for a retrospective cut, verified as an ancestor of HEAD. --run hands an open audit, composition or verify to an agent through runTask() in src/prompt.mjs; at a TTY the open questions are asked through askInline() before composing and again after a verify; then it asks before cutting (--yes skips that). `--skip summary,review` map to compose and verify. `release cut|list|amend` stay as aliases in src/cli.mjs.",
   "history": [
     {
@@ -20,7 +16,7 @@
     },
     {
       "version": 3,
-      "description": "The command ledger cut gives the open release its name and date, prints its PDF edition into the client folder, and opens the next release. First it runs its checks: no redraft waiting, nothing left for an audit, something recorded, the composition up to date, the edition verified when that is turned on, no question open, and a different moment from the last cut. When one is open, it writes nothing and lists them all, each with the command that fixes it. At a terminal it asks the open questions one at a time, and with --run it hands an open audit, composition or verify to a coding agent first. Each cut records its commit."
+      "description": "The command ledger cut gives the open release its name, date and commit, prints its PDF edition into the client folder with the message to send beside it, and opens the next release. It refuses only an edition that would be wrong: one with nothing recorded, or one whose redrafted corpus hasn't been checked against the old. Anything else, such as changes the last prepare hasn't read or a reason nobody gave, it shows first and asks before it goes ahead; --yes answers when nobody is at a terminal."
     }
   ],
   "events": [
@@ -37,6 +33,14 @@
       "kind": "change",
       "what": "The cut checks the composition, the opt-in verify and the open questions where it checked the summary and the review, asks open questions one at a time at a terminal, and with --run hands over an audit, a composition or a verify.",
       "why": "The summary and the review became one composition and an optional check against the code, and an agent's questions printed at the end of its run were gone with the terminal.",
+      "why_from": "person",
+      "date": "2026-10-12"
+    },
+    {
+      "version": 3,
+      "kind": "change",
+      "what": "ledger cut refuses only an edition that would be wrong, with nothing recorded or a redraft not yet checked, and shows everything else as a warning before it asks to go ahead. It also writes the message to send beside the edition, and no longer hands anything to a coding agent.",
+      "why": "The developer decides what isn't done, and the tool's job is to say it clearly. Lining up the stamps of three agent tasks, with --skip and --force to get round them, made the cut the place the workflow had to be explained, and tokens are spent only when someone asks for them.",
       "why_from": "person",
       "date": "2026-10-12"
     }

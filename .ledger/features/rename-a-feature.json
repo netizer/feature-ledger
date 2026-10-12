@@ -3,9 +3,6 @@
   "audience": "user",
   "category": "Recording what the product does",
   "size": "Small",
-  "paths": [
-    "src/commands/write.mjs"
-  ],
   "dev_notes": "src/commands/write.mjs cmdRename. The old name comes from Feature#stateAt's renamedFrom, computed from the named entries in the history rather than stored.",
   "history": [
     {

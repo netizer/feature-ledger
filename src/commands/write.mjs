@@ -2,10 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { openProject } from "../store.mjs";
 import { Feature, WHY_FROM } from "../model/feature.mjs";
-import { fail, readStdin, asList, isBlank, exists, readJson, writeJson, today } from "../util.mjs";
-import { askWhy } from "../questions.mjs";
-import { globRegExp } from "../paths.mjs";
-import * as git from "../git.mjs";
+import { fail, readStdin, asList, isBlank, exists, today } from "../util.mjs";
 
 const out = (s) => process.stdout.write(`${s}\n`);
 
@@ -43,7 +40,7 @@ async function payload(flags, { allow }) {
     name: flags.name,
     description: flags.description,
     dev_notes: flags["dev-notes"],
-    paths: flags.paths !== undefined && flags.paths !== true ? asList(flags.paths).flatMap((p) => String(p).split(",")).map((p) => p.trim()).filter(Boolean) : undefined,
+    how_to_see: flags["how-to-see"],
     what: flags.what,
     why: flags.why,
     why_from: flags["why-from"],
@@ -55,8 +52,17 @@ async function payload(flags, { allow }) {
   };
   for (const [k, v] of Object.entries(fromFlags)) if (v !== undefined) data[k] = v;
 
+  // A stanza or a script written for the version that mapped code to entries
+  // still sends this. The map is gone, so it is dropped rather than refused.
+  if ("paths" in data) {
+    delete data.paths;
+    process.stderr.write("note: \"paths\" is no longer recorded; the ledger doesn't map code to entries any more.\n");
+  }
   const unknown = Object.keys(data).filter((k) => !allow.includes(k));
   if (unknown.length) fail(`unexpected field${unknown.length === 1 ? "" : "s"} in the payload: ${unknown.join(", ")} (allowed: ${allow.join(", ")})`);
+  for (const k of ["how_to_see", "description", "name", "what", "why"]) {
+    if (data[k] === true) fail(`--${k.replaceAll("_", "-")} needs its text`);
+  }
   return data;
 }
 
@@ -103,13 +109,6 @@ function resolveCategory(project, dryRun) {
   return name;
 }
 
-function checkPaths(paths) {
-  for (const p of paths ?? []) {
-    if (typeof p !== "string" || isBlank(p)) fail("\"paths\" is a list of globs, like \"src/billing/**\"");
-    if (p.startsWith("/") || p.split("/").includes("..")) fail(`"${p}": paths are relative to the project root, inside it`);
-  }
-}
-
 /** Where a filed entry lives: the parts of a feature that describe it rather
  *  than one moment in its history, and so record nothing against a release. */
 function applyFiling(project, feature, data) {
@@ -126,17 +125,13 @@ function applyFiling(project, feature, data) {
   if ("subcategory" in data) feature.subcategory = data.subcategory || null;
   if (data.size) feature.size = data.size;
   if (data.dev_notes !== undefined) feature.dev_notes = isBlank(data.dev_notes) ? null : data.dev_notes;
-  if (data.paths !== undefined) {
-    checkPaths(data.paths);
-    feature.paths = [...new Set(data.paths)];
-  }
 }
 
 export async function cmdAdd({ flags, positional }) {
   const project = openProject(flags);
   const version = project.workingVersion;
   const data = await payload(flags, {
-    allow: ["id", "audience", "category", "subcategory", "size", "name", "description", "dev_notes", "paths", "backfilled"],
+    allow: ["id", "audience", "category", "subcategory", "size", "name", "description", "how_to_see", "dev_notes", "backfilled"],
   });
 
   const id = positional[0] ?? data.id;
@@ -171,7 +166,6 @@ export async function cmdAdd({ flags, positional }) {
       fail(`sub-section ${sub.id} lives under ${JSON.stringify(sub.category)}, not ${JSON.stringify(data.category)}`);
     }
   }
-  checkPaths(data.paths);
 
   const feature = new Feature({
     id,
@@ -179,12 +173,12 @@ export async function cmdAdd({ flags, positional }) {
     category: data.category,
     subcategory: data.subcategory ?? null,
     size: data.size,
-    paths: [...new Set(data.paths ?? [])],
     dev_notes: isBlank(data.dev_notes) ? null : data.dev_notes,
     history: [{
       version,
       name: data.name,
       description: data.description,
+      ...(isBlank(data.how_to_see) ? {} : { how_to_see: data.how_to_see }),
       // --backfilled: the capability was already in the product, and this is
       // simply the first edition to list it. It still lands on the open
       // release — "new" in a client edition means new to the reader — but it
@@ -193,9 +187,7 @@ export async function cmdAdd({ flags, positional }) {
     }],
   });
 
-  if (report(project, feature, { dryRun: flags["dry-run"], verb: "added" }) && !feature.paths.length && feature.audience === "user") {
-    out(`  no "paths" yet: \`ledger own ${id} <glob>\` says which code it lives in, so an audit and a preview can see it move`);
-  }
+  report(project, feature, { dryRun: flags["dry-run"], verb: "added" });
 }
 
 /**
@@ -211,8 +203,8 @@ function whyOf(flags, data, id) {
   if (isBlank(data.why)) {
     fail(`${id} existed before this release, so the change needs "why": the reason it moved. The client can see ` +
       "what it does now from the description; the reason is the part only the person who decided it knows. If you " +
-      "don't know, ask. If nobody can say, pass --why-unknown, which records the gap as a question rather than a " +
-      "plausible-sounding guess. A reason read off a commit message takes --why-from commit.");
+      "don't know, ask. If nobody can say, pass --why-unknown, which records the gap for `ledger prepare` to ask " +
+      "about rather than a plausible-sounding guess. A reason read off a commit message takes --why-from commit.");
   }
   const from = data.why_from ?? "person";
   if (!WHY_FROM.includes(from) || from === "unknown") fail("--why-from is person (the default) or commit; for no reason at all, --why-unknown");
@@ -222,15 +214,16 @@ function whyOf(flags, data, id) {
 /**
  * `ledger change <id>`: something about a capability moved, and this is what
  * and why. Appended to the feature's events; nothing here is phrased for the
- * client. The "What changed" note the edition prints is composed for the
- * whole release at once (`ledger compose`), from the state the last edition
+ * client. The "What changed" note the edition prints is written for the
+ * whole release at once (`ledger prepare`), from the state the last edition
  * showed, the state now and these events, so a second change in one cycle is
  * just a second event: there is nothing earlier to revise.
  *
  * What moves the product: `what` (with its `why`), a new `description` of
  * the whole current state, a `name` the product now uses. What doesn't: the
- * area, the size, the paths and the team's notes, which say where an entry
- * lives and are filed without recording anything.
+ * area, the size and the team's notes, which are filed without recording
+ * anything. `how_to_see` goes with the entry's state at this release: set
+ * alongside a change, or on its own once the entry is in the release.
  */
 export async function cmdChange({ flags, positional }, { legacy = false } = {}) {
   const project = openProject(flags);
@@ -239,7 +232,7 @@ export async function cmdChange({ flags, positional }, { legacy = false } = {}) 
   if (!id) fail(`usage: ledger ${legacy ? "update" : "change"} <id>  (what and why as JSON on stdin, or --what/--why)`);
   const feature = project.featureSet.find(id);
 
-  const base = ["what", "why", "why_from", "description", "name", "size", "category", "subcategory", "dev_notes", "paths", "backfilled"];
+  const base = ["what", "why", "why_from", "description", "name", "how_to_see", "size", "category", "subcategory", "dev_notes", "backfilled"];
   const data = await payload(flags, { allow: legacy ? [...base, "changes", "add_changes", "reason_inferred"] : base });
 
   if (feature.entryAt(version)?.removed) {
@@ -252,13 +245,26 @@ export async function cmdChange({ flags, positional }, { legacy = false } = {}) 
   const legacyBullets = legacy ? [...asList(data.changes), ...asList(data.add_changes)].filter((b) => !isBlank(b)) : [];
 
   const moves = !isBlank(data.what) || !isBlank(data.description) || !isBlank(data.name) || data.backfilled || legacyBullets.length;
-  const filing = ["category", "subcategory", "size", "dev_notes", "paths"].some((k) => data[k] !== undefined);
+  const filing = ["category", "subcategory", "size", "dev_notes"].some((k) => data[k] !== undefined);
+  const howToSee = !isBlank(data.how_to_see);
   if (!moves) {
-    if (!filing) fail(`nothing to record — \`ledger change ${id}\` takes "what" and "why", and "description" for the new state`);
+    if (!filing && !howToSee) fail(`nothing to record — \`ledger change ${id}\` takes "what" and "why", and "description" for the new state`);
+    if (howToSee) {
+      // How to see an entry the release already moved: part of this
+      // release's state, and nothing new about the product.
+      const here = feature.entryAt(version);
+      if (!here) {
+        fail(`${id} hasn't moved in v${version}, so how to see it is wording: edit "how_to_see" on its latest entry in ` +
+          `.ledger/features/${id}.json. Recording a change with --what and --why takes --how-to-see too.`);
+      }
+      here.how_to_see = String(data.how_to_see).trim();
+    }
     const rebuilt = new Feature(feature.toJSON());
     if (flags["dry-run"]) { out(JSON.stringify(rebuilt.toJSON(), null, 2)); out("(--dry-run: nothing written)"); return; }
     project.saveFeature(rebuilt);
-    out(`filed ${id} — where an entry lives isn't news, so nothing is recorded against v${version}`);
+    out(howToSee
+      ? `set how to see ${id} at v${version} — nothing about the product moved, so nothing is recorded`
+      : `filed ${id} — where an entry lives isn't news, so nothing is recorded against v${version}`);
     return;
   }
 
@@ -274,6 +280,7 @@ export async function cmdChange({ flags, positional }, { legacy = false } = {}) 
   if (!existedBefore) {
     if (!isBlank(data.description)) entry.description = data.description;
     if (!isBlank(data.name)) entry.name = data.name;
+    if (howToSee) entry.how_to_see = String(data.how_to_see).trim();
     if (!isBlank(data.what) || legacyBullets.length) {
       if (legacy) {
         fail(`${id} is new in v${version} — the client has never seen an earlier version of it, so there is nothing to ` +
@@ -318,6 +325,7 @@ export async function cmdChange({ flags, positional }, { legacy = false } = {}) 
     // generators footnote the previous name on their own. A name that was
     // simply chosen badly is wording, and a hand-edit.
     if (!isBlank(data.name)) entry.name = data.name;
+    if (howToSee) entry.how_to_see = String(data.how_to_see).trim();
     if (data.backfilled) entry.backfilled = true;
 
     for (const e of events) {
@@ -330,18 +338,15 @@ export async function cmdChange({ flags, positional }, { legacy = false } = {}) 
   const rebuilt = new Feature(feature.toJSON());
   if (!report(project, rebuilt, { dryRun: flags["dry-run"], verb: legacy ? "updated" : "changed" })) return;
   for (const n of notes) out(`note: ${n}`);
+  unvouched(rebuilt.events.slice(recorded));
+}
 
-  // A reason nobody vouched for stays a question until someone does.
-  const asked = [];
-  for (let i = recorded; i < rebuilt.events.length; i++) {
-    const q = askWhy(project, rebuilt, i);
-    if (q) asked.push(q);
-  }
-  if (asked.length) {
-    project.saveQuestions();
-    for (const q of asked) out(`  question #${q.id} opened: ${q.text}`);
-    out("  `ledger questions` lists what's open; `ledger cut` asks them before printing.");
-  }
+/** Says, once, that a reason nobody vouched for is kept as a question. */
+function unvouched(events) {
+  const open = events.filter((e) => e.why_from !== "person");
+  if (!open.length) return;
+  out(`  the reason ${open.some((e) => e.why_from === "unknown") ? "isn't known" : "came from a commit message"}, so it stays ` +
+    "a question for a person: `ledger` lists it, and `ledger prepare` asks it.");
 }
 
 /** The old name. Kept so stanzas and scripts written against it still work. */
@@ -376,7 +381,7 @@ export async function cmdRemove({ flags, positional }) {
   feature.history = feature.history.filter((h) => h.version !== version);
   feature.history.push({
     version, removed: true, reason: String(why).trim(),
-    // A withdrawal an audit found late. It is still reported to the client —
+    // A withdrawal found late. It is still reported to the client —
     // a capability that is gone and was never mentioned is exactly what a
     // reader needs to know — but not as something taken away this cycle.
     ...(data.backfilled ? { backfilled: true } : {}),
@@ -387,55 +392,7 @@ export async function cmdRemove({ flags, positional }) {
 
   const rebuilt = new Feature(feature.toJSON());
   if (!report(project, rebuilt, { dryRun: flags["dry-run"], verb: "removed" })) return;
-  const q = askWhy(project, rebuilt, rebuilt.events.length - 1);
-  if (q) {
-    project.saveQuestions();
-    out(`  question #${q.id} opened: ${q.text}`);
-  }
-}
-
-/**
- * `ledger own <id> <glob…>`: which code a capability lives in. Adds to the
- * entry's `paths`, or with --remove takes globs off it. `ledger own --ignore
- * <glob…>` marks files as not product code at all — tests, fixtures, CI — so
- * they never read as code that no entry owns.
- *
- * Nothing is recorded against the release: where the code lives is about the
- * entry, not news about the product.
- */
-export async function cmdOwn({ flags, positional }) {
-  const project = openProject(flags);
-  project.assertWritable();
-  const ignore = Boolean(flags.ignore);
-  const [id, ...globs] = ignore ? [null, ...positional] : positional;
-  if (!ignore && !id) fail("usage: ledger own <id> <glob…> [--remove]  |  ledger own --ignore <glob…>");
-  if (!globs.length && !flags.clear) fail("name the globs: `ledger own <id> 'src/billing/**'` — quote them, so the shell leaves the stars alone");
-  checkPaths(globs);
-
-  const tracked = git.available(project.root) ? git.files(project.root) : [];
-  const count = (g) => tracked.filter((f) => globRegExp(g).test(f)).length;
-  const describe = (g) => (tracked.length ? `${g}  (${count(g)} file${count(g) === 1 ? "" : "s"})` : g);
-
-  if (ignore) {
-    const raw = readJson(project.configPath);
-    const list = raw.ignore ?? [];
-    const next = flags.remove ? list.filter((g) => !globs.includes(g)) : [...new Set([...list, ...globs])];
-    if (flags["dry-run"]) { out(JSON.stringify(next, null, 2)); out("(--dry-run: nothing written)"); return; }
-    raw.ignore = next;
-    writeJson(project.configPath, raw);
-    for (const g of globs) out(`${flags.remove ? "no longer ignoring" : "ignoring"} ${describe(g)}`);
-    return;
-  }
-
-  const feature = project.featureSet.find(id);
-  const before = feature.paths;
-  feature.paths = flags.clear ? [] : flags.remove ? before.filter((g) => !globs.includes(g)) : [...new Set([...before, ...globs])];
-  const rebuilt = new Feature(feature.toJSON());
-  if (flags["dry-run"]) { out(JSON.stringify(rebuilt.toJSON(), null, 2)); out("(--dry-run: nothing written)"); return; }
-  project.saveFeature(rebuilt);
-  out(`${id} lives in:`);
-  for (const g of rebuilt.paths) out(`  ${describe(g)}${tracked.length && !count(g) ? "   ! matches no tracked file" : ""}`);
-  if (!rebuilt.paths.length) out("  (nothing — `ledger own <id> <glob>` adds a path)");
+  unvouched(rebuilt.events.slice(-1));
 }
 
 /**

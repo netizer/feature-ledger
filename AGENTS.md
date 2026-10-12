@@ -11,18 +11,23 @@ through the CLI:
 ```
 ledger list                  # the corpus, one line per feature
 ledger show <id>             # the one entry you are about to touch
-ledger add <id>              # a new feature    (JSON payload on stdin, with "paths")
+ledger add <id>              # a new feature    (JSON on stdin: audience, size, name, description, how_to_see)
 ledger change <id>           # a change to one  ({ "what", "why", "description" } on stdin)
-ledger own <id> '<glob>'     # code a feature lives in, when you add some
+ledger remove <id> --why "…" # a feature that's gone
+ledger note                  # something that belongs to no single feature
 ledger status                # release, corpus and setup, checked
-ledger rules                 # the full authoring rules; read before your first edit
 ```
 
-A change records **what** moved and **why**, as facts; you don't write it for
-the client. The edition's "What changed" note is composed later, for the whole
-release at once. Never invent a reason: ask. If nobody can say, pass
+Record **facts**, as you work: **what** moved, in one sentence a client could
+read ("Delivery windows can be booked 28 days ahead instead of 14."), and
+**why**. The text the client reads is written later, once per release, by
+`ledger prepare`. Never invent a reason: ask. If nobody can say, pass
 `--why-unknown`, and a reason you read off a commit message takes
-`--why-from commit`. Either is kept as a question for a person.
+`--why-from commit`. Either stays a question for a person.
+
+`how_to_see` says how a reader checks the claim themselves ("Open Settings →
+Delivery and choose *Book ahead*"). Give it when you know; leave it out
+rather than guess.
 
 Wording is different: there is no command for it. To improve how an existing
 entry is *said* — its name, its description, its dev notes — edit
@@ -41,6 +46,10 @@ in as `dev`, or as `ledger note`. They never get an entry of their own.
 Descriptions are present-tense statements of what the product does, in two or
 three sentences, never of who did what to it. Every sentence states something a
 reader could confirm by using the product.
+
+**Don't commit.** What you record lands in the working tree, and the developer
+commits it with everything else. Don't run `ledger prepare` or `ledger cut`
+unless you are asked to.
 
 Do not run `ledger build` as part of an ordinary change. The Markdown docs are
 gitignored build output; the client PDFs in `docs/client/` are committed, and

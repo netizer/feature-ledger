@@ -17,11 +17,9 @@ export const LEDGER_DIRNAME = ".ledger";
  *     releases.json        the version timeline
  *     subcategories.json   optional sub-section headings
  *     other-changes.json   changes belonging to no single feature
- *     audits.json          every audit so far, and the commit each was run against
- *     compositions.json    per release, the "What changed" notes and the summary its
- *                          edition prints, and what they were composed from
- *     questions.json       what only a person can answer: reasons nobody recorded or
- *                          that came from a commit message, and what a check found
+ *     compositions.json    per release, the "What changed" notes, the summary and the
+ *                          message its edition goes out with, and what `ledger prepare`
+ *                          had seen when it wrote them
  *     redrafts.json        every time the corpus was rewritten from scratch, and whether
  *                          the new one has been checked against the old
  *     archive/<label>/     the corpus a redraft set aside, read-only
@@ -29,7 +27,6 @@ export const LEDGER_DIRNAME = ".ledger";
  *     features/<id>.json   one file per feature
  *     STYLE.md             optional prose tone, when style is "custom"
  *     theme.css            optional CSS appended last to the PDF
- *     .cache/              gitignored; what the last `ledger preview` saw
  */
 export function findLedgerDir(startDir = process.cwd(), explicit = null) {
   if (explicit) {
@@ -51,12 +48,20 @@ export function findLedgerDir(startDir = process.cwd(), explicit = null) {
 }
 
 /**
- * The shape of the corpus on disk. 2 keeps a feature's changes as events and
- * the client's "What changed" notes in compositions.json; 1 kept the notes on
- * the feature, written as each change landed. `ledger migrate` moves a ledger
- * from 1 to 2, and nothing else reads 1.
+ * The shape of the corpus on disk.
+ *
+ *   1  the client's "What changed" notes on each feature, written as each
+ *      change landed, with summaries.json and reviews.json beside them
+ *   2  events and compositions, plus per-entry `paths`, questions.json and
+ *      audits.json
+ *   3  events and compositions, with `how_to_see` on each entry, and nothing
+ *      that maps code to entries
+ *
+ * `ledger migrate` brings 1 or 2 to 3, and nothing else reads them. A CLI
+ * that wrote an older shape over this one would drop what it doesn't know,
+ * so an older ledger is refused rather than read.
  */
-export const SCHEMA = 2;
+export const SCHEMA = 3;
 
 export const DEFAULT_CONFIG = {
   schema: SCHEMA,
@@ -73,12 +78,6 @@ export const DEFAULT_CONFIG = {
   // taxonomy onto a product with four capabilities, invents a structure the
   // reader then has to hold in their head for nothing.
   default_category: "Features",
-  // Files that say nothing about what the product does — tests, lockfiles,
-  // CI — so they never read as code no entry owns. See src/paths.mjs.
-  ignore: [],
-  // Opt-in checks. `verify` has an agent check the composed text against the
-  // code before every cut.
-  checks: { verify: false },
   // The tone every entry is written in: one style-guide id, or "custom" for
   // a tone written as prose in .ledger/STYLE.md. See src/style.mjs.
   style: "google",
@@ -155,10 +154,7 @@ export class Project {
     this.subcategoriesPath = path.join(ledgerDir, "subcategories.json");
     this.otherChangesPath = path.join(ledgerDir, "other-changes.json");
     this.indexPath = path.join(ledgerDir, "index.json");
-    this.auditsPath = path.join(ledgerDir, "audits.json");
     this.compositionsPath = path.join(ledgerDir, "compositions.json");
-    this.questionsPath = path.join(ledgerDir, "questions.json");
-    this.cacheDir = path.join(ledgerDir, ".cache");
     this.redraftsPath = path.join(ledgerDir, "redrafts.json");
     this.archiveDir = path.join(ledgerDir, ARCHIVE_DIRNAME);
     this.featuresDir = path.join(ledgerDir, "features");
@@ -168,10 +164,15 @@ export class Project {
 
   load() {
     const raw = readJson(this.configPath);
+    const where = path.relative(process.cwd(), this.ledgerDir) || this.ledgerDir;
     if ((raw.schema ?? 1) < SCHEMA) {
-      fail(`${path.relative(process.cwd(), this.ledgerDir) || this.ledgerDir} was written by an earlier version of ` +
-        "feature-ledger. Run `ledger migrate` to bring it over (`ledger migrate --run claude` also has an agent " +
-        "say which code each entry lives in). Nothing printed so far changes.");
+      fail(`${where} was written by an earlier version of feature-ledger. Run \`ledger migrate\` to bring it ` +
+        "over; nothing printed so far changes. Everyone who records into this ledger needs the same version: " +
+        "merge any branch with ledger changes first, then migrate once.");
+    }
+    if (raw.schema > SCHEMA) {
+      fail(`${where} was written by a newer version of feature-ledger (schema ${raw.schema}); this one reads ` +
+        `schema ${SCHEMA}. Upgrade feature-ledger: an older CLI would drop what it doesn't know when it writes.`);
     }
     this.config = deepMerge(DEFAULT_CONFIG, raw);
     this.brand = deepMerge(DEFAULT_BRAND, readOptional(this.brandPath, {}));
@@ -181,9 +182,7 @@ export class Project {
     this.subcategories = readOptional(this.subcategoriesPath, []);
     this.otherChangesList = readOptional(this.otherChangesPath, []);
     this.index = readOptional(this.indexPath, { order: [] }).order ?? [];
-    this.audits = readOptional(this.auditsPath, { audits: [] }).audits ?? [];
     this.compositions = readOptional(this.compositionsPath, { compositions: [] }).compositions ?? [];
-    this.questions = readOptional(this.questionsPath, { questions: [] }).questions ?? [];
     this.redrafts = readOptional(this.redraftsPath, { redrafts: [] }).redrafts ?? [];
 
     const files = exists(this.featuresDir)
@@ -210,8 +209,8 @@ export class Project {
 
   /**
    * A feature's "What changed" notes by version, from compositions.json, and
-   * for the open release, until anything is composed for it, its events as a
-   * draft. Only an updated entry gets either: a new one has no "before".
+   * for the open release, until a note is prepared for it, its events as
+   * recorded. Only an updated entry gets either: a new one has no "before".
    */
   bulletsFor(data) {
     const bullets = {};
@@ -223,8 +222,8 @@ export class Project {
     const open = this.releases.current.future ? this.releases.current.version : null;
     const first = Math.min(...(data.history ?? []).map((h) => h.version));
     if (open !== null && !bullets[open] && first < open) {
-      const events = (data.events ?? []).filter((e) => e.version === open && (e.kind ?? "change") === "change");
-      if (events.length) drafts[open] = events.map((e) => (isBlank(e.why) ? e.what : `${e.what.replace(/\s*$/, "")} ${e.why}`));
+      const lines = recordedLines((data.events ?? []).filter((e) => e.version === open));
+      if (lines.length) drafts[open] = lines;
     }
     return { bullets, drafts };
   }
@@ -335,34 +334,10 @@ export class Project {
   }
 
   /**
-   * The last audit, or null. Every audit is kept rather than one scalar
-   * being overwritten: a scalar answers "is the record stale" and nothing
-   * else, where the log also answers "when was the last FULL sweep" — which
-   * matters, because only a full sweep can correct a capability the baseline
-   * survey missed. It is also what lets an edition carry an audit stamp.
-   */
-  get lastAudit() {
-    return this.audits.length ? this.audits[this.audits.length - 1] : null;
-  }
-
-  get lastFullAudit() {
-    return [...this.audits].reverse().find((a) => a.mode === "full") ?? null;
-  }
-
-  recordAudit(entry) {
-    this.audits.push(entry);
-    this.saveAudits();
-  }
-
-  saveAudits() {
-    this.assertWritable();
-    writeJson(this.auditsPath, { audits: this.audits });
-  }
-
-  /**
-   * What was composed for one release: its "What changed" notes, the summary
-   * lists its edition opens with, and the stamp of what they were composed
-   * from. One per release; an edition prints the one it was cut with.
+   * What was written for one release: its "What changed" notes, the summary
+   * lists its edition opens with, the message it goes out with, and what
+   * `ledger prepare` had seen when it wrote them. One per release; an edition
+   * prints the one it was cut with, and a cut one is never rewritten.
    */
   compositionOf(version) {
     return this.compositions.find((c) => c.version === version) ?? null;
@@ -373,11 +348,6 @@ export class Project {
     this.compositions = [...this.compositions.filter((c) => c.version !== composition.version), composition]
       .sort((a, b) => a.version - b.version);
     writeJson(this.compositionsPath, { compositions: this.compositions });
-  }
-
-  saveQuestions() {
-    this.assertWritable();
-    writeJson(this.questionsPath, { questions: this.questions });
   }
 
   saveIndex() {
@@ -417,6 +387,17 @@ export class Project {
   themeCss() {
     return exists(this.themeCssPath) ? fs.readFileSync(this.themeCssPath, "utf8") : "";
   }
+}
+
+/**
+ * A release's events as the edition prints them until a note is prepared:
+ * what changed, then why, one line each. A removal prints under its own
+ * heading with its reason, so it is not a line here.
+ */
+export function recordedLines(events) {
+  return events
+    .filter((e) => (e.kind ?? "change") === "change")
+    .map((e) => (isBlank(e.why) || e.combined ? e.what : `${e.what.replace(/\s*$/, "")} ${e.why}`));
 }
 
 export function openProject(flags = {}) {

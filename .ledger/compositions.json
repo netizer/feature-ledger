@@ -137,27 +137,30 @@
         }
       ],
       "quiet": [],
-      "date": "2026-10-12",
-      "commit": "847e774421c3c0ae8e7776fa9f3718faf1b06e48",
-      "inputs": {
-        "init-a-ledger": "2ef16dedd024c384",
-        "agent-wiring": "8c3ac9125e6d8e88",
-        "baseline-survey": "6b5536b36ca4225a",
-        "authoring-rules": "23f85f6a8ab7bb65",
-        "migrate-ledger": "92786c77b127c8fe",
-        "record-a-change": "b3fe0681e485b199",
-        "editing-by-hand": "75dedb605014f680",
-        "codebase-audit": "10cf4a14d41a4fb5",
-        "release-review": "a884e4277c99dfc0",
-        "agent-handoff": "0008b0a6b68be432",
-        "path-ownership": "99ad3265cd4634f9",
-        "open-questions": "34c2cee247cff1b5",
-        "read-the-corpus": "fdee0138d1e306b8",
-        "status-check": "7aae1c8e671f83a8",
-        "release-size": "6f879a1dcc8afea1",
-        "release-editions": "0d87475be90517f0",
-        "pdf-edition": "3e946e9e7f135925",
-        "edition-summary": "646db11ca477e513"
+      "prepared": {
+        "date": "2026-10-12",
+        "commit": null,
+        "entries": {
+          "init-a-ledger": 1,
+          "agent-wiring": 1,
+          "baseline-survey": 1,
+          "authoring-rules": 1,
+          "migrate-ledger": 0,
+          "record-a-change": 1,
+          "editing-by-hand": 1,
+          "codebase-audit": 1,
+          "release-review": 2,
+          "agent-handoff": 2,
+          "path-ownership": 0,
+          "open-questions": 0,
+          "read-the-corpus": 1,
+          "status-check": 1,
+          "release-size": 0,
+          "release-editions": 2,
+          "pdf-edition": 3,
+          "edition-summary": 0
+        },
+        "notes": 0
       }
     }
   ]

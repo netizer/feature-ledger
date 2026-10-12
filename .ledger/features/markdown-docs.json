@@ -3,10 +3,6 @@
   "audience": "user",
   "category": "The documents it produces",
   "size": "Medium",
-  "paths": [
-    "src/render/markdown.mjs",
-    "src/wording.mjs"
-  ],
   "dev_notes": "src/render/markdown.mjs; the three docs are the three audience/dev_notes combinations. Titles, intros and the colophon are overridable per project under `docs` in config.json — see src/wording.mjs.",
   "history": [
     {

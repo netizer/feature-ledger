@@ -11,21 +11,21 @@ The ledger produces two kinds of document:
 ## Editions and drafts
 
 An **edition** is a release that was cut. `ledger cut` prints it into the client
-directory under the name the client sees, and that is the only way a file gets
-there:
+directory under the name the client sees, with the message to send beside it,
+and that is the only way a file gets there:
 
 ```
 docs/client/Acme-Portal-Feature-Ledger_6.pdf
+docs/client/Acme-Portal-Feature-Ledger_6-message.txt
 ```
 
 A **draft** is the open release as it stands. `ledger preview` prints it, after
-a short readout of how big the release is (`--size` stops there), and so does
-`ledger build` once the open release has something in it. `--run claude` on
-either composes what changed first, when anything has moved since it was last
-composed. Until then, an updated entry's "What changed" note prints the changes
-as they were recorded, labelled as such. It goes in the
-gitignored docs directory, with `-draft` in its name, so it can never be
-mistaken for, or committed as, an edition:
+a short readout of where the release stands, and so does `ledger build` once
+the open release has something in it. Neither ever starts an agent. Where
+`ledger prepare` hasn't written a note yet, an updated entry prints its changes
+as they were recorded, labelled as such. It goes in the gitignored docs
+directory, with `-draft` in its name, so it can never be mistaken for, or
+committed as, an edition:
 
 ```
 docs/generated/Acme-Portal-Feature-Ledger_7-draft.pdf
@@ -37,27 +37,54 @@ and the draft. `ledger build v3` prints one edition, `ledger build all` reprints
 every edition with the current wording, and `--html` writes HTML instead of PDF
 (the fast loop when you're tuning `theme.css`).
 
+## What an edition holds
+
+The **first edition**, and the first after a redraft, is an inventory: the
+cover, then every entry in full, area by area, each with how to see it.
+
+**Every later edition** is short without dropping work:
+
+1. **The cover**: the masthead, the version and date, and one line —
+   "5 new · 8 updated · 12 unchanged".
+2. **The summary page** (below).
+3. **What's new and what changed**: every new, updated, in-place and removed
+   entry, in full: its description, its "What changed" note, and how to see it.
+   Then the product-wide notes. The summary picks highlights; this section never
+   leaves recorded work out.
+4. **Everything else the product does**: one line per entry that didn't move,
+   its name and first sentence, area by area.
+
+`ledger cut --full` (or `ledger build vN --full`) prints any edition as a full
+inventory instead, with what moved still marked. An edition cut with `--full`
+reprints that way on its own.
+
 ## The summary page
 
 From the second edition on, the page after the cover lists what differs from
 the last edition as short numbered lists, each under a plain heading in the
 colour its entries wear: *What's new*, *What changed*, *Already in place*, *No
-longer available*, and the product-wide notes. The first three are composed
-with the release's "What changed" notes, by `ledger compose`: each item is a sentence that
-reads on its own, followed by numbered links, `[1] [2] [3]`, to the entries it
-sums up. A removal is listed by its name, and a product-wide note by its first
-sentence. The first edition, and the first after a redraft, have nothing to
-compare with and print no summary.
+longer available*, and the product-wide notes. The first three are written by
+`ledger prepare`: each item is a sentence that reads on its own, followed by
+numbered links, `[1] [2] [3]`, to the entries it sums up. A removal is listed by
+its name, and a product-wide note by its first sentence.
 
-A draft whose composition is missing or out of date says so in a note at the
-top of the page, and lists the entries by name where nothing is composed yet.
-An edition cut before summaries existed lists its entries by name, as it
-always did.
+A draft says in a note at the top of the page when changes were recorded that
+`prepare` hasn't read, and lists the entries by name where nothing is prepared
+yet. An edition cut without a summary lists its entries by name too.
 
-The heading, the sentence under it and the first two list headings are
-`summary_title`, `summary_intro`, `summary_new` and `summary_updated` in the
-`docs.pdf` block of `.ledger/config.json`. `{date}` in the intro becomes
-the last edition's date.
+## The message
+
+Next to every edition, `ledger cut` writes the text to paste into an email or a
+chat: an opening line with no greeting, the summary items as a short list, and a
+line on anything removed. `ledger prepare` writes it as part of the release (it
+is `message` in `compositions.json`, yours to edit); when it didn't, the cut
+builds a plain one from the summary.
+
+The summary page's heading, the sentence under it and its first two list
+headings are `summary_title`, `summary_intro`, `summary_new` and
+`summary_updated` in the `docs.pdf` block of `.ledger/config.json` (`{date}` in
+the intro becomes the last edition's date). The two halves after it are
+`changed_title`, `changed_intro`, `rest_title` and `rest_intro`.
 
 ## Where they go
 

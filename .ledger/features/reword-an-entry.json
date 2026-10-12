@@ -3,9 +3,6 @@
   "audience": "user",
   "category": "Recording what the product does",
   "size": "Medium",
-  "paths": [
-    "src/commands/write.mjs"
-  ],
   "dev_notes": "src/commands/write.mjs cmdReword and rewordSubcategory. It can improve a `changes` bullet but not add or drop one — the bullet count has to match, since changing it is `ledger update`'s job.",
   "history": [
     {

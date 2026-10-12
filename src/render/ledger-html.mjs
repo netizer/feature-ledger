@@ -2,7 +2,7 @@ import { escapeHtml as h, longDate } from "../util.mjs";
 import { wording, redraftBody } from "../wording.mjs";
 import { resolveBrand, mastheadHtml } from "./brand.mjs";
 import { fontFaceCss, SYMBOL_FACE } from "./fonts.mjs";
-import { composeReportFor, composeLine } from "../compose.mjs";
+import { prepareReport, prepareLine, hasLists } from "../compose.mjs";
 
 /**
  * The client-facing "feature ledger" for one specific release — an archival
@@ -12,17 +12,22 @@ import { composeReportFor, composeLine } from "../compose.mjs";
  * New/Changed tags here are computed relative to that release's own
  * predecessor, ALWAYS — even for a release from months ago — because the
  * whole point of the ledger is reproducing what was actually presented at
- * that moment. This is deliberately different from the Markdown renderer,
- * which only shows New/Changed while the target release is still in
- * progress. Version 1 has no predecessor, so a first edition prints as a
+ * that moment. Version 1 has no predecessor, so a first edition prints as a
  * plain inventory with no flags anywhere on it: exactly what you want when
  * the corpus is a baseline of a codebase that already existed.
+ *
+ * Every later edition is short without dropping work: the cover, a summary
+ * page, then every new, updated, backfilled and removed entry in full — its
+ * description, its "What changed" note and how to see it — and then one line
+ * for each entry that didn't move. Reprinting every unchanged entry in full
+ * every time was most of an edition's length. `full` prints them all in full
+ * instead, the way an inventory does.
  *
  * Rendered as real HTML/CSS and printed with headless Chromium the same way
  * a person would print a styled page — not hand-positioned PDF drawing.
  */
-export function renderLedgerHtml({ project, version, label }) {
-  const doc = new LedgerHtml(project, version, label);
+export function renderLedgerHtml({ project, version, label, full = false }) {
+  const doc = new LedgerHtml(project, version, label, { full });
   const html = doc.render();
   return { html, warnings: doc.warnings, fontsEmbedded: doc.fontsEmbedded };
 }
@@ -38,8 +43,11 @@ const firstSentence = (text) => text.trim().split(/(?<=[.!?])\s+(?=[A-Z“"(])/)
  * structure — see `categoryId`. */
 const CLOSING_IDS = { removed: "closing-removed", goneEarlier: "closing-gone-earlier", other: "closing-other" };
 
+/** Anchors for the two halves of a short edition. */
+const SECTION_IDS = { changed: "whats-changed", rest: "everything-else" };
+
 class LedgerHtml {
-  constructor(project, version, label) {
+  constructor(project, version, label, { full = false } = {}) {
     this.project = project;
     this.config = project.config;
     this.set = project.featureSet;
@@ -54,6 +62,8 @@ class LedgerHtml {
     // but one arranged differently, so this one can't be diffed against it
     // and says so instead.
     this.redraftReplaces = project.releases.redraftReplaces(this.version);
+    // An inventory has nothing to set apart, so it is always in full.
+    this.short = Boolean(this.predecessor) && !full;
     this.brand = resolveBrand(project.brand);
     this.words = wording(project.config);
     this.warnings = [];
@@ -172,14 +182,6 @@ class LedgerHtml {
     };
   }
 
-  /** Each size's share of the total, for the width of its slice in the
-   *  breakdown bar. Two decimals so the three slices add up to a full bar
-   *  rather than leaving a hairline of background at the right end. */
-  sizeShare(key) {
-    const total = this.stats.features;
-    return total === 0 ? 0 : Math.round((this.stats[key] * 10000) / total) / 100;
-  }
-
   /** Withdrawn in the cycle this edition covers — announced as this
    *  edition's news. */
   get removedThisVersion() {
@@ -272,10 +274,18 @@ class LedgerHtml {
   changesPanel(state) {
     if (!state.changes?.length) return "";
     const items = state.changes.map((c) => `<li>${h(c)}</li>`).join("");
-    // On a draft, before anything is composed: the changes as they were
+    // On a preview, before anything is prepared: the changes as they were
     // recorded, said to be that, so nobody reads them as the finished note.
-    const label = state.changes_draft ? "What changed · as recorded, not yet composed" : "What changed";
-    return `<div class="changes${state.changes_draft ? " is-draft" : ""}"><span class="label">${label}</span><ul>${items}</ul></div>`;
+    // A cut edition prints the same lines as its note, unlabelled.
+    const draft = state.changes_draft && this.release.future;
+    const label = draft ? "What changed · as recorded, not yet prepared" : "What changed";
+    return `<div class="changes${draft ? " is-draft" : ""}"><span class="label">${label}</span><ul>${items}</ul></div>`;
+  }
+
+  /** How a reader checks the entry for themselves. */
+  howPanel(state) {
+    if (!state.how_to_see) return "";
+    return `<div class="how"><span class="label">How to see it</span><p>${h(state.how_to_see)}</p></div>`;
   }
 
   /**
@@ -304,7 +314,15 @@ class LedgerHtml {
       `<div class="badges">${this.sizeChip(f.size)}${tag}</div>` +
       `<div class="body"><div class="name">${h(s.name)}${was}</div>` +
       `<div class="desc">${h(s.description)}</div>` +
-      `${badge && f.firstVersion !== this.version ? this.changesPanel(s) : ""}</div></div></div>`;
+      `${row.badge && f.firstVersion !== this.version ? this.changesPanel(s) : ""}` +
+      `${row.badge || !this.short ? this.howPanel(s) : ""}</div></div></div>`;
+  }
+
+  /** One line for an entry that didn't move: its name and first sentence. */
+  restLine(row) {
+    const s = row.state;
+    return `<li id="${h(this.featureId(row.feature.id))}"><span class="nm">${h(s.name)}</span>` +
+      `<span class="first">${h(firstSentence(s.description))}</span></li>`;
   }
 
   /**
@@ -338,9 +356,10 @@ class LedgerHtml {
     const byName = (badge) => rows.filter((r) => r.badge === badge)
       .map((r) => item(this.featureId(r.feature.id), r.state.name));
     // A composition that only carries notes (an edition cut before summaries
-    // existed) has no lists, and prints its entries by name as it always did.
+    // existed, or one nobody prepared) has no lists, and prints its entries
+    // by name.
     const composed = this.project.compositionOf(this.version);
-    const written = composed && ["new", "changed", "in_place", "quiet"].some((k) => composed[k] !== undefined) ? composed : null;
+    const written = hasLists(composed) ? composed : null;
     const curated = (key) => (written?.[key] ?? []).map((it) => {
       const refs = (it.covers ?? []).filter((id) => printed.has(id))
         .map((id, n) => `<a class="ref" href="#${h(this.featureId(id))}">[${n + 1}]</a>`).join("");
@@ -358,11 +377,12 @@ class LedgerHtml {
     ].filter(([, , items]) => items.length);
     if (!groups.length) return "";
 
-    const report = this.release.future ? composeReportFor(this.project, this.version) : null;
-    const draftNote = report && !report.ok
-      ? `<p class="draft-note">Draft: ${h(report.missing
-        ? "nothing has been composed for this edition yet, so its entries are listed by name."
-        : `${composeLine(report).replace(/^the composition/, "this summary")}.`)}</p>`
+    // Only on a preview: a cut edition is what it is.
+    const report = this.release.future ? prepareReport(this.project, this.version) : null;
+    const draftNote = report && !report.ok && !report.nothing
+      ? `<p class="draft-note">Draft: ${h(report.never
+        ? "nothing has been prepared for this edition yet, so its entries are listed by name and their changes print as recorded."
+        : `${prepareLine(report).replace(/^./, (c) => c.toUpperCase())}, so this summary may not cover them.`)}</p>`
       : "";
     const intro = w.summary_intro.replaceAll("{date}", predDateLabel ? ` (${predDateLabel})` : "");
     return `<section class="summary">
@@ -371,6 +391,59 @@ class LedgerHtml {
     ${groups.map(([key, label, items]) => `<div class="sum-group is-${key}">` +
       `<h3><i></i>${h(label)}</h3><ol>${items.join("")}</ol></div>`).join("\n    ")}
   </section>`;
+  }
+
+  /* ---- a short edition's two halves ----------------------------------- */
+
+  /** Every row this edition marks: new, updated or already in place. */
+  get changedRows() {
+    return this.categoryRows.flatMap(([, rows]) => rows).filter((r) => r.badge);
+  }
+
+  /** The areas as "Everything else" lists them: only the rows that didn't move. */
+  get restAreas() {
+    return this.categoryRows
+      .map(([category, , groups]) => {
+        const kept = groups.map(([sub, rows]) => [sub, rows.filter((r) => !r.badge)]).filter(([, rows]) => rows.length);
+        return { category, groups: kept, rows: kept.flatMap(([, rows]) => rows) };
+      })
+      .filter((a) => a.rows.length);
+  }
+
+  /**
+   * Every entry that moved, in full: description, "What changed" note, and
+   * how to see it. The summary page picks highlights; this never leaves
+   * recorded work out.
+   */
+  changedSection() {
+    const w = this.words.pdf;
+    const groups = this.categoryRows.map(([category, rows]) => [category, rows.filter((r) => r.badge)]).filter(([, rows]) => rows.length);
+    if (!groups.length) return "";
+    const inner = groups.map(([category, rows]) => {
+      // Each one is a card of its own here, so none needs a rule under it.
+      const cards = rows.map((r) => this.featureRow({ ...r, showBadge: true, noLine: true }));
+      const head = this.set.unstructured ? "" : `<div class="area-label">${h(category)}</div>`;
+      return `<div class="changed-area"><div class="cat-open">${head}${cards[0]}</div>${cards.slice(1).join("")}</div>`;
+    }).join("");
+    return `<section class="part" id="${SECTION_IDS.changed}"><div class="part-head"><h2>${h(w.changed_title)}</h2>` +
+      `<p class="sub">${h(w.changed_intro)}</p></div>${inner}</section>`;
+  }
+
+  /** Everything that didn't move, one line each: its name and first sentence. */
+  restSection() {
+    const areas = this.restAreas;
+    if (!areas.length) return "";
+    const w = this.words.pdf;
+    const inner = areas.map(({ category, groups, rows }, i) => {
+      const head = this.set.unstructured ? "" : `<div class="cat-head" id="${this.categoryId(i)}">` +
+        `<span class="num">${this.categoryNumber(i)}</span><h2>${h(category)}</h2>` +
+        `<span class="meta">${rows.length} ${rows.length === 1 ? "feature" : "features"}</span></div>`;
+      const lists = groups.map(([sub, grows]) => `${sub ? `<div class="rest-sub">${h(sub.name)}</div>` : ""}` +
+        `<ul class="rest-list">${grows.map((r) => this.restLine(r)).join("")}</ul>`).join("");
+      return `<div class="rest-area">${head}${lists}</div>`;
+    }).join("");
+    return `<section class="part rest" id="${SECTION_IDS.rest}"><div class="part-head"><h2>${h(w.rest_title)}</h2>` +
+      `<p class="sub">${h(w.rest_intro)}</p></div>${inner}</section>`;
   }
 
   /* ---- the document --------------------------------------------------- */
@@ -393,7 +466,7 @@ class LedgerHtml {
     const footerLeft = `${this.brand.name} · The Feature Ledger · Version ${this.label}` +
       (dateLabel ? ` · ${dateLabel}` : "");
 
-    const body = this.categoryRows.map(([category, rows, groups], i) => {
+    const body = this.short ? "" : this.categoryRows.map(([category, rows, groups], i) => {
       const nNew = rows.filter((r) => r.badge === "new").length;
       const nUpd = rows.filter((r) => r.badge === "updated").length;
       const nBack = rows.filter((r) => r.badge === "backfilled").length;
@@ -433,46 +506,48 @@ class LedgerHtml {
       [other.length, CLOSING_IDS.other, "Also since last time", other.length],
     ].filter(([present]) => present);
 
-    const contents = this.categoryRows.map(([category, rows], i) => {
-      const nNew = rows.filter((r) => r.badge === "new").length;
-      const nUpd = rows.filter((r) => r.badge === "updated").length;
-      const nBack = rows.filter((r) => r.badge === "backfilled").length;
-      const flags = '<i class="dot-new"></i>'.repeat(nNew)
-        + '<i class="dot-updated"></i>'.repeat(nUpd)
-        + '<i class="dot-backfilled"></i>'.repeat(nBack);
-      return `<li><a href="#${this.categoryId(i)}">` +
-        `<span class="num">${this.categoryNumber(i)}</span><span class="nm">${h(category)}</span>` +
-        `<span class="flags">${flags}</span><span class="ct">${rows.length}</span></a></li>`;
-    }).join("");
+    const dots = (rows) => '<i class="dot-new"></i>'.repeat(rows.filter((r) => r.badge === "new").length)
+      + '<i class="dot-updated"></i>'.repeat(rows.filter((r) => r.badge === "updated").length)
+      + '<i class="dot-backfilled"></i>'.repeat(rows.filter((r) => r.badge === "backfilled").length);
+    // A short edition's areas are the ones in "Everything else", numbered
+    // there; a full one's are the whole ledger.
+    const areas = this.short ? this.restAreas : this.categoryRows.map(([category, rows]) => ({ category, rows }));
+    const contents = areas.map(({ category, rows }, i) => `<li><a href="#${this.categoryId(i)}">` +
+      `<span class="num">${this.categoryNumber(i)}</span><span class="nm">${h(category)}</span>` +
+      `<span class="flags">${this.short ? "" : dots(rows)}</span><span class="ct">${rows.length}</span></a></li>`).join("");
 
-    // Deliberately not numbered and deliberately quieter: these are closing
-    // notes about what left the product, not areas of it, and a reader
-    // scanning "01…08" shouldn't have to wonder why the count went up.
-    const closingContents = closing.map(([, id, title, count]) =>
-      `<li><a href="#${id}"><span class="num">&mdash;</span><span class="nm">${h(title)}</span>` +
-      `<span class="ct">${count}</span></a></li>`).join("");
+    // Deliberately not numbered and deliberately quieter: these are notes
+    // about what moved, not areas of the product, and a reader scanning
+    // "01…08" shouldn't have to wonder why the count went up.
+    const changedRows = this.changedRows;
+    const lead = this.short && changedRows.length ? [[SECTION_IDS.changed, w.changed_title, changedRows.length, ""]] : [];
+    const closingContents = [...lead, ...closing.map(([, id, title, count]) => [id, title, count, ""])]
+      .map(([id, title, count, flags]) => `<li><a href="#${id}"><span class="num">&mdash;</span><span class="nm">${h(title)}</span>` +
+        `<span class="flags">${flags}</span><span class="ct">${count}</span></a></li>`).join("");
 
     const summary = this.summaryHtml({ removed, goneEarlier, other, predDateLabel });
 
-    const sinceBlock = this.predecessor ? `
-      <div class="split-label">Since the last edition${predDateLabel ? `, ${predDateLabel}` : ""}</div>
-      <div class="since">
-        <div class="item is-new"><span class="n">${stats.new}</span><span class="l">New</span></div>
-        <div class="item is-updated"><span class="n">${stats.updated}</span><span class="l">Updated</span></div>
-        ${stats.backfilled > 0
-          ? `<div class="item is-backfilled"><span class="n">${stats.backfilled}</span><span class="l">Already in place</span></div>`
-          : ""}
-        <div class="item is-same"><span class="n">${stats.unchanged}</span><span class="l">Unchanged</span></div>
-      </div>` : "";
+    // One line on the cover: what this edition holds, against the last one.
+    const tally = this.predecessor
+      ? [[stats.new, "new", "is-new"], [stats.updated, "updated", "is-updated"],
+        [stats.backfilled, this.words.tags.backfilled.toLowerCase(), "is-backfilled"],
+        [removed.length, "no longer available", "is-removed"], [stats.unchanged, "unchanged", "is-same"]]
+        .filter(([n, , cls]) => n > 0 || cls === "is-new" || cls === "is-updated" || cls === "is-same")
+        .map(([n, label, cls]) => `<span class="${cls}"><b>${n}</b> ${h(label)}</span>`).join('<span class="sep">·</span>')
+      : `<span><b>${stats.features}</b> feature${stats.features === 1 ? "" : "s"}${stats.areas > 1 ? ` across <b>${stats.areas}</b> areas` : ""}</span>`;
 
+    const layoutNote = this.short
+      ? " Every new and updated entry follows it in full, with what changed and how to see it for yourself; everything else is listed after that, one line each."
+      : "";
     const callout = this.predecessor ? `
       <div class="callout"><div class="callout-content">
         <b>What's changed since the last edition${predDateLabel ? ` (${predDateLabel})` : ""}:</b>
-        every entry below is highlighted to show what's different. A green stripe marks a brand-new feature;
+        ${summary ? "the page after this one sums up what's different." : "every new and updated entry is highlighted."}${layoutNote}
+        A green stripe marks a brand-new feature;
         a blue stripe marks an existing feature that was materially reworked, with its own
-        <b>What changed</b> note.${summary ? " The page after this one sums up what's different." : ""}${stats.backfilled > 0 ? ` A grey stripe marks a capability that was already
+        <b>What changed</b> note.${stats.backfilled > 0 ? ` A grey stripe marks a capability that was already
         part of ${h(this.brand.name)} and is listed here for the first time, rather than something built this
-        time.` : ""} Anything without a stripe hasn't changed.
+        time.` : ""}${this.short ? "" : " Anything without a stripe hasn't changed."}
         <div class="legend">
           <span><i class="dot-new"></i> New feature</span>
           <span><i class="dot-updated"></i> Updated feature</span>
@@ -504,8 +579,8 @@ class LedgerHtml {
       </div>` : "";
 
     // Deliberately its own block, and deliberately vague about timing: these
-    // went before the last cutoff, and since the audit does no archaeology the
-    // document cannot honestly name the release they went in.
+    // went before the last cutoff, and nothing records which release they went
+    // in, so the document cannot honestly name one.
     const goneEarlierBlock = goneEarlier.length ? `
       <div class="category">
         <div class="cat-head" id="${CLOSING_IDS.goneEarlier}"><span class="num">&mdash;</span><h2>${h(this.words.tags.backfilled_removed)}</h2>
@@ -520,10 +595,9 @@ class LedgerHtml {
         <ul>${other.map((c) => `<li>${h(c.description)}</li>`).join("")}</ul>
       </div>` : "";
 
-    const sizeBar = [["big", "Big"], ["medium", "Medium"], ["small", "Small"]]
-      .filter(([key]) => stats[key] > 0)
-      .map(([key, label]) => `<div class="seg seg-${key}" style="width:${this.sizeShare(key)}%"><b>${stats[key]}</b> ${label}</div>`)
-      .join("");
+    const pages = this.short
+      ? `${this.changedSection()}${removedBlock}${goneEarlierBlock}${otherBlock}${this.restSection()}`
+      : `${body}${removedBlock}${goneEarlierBlock}${otherBlock}`;
 
     return `<!doctype html>
 <html lang="en">
@@ -552,37 +626,20 @@ ${this.project.themeCss()}
       Version ${this.label}${rel.name ? ` · ${h(rel.name)}` : ""}${rel.future ? " · draft, not yet presented" : ""}
     </div>
     <p class="intro">${h(w.intro)}</p>
+    <div class="tally">${tally}</div>
     ${callout}${redraftBlock}
-
-    <div class="panel">
-      <div class="kicker">The ledger at a glance</div>
-      <div class="headline">${stats.areas > 1
-        ? `<b>${stats.features}</b> features <span>across</span> <b>${stats.areas}</b> areas`
-        : `<b>${stats.features}</b> feature${stats.features === 1 ? "" : "s"}`}</div>
-
-      <div class="split-label">Every one of those ${stats.features}, by size</div>
-      <div class="bar">${sizeBar}</div>
-      <div class="bar-key">
-        <div class="row">${this.sizeChip("Big")} A capability the product is chosen for</div>
-        <div class="row">${this.sizeChip("Medium")} A capability in its own right, inside a bigger one</div>
-        <div class="row">${this.sizeChip("Small")} A capability narrow enough to describe in a line</div>
-      </div>
-      ${sinceBlock}
-    </div>
   </header>
 
   ${summary}
 
   ${this.set.unstructured ? "" : `<div class="contents">
     <div class="kicker">Contents</div>
-    <ol>${contents}</ol>
-    ${closingContents ? `<ul class="closing">${closingContents}</ul>` : ""}
+    ${this.short && closingContents ? `<ul class="closing lead">${closingContents}</ul>` : ""}
+    ${contents ? `${this.short ? `<div class="contents-sub">${h(w.rest_title)}</div>` : ""}<ol>${contents}</ol>` : ""}
+    ${!this.short && closingContents ? `<ul class="closing">${closingContents}</ul>` : ""}
   </div>`}
 
-  ${body}
-  ${removedBlock}
-  ${goneEarlierBlock}
-  ${otherBlock}
+  ${pages}
 
   <div class="colophon">
     ${h(this.brand.name)} · The Feature Ledger · Version ${this.label}${dateLabel ? ` · ${dateLabel}` : ""}.
@@ -716,47 +773,25 @@ const STYLES = `
   .dot-updated { background: var(--blue); }
   .dot-backfilled { background: var(--slate); }
 
-  /* ---- At a glance ----
-     The total reads as a sentence, and the size split is drawn as one bar cut
-     into three pieces, so it's self-evidently a breakdown *of* that total and
-     not five more facts sitting in a row inviting comparison. */
   .kicker {
     font-size: 7.5pt; font-weight: 800; letter-spacing: .14em; text-transform: uppercase;
     color: var(--accent); margin-bottom: 12px;
   }
-  .panel { margin-top: 36px; }
-  .headline { font-family: var(--font-display); font-size: 15pt; color: var(--ink-soft); font-weight: 400; }
-  .headline b { font-weight: 700; font-size: 27pt; color: var(--ink); letter-spacing: -.01em; }
 
-  .split-label {
-    margin-top: 26px; font-size: 7.5pt; font-weight: 800; letter-spacing: .12em;
-    text-transform: uppercase; color: var(--ink-faint); margin-bottom: 7px;
+  /* ---- The tally ----
+     One line, read as a sentence: what this edition holds against the last
+     one. Each count wears the colour its entries wear inside. */
+  .tally {
+    margin-top: 26px; font-family: var(--font-display); font-size: 14pt; color: var(--ink-soft);
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px;
   }
-  .bar { display: flex; border-radius: 5px; overflow: hidden; }
-  .bar .seg {
-    padding: 11px 13px; font-size: 8pt; font-weight: 700; letter-spacing: .06em;
-    text-transform: uppercase; white-space: nowrap; overflow: hidden;
-  }
-  .bar .seg b { font-family: var(--font-display); font-size: 12.5pt; font-weight: 700; letter-spacing: 0; margin-right: 4px; }
-  .bar .seg-big { background: var(--accent); color: #fff; }
-  .bar .seg-medium { background: var(--accent-mid); color: var(--accent-deep); }
-  .bar .seg-small { background: var(--accent-pale); color: var(--accent-quiet); }
-  /* The key shows the real chip, not a description of it — so the three
-     slices of the bar above and the three marks stamped on every row of the
-     ledger are visibly the same three things, and "how big is this one" is
-     answered once, on page one, for the whole document. */
-  .bar-key { margin-top: 13px; display: flex; flex-direction: column; gap: 7px; }
-  .bar-key .row { display: flex; align-items: center; gap: 12px; font-size: 9pt; color: var(--ink-soft); }
-  .bar-key .row .size { flex: 0 0 90px; }
-
-  .since { display: flex; gap: 34px; margin-top: 24px; flex-wrap: wrap; }
-  .since .item { display: flex; align-items: baseline; gap: 8px; }
-  .since .n { font-family: var(--font-display); font-size: 21pt; font-weight: 700; line-height: 1; }
-  .since .l { font-size: 8pt; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
-  .since .is-new .n { color: var(--green-deep); } .since .is-new .l { color: var(--green-deep); }
-  .since .is-updated .n { color: var(--blue-deep); } .since .is-updated .l { color: var(--blue-deep); }
-  .since .is-backfilled .n { color: var(--slate-deep); } .since .is-backfilled .l { color: var(--slate-deep); }
-  .since .is-same .n { color: var(--ink-ghost); } .since .is-same .l { color: var(--ink-faint); }
+  .tally b { font-weight: 700; font-size: 20pt; color: var(--ink); margin-right: 3px; }
+  .tally .sep { color: var(--ink-ghost); }
+  .tally .is-new b { color: var(--green-deep); }
+  .tally .is-updated b { color: var(--blue-deep); }
+  .tally .is-backfilled b { color: var(--slate-deep); }
+  .tally .is-removed b { color: var(--accent-deep); }
+  .tally .is-same b { color: var(--ink-faint); }
 
   /* ---- What's different ----
      Read, not scanned: plain headings and numbered sentences at body size,
@@ -997,6 +1032,45 @@ const STYLES = `
      otherwise the one blue thing on a grey card reads as a stray highlight. */
   .feature.backfilled .changes .label { color: var(--slate-deep); }
   .feature.backfilled .changes li::before { background: var(--slate); }
+
+  /* ---- How to see it ----
+     Instructions, not a claim: the same quiet label as "What changed", in the
+     row's own ink, so it reads as the last thing to know about the entry. */
+  .how { margin-top: 10px; max-width: var(--measure); }
+  .how .label {
+    display: block; font-weight: 800; font-size: 7.2pt; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--ink-faint); margin-bottom: 3px;
+  }
+  .how p { margin: 0; color: var(--ink-soft); }
+
+  /* ---- A short edition's two halves ----
+     Everything that moved, in full, then everything else, one line each. Each
+     half opens on a heading the size of a section, so the switch from cards
+     to lines is announced rather than stumbled into. */
+  .part { margin-top: 30px; }
+  .part-head { padding-top: 14px; border-top: 2px solid var(--accent); margin-bottom: 8px; break-after: avoid; }
+  .part-head h2 { font-family: var(--font-display); font-size: 17pt; font-weight: 700; letter-spacing: -.005em; }
+  .part-head p.sub { margin: 3px 0 0; font-size: 9pt; color: var(--ink-faint); max-width: var(--measure); }
+  .area-label {
+    margin: 16px 0 4px; font-size: 7.5pt; font-weight: 800; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--ink-faint); break-after: avoid;
+  }
+  .rest .cat-head { border-top-width: 1px; margin-top: 18px; }
+  .rest-area { break-inside: auto; }
+  .rest-sub { margin: 10px 0 2px; font-family: var(--font-display); font-weight: 700; font-size: 10.5pt; color: var(--accent-deep); }
+  .rest-list { margin: 0; padding: 0; list-style: none; }
+  .rest-list li {
+    break-inside: avoid; padding: 6px 0; border-bottom: 1px solid var(--line-soft);
+    display: flex; gap: 12px; align-items: baseline;
+  }
+  .rest-list .nm { flex: 0 0 34%; font-family: var(--font-display); font-weight: 700; font-size: 10.5pt; }
+  .rest-list .first { flex: 1; color: var(--ink-soft); font-size: 9.5pt; }
+  .contents-sub {
+    margin-top: 14px; font-size: 7.5pt; font-weight: 800; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--ink-faint);
+  }
+  .contents .closing.lead { margin: 10px 0 0; }
+  .contents .closing.lead .nm { font-weight: 600; color: var(--ink); }
 
   .removed-box { margin-top: 12px; background: var(--accent-deep); border-radius: 7px; overflow: hidden; break-inside: avoid; }
   .removed-box-content { background: var(--accent-pale); margin-left: 5px; padding: 13px 16px; font-size: 9.5pt; }

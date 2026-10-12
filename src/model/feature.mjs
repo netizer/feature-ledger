@@ -2,9 +2,13 @@ import { fail, isBlank } from "../util.mjs";
 
 /** Where a change's reason came from. `person`: whoever decided it said why.
  *  `commit`: an agent read it off a commit message, and nobody has vouched for
- *  it yet. `unknown`: nobody recorded one. The last two open a question (see
- *  src/questions.mjs) until someone answers it. */
+ *  it yet. `unknown`: nobody recorded one. `ledger` lists the last two, and
+ *  `ledger prepare` asks the developer about them in its session. */
 export const WHY_FROM = ["person", "commit", "unknown"];
+
+/** Fields an earlier version of the tool kept, and where to send someone who
+ *  has a file with them in it. */
+const OLD_HISTORY_FIELDS = ["changes", "dev_notes", "reason_inferred"];
 
 /**
  * One feature: what it is at every version, and what happened to it.
@@ -19,16 +23,19 @@ export const WHY_FROM = ["person", "commit", "unknown"];
  *
  * `events` are the *facts* recorded as work landed: what changed and why,
  * with where the reason came from. They are written by whoever did the work,
- * one `ledger change` at a time, and nobody has to phrase them for the client.
- * The client reads a "What changed" note composed for the whole release at
- * once (`ledger compose`), from the state the last edition showed, the state
- * now, and the events between. Those notes live in compositions.json, and the
+ * one `ledger change` at a time, and nobody phrases them for the client. The
+ * client reads a "What changed" note written for the whole release at once
+ * (`ledger prepare`), from the state the last edition showed, the state now,
+ * and the events between. Those notes live in compositions.json, and the
  * store hands them to each feature as `bullets`, so every renderer reads them
- * off #stateAt as it always has.
+ * off #stateAt.
  *
- * `paths` are the globs the capability's code lives in (src/paths.mjs), and
- * `dev_notes` the team's detail. Both describe the feature, not one moment in
- * its history, so each is kept once.
+ * `how_to_see` lives on the history entry, next to the description: how a
+ * reader checks the claim for themselves. It is versioned like the
+ * description, so an old edition reprints the instructions it was sent with.
+ *
+ * `dev_notes` are the team's detail. They describe the feature, not one
+ * moment in its history, so they are kept once.
  */
 export class Feature {
   constructor(data, { file, bullets = {}, drafts = {} } = {}) {
@@ -38,14 +45,15 @@ export class Feature {
     this.category = data.category;
     this.subcategory = data.subcategory ?? null;
     this.size = data.size ?? null;
-    this.paths = data.paths ?? [];
     this.dev_notes = data.dev_notes ?? null;
     this.history = [...(data.history ?? [])].sort((a, b) => a.version - b.version);
     this.events = [...(data.events ?? [])];
-    // Composed "What changed" notes, by version (compositions.json), and for
-    // the open release before anything is composed, the events themselves.
+    // Prepared "What changed" notes, by version (compositions.json), and for
+    // the open release before anything is prepared, the events themselves.
     this.bullets = bullets;
     this.drafts = drafts;
+    // Only so validate() can say which tool wrote the file.
+    this.legacyPaths = "paths" in data;
     this.validate();
   }
 
@@ -82,22 +90,26 @@ export class Feature {
 
     const names = entries.map((h) => h.name).filter(Boolean);
     const renamedFrom = current.name && names.length > 1 ? names[names.length - 2] : null;
-    const composed = this.bullets[current.version] ?? null;
-    const draft = composed ? null : (this.drafts[current.version] ?? null);
+    // Carried forward like the name: an update rarely moves where a reader
+    // finds the capability, and `ledger prepare` checks it when it does.
+    const howToSee = entries.map((h) => h.how_to_see).filter((t) => !isBlank(t)).pop() ?? null;
+    const prepared = this.bullets[current.version] ?? null;
+    const draft = prepared ? null : (this.drafts[current.version] ?? null);
 
     return {
       version: current.version,
       name: names[names.length - 1],
       description: current.description,
+      how_to_see: howToSee,
       dev_notes: this.dev_notes,
-      changes: composed ?? draft,
-      // The events themselves, standing in for a note nobody has composed
-      // yet. Only ever on the open release, and drawn as a draft.
+      changes: prepared ?? draft,
+      // The events themselves, standing in for a note nobody has prepared
+      // yet. Only ever on the open release.
       changes_draft: Boolean(draft),
       removed: false,
-      // Set when this entry records something the audit found late: the
-      // product did not move at this version, the record did. The renderers
-      // draw it in a third, quieter register — see src/render/ledger-html.mjs.
+      // Set when this entry records something found late: the product did
+      // not move at this version, the record did. The renderers draw it in a
+      // third, quieter register — see src/render/ledger-html.mjs.
       backfilled: current.backfilled === true,
       renamedFrom,
     };
@@ -127,7 +139,6 @@ export class Feature {
     };
     if (this.subcategory) out.subcategory = this.subcategory;
     out.size = this.size;
-    out.paths = this.paths;
     if (this.dev_notes) out.dev_notes = this.dev_notes;
     out.history = this.history.map((h) => {
       if (h.removed) {
@@ -138,6 +149,7 @@ export class Feature {
       const e = { version: h.version };
       if (h.name) e.name = h.name;
       e.description = h.description;
+      if (!isBlank(h.how_to_see)) e.how_to_see = h.how_to_see;
       if (h.backfilled) e.backfilled = true;
       return e;
     });
@@ -160,6 +172,13 @@ export class Feature {
     if (!/^[a-z0-9][a-z0-9-]*$/.test(this.id)) {
       fail(`feature ${this.id}: id must be lower-case kebab-case (letters, digits, hyphens)${where}`);
     }
+    // A file in a shape this version no longer reads: an entry recorded on a
+    // branch with an older CLI and merged after `ledger migrate`. Refused
+    // rather than read, because writing it back would drop what it carries.
+    if (this.legacyPaths) {
+      fail(`feature ${this.id}: "paths" is no longer part of an entry${where}. ` +
+        "The file was written by an earlier version of feature-ledger: run `ledger migrate`, which converts it.");
+    }
     if (!["user", "dev"].includes(this.audience)) fail(`feature ${this.id}: audience must be "user" or "dev"`);
     if (isBlank(this.category)) fail(`feature ${this.id}: category is blank`);
     if (this.size !== null && !["Big", "Medium", "Small"].includes(this.size)) {
@@ -168,9 +187,6 @@ export class Feature {
         "The scale ranks capabilities within this product; it is not a licence to record something smaller " +
         "than a capability — see `ledger rules`.",
       );
-    }
-    if (!Array.isArray(this.paths) || !this.paths.every((p) => typeof p === "string" && p.trim())) {
-      fail(`feature ${this.id}: "paths" is a list of globs naming the files the capability lives in${where}`);
     }
     if (this.dev_notes !== null && typeof this.dev_notes !== "string") fail(`feature ${this.id}: "dev_notes" is text`);
     if (this.history.length === 0) fail(`feature ${this.id}: history is empty`);
@@ -183,20 +199,18 @@ export class Feature {
 
     for (const h of this.history) {
       if (!Number.isInteger(h.version)) fail(`feature ${this.id}: every history entry needs an integer "version"`);
-      // Where these lived before the ledger kept events: a ledger written by
-      // an earlier version of the tool, which `ledger migrate` brings over.
-      for (const old of ["changes", "dev_notes", "reason_inferred"]) {
+      for (const old of OLD_HISTORY_FIELDS) {
         if (old in h) {
           fail(`feature ${this.id} v${h.version}: "${old}" no longer lives in "history"${where}. ` +
-            "This ledger was written by an earlier version of feature-ledger: run `ledger migrate`.");
+            "The file was written by an earlier version of feature-ledger: run `ledger migrate`, which converts it.");
         }
       }
-      // Written only by an audit, and only ever true — an explicit `false`
-      // would be a third state to reason about in every renderer.
+      // Only ever true — an explicit `false` would be a third state to
+      // reason about in every renderer.
       if ("backfilled" in h && h.backfilled !== true) {
         fail(
           `feature ${this.id} v${h.version}: "backfilled" is either absent or true (got ${JSON.stringify(h.backfilled)}). ` +
-          "It marks an entry an audit recorded after the fact; leave it out for ordinary work.",
+          "It marks an entry recorded after the fact; leave it out for ordinary work.",
         );
       }
       if (h.removed) {
@@ -204,6 +218,9 @@ export class Feature {
         continue;
       }
       if (isBlank(h.description)) fail(`feature ${this.id} v${h.version}: needs a description`);
+      if (h.how_to_see != null && typeof h.how_to_see !== "string") {
+        fail(`feature ${this.id} v${h.version}: "how_to_see" is text: how a reader checks the claim for themselves`);
+      }
     }
 
     for (const e of this.events) {
@@ -213,7 +230,9 @@ export class Feature {
       if (isBlank(e.what)) fail(`${at} needs "what": what changed, in a sentence`);
       if (e.why !== null && e.why !== undefined && typeof e.why !== "string") fail(`${at}: "why" is text, or null`);
       if (!WHY_FROM.includes(e.why_from)) fail(`${at}: "why_from" is one of ${WHY_FROM.join(", ")}`);
-      if (e.why_from === "unknown" && !isBlank(e.why)) fail(`${at} says its reason is unknown, and gives one`);
+      if (e.why_from === "unknown" && !isBlank(e.why)) {
+        fail(`${at} says its reason is unknown, and gives one. An answered reason is "why_from": "person"`);
+      }
       if (e.why_from !== "unknown" && isBlank(e.why) && !e.combined) {
         fail(`${at} has no "why". Record one, or say it isn't known (\`--why-unknown\`)`);
       }

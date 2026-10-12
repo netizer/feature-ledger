@@ -3,11 +3,6 @@
   "audience": "user",
   "category": "Setting up a ledger",
   "size": "Big",
-  "paths": [
-    "src/style.mjs",
-    "src/commands/style.mjs",
-    "assets/STYLE-template.md"
-  ],
   "dev_notes": "src/style.mjs holds all four samples; they describe the same fictional product (examples/northwind) so the only difference between them is register. resolveStyle() throws for an unknown id or a missing STYLE.md.",
   "history": [
     {

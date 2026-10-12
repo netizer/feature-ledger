@@ -3,10 +3,6 @@
   "audience": "user",
   "category": "The documents it produces",
   "size": "Medium",
-  "paths": [
-    "src/render/brand.mjs",
-    "src/render/fonts.mjs"
-  ],
   "dev_notes": "src/render/brand.mjs derives accent_deep, accent_quiet, accent_mid and accent_pale in HSL; any of them can be pinned in brand.json. A logo is embedded as a data URI (PNG, JPG, SVG, WebP). .ledger/theme.css is appended last to the PDF stylesheet for a one-off nudge.",
   "history": [
     {

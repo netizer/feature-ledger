@@ -3,17 +3,12 @@
   "audience": "user",
   "category": "The documents it produces",
   "size": "Medium",
-  "paths": [
-    "src/compose.mjs",
-    "src/commands/compose.mjs",
-    "src/render/ledger-html.mjs"
-  ],
   "dev_notes": "src/compose.mjs holds the model: composeTargets, needsNote, inputsOf (the entry at the last edition, now, and its events' what and why — not why_from, so vouching for a reason changes nothing), composeReportFor, composeLine, stamped and ordered. src/commands/compose.mjs is the brief and `compose complete`; TASKS.compose in src/prompt.mjs checks the report after an agent runs. Compositions live in .ledger/compositions.json, one per release, with `changes` (id → bullets), the summary lists, `quiet`, and the stamp (`date`, `commit`, `inputs`, `verified`). The store hands each feature its composed bullets, and for the open release before anything is composed, its events as a draft (`changes_draft`). LedgerHtml.summaryHtml in src/render/ledger-html.mjs prints each item with links to id=\"f-<id>\", falls back to entry names when a composition has no lists, and adds a draft note when the open release's composition isn't up to date.",
   "history": [
     {
       "version": 3,
-      "name": "Composing what changed",
-      "description": "From the second edition on, each edition says what moved since the last: a \"What changed\" note under every updated entry, and short lists up front of what's new and what changed, each item linking to the entries it sums up. The command ledger compose has a coding agent write both at once, from what the last edition said, what the entries say now and the changes recorded between, without reading the code. A change recorded afterwards puts it out of date; editing its words by hand doesn't."
+      "name": "Preparing an edition",
+      "description": "The command ledger prepare prints one brief for an interactive coding-agent session that writes what the client reads about a release: a \"What changed\" note on each updated entry, the summary page, how to see each new or updated entry, and the message to send. In the same session it finds work nobody recorded, asks you the reasons nobody gave, and checks what it wrote against the code. It never commits."
     }
   ]
 }

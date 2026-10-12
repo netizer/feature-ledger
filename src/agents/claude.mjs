@@ -4,8 +4,9 @@
  * caught for resuming it afterwards.
  *
  * Permissions are the narrowest set a ledger task needs: the ledger CLI, git
- * read commands for an audit's range, reading the codebase, and editing files
- * (a review and a redraft check reword entries in place). Anything else the
+ * read commands for the code since the last edition, reading the codebase,
+ * and editing files (prepare writes compositions.json, and a redraft check
+ * rewords entries in place). Anything else the
  * agent tries is refused rather than asked about, since nobody is at a prompt
  * to answer — and the refusals are reported at the end, with the resume
  * command, so the session can be picked up and finished by hand.
@@ -22,7 +23,9 @@ const ALLOWED_TOOLS = [
 const HEADLESS_NOTE = "You are running unattended: nobody can approve a tool call. Only `ledger`, `git log/show/diff/status/ls-files`, " +
   "reading files and editing files inside the project are pre-approved. Run each shell command on its own — never chain " +
   "commands with `;`, `&&` or `|` — and pass a JSON payload to `ledger` as a heredoc on that one command " +
-  "(`ledger add <id> <<'JSON' … JSON`). Keep any file you write inside the project directory.";
+  "(`ledger add <id> <<'JSON' … JSON`). Keep any file you write inside the project directory. Nobody is there to " +
+  "answer a question either: where the task says to ask the developer, leave that thing as it is and put the question " +
+  "in your final message.";
 
 export default {
   id: "claude",

@@ -3,10 +3,6 @@
   "audience": "user",
   "category": "Recording what the product does",
   "size": "Big",
-  "paths": [
-    "src/model/feature.mjs",
-    "src/model/feature-set.mjs"
-  ],
   "dev_notes": "There is no command, deliberately: `ledger reword`, `ledger rename` and `ledger subcategory reword` were removed, and src/cli.mjs RETIRED points each one at the file to edit. Validation on load is what makes hand-editing safe — src/model/feature.mjs Feature#validate runs for every file the store opens, so `ledger status` is the check. `ledger categories rename` stays a command because an area's name is repeated on every feature filed under it.",
   "history": [
     {
@@ -16,7 +12,7 @@
     },
     {
       "version": 3,
-      "description": "The corpus is JSON in the repository, and its prose is yours to rewrite. You reword a name, a description or a dev note in the feature's own file, or a \"What changed\" note or summary item in compositions.json; add the sentence a coding agent had no way of knowing; or cut what the client is better off not reading. Nothing is recorded and nothing is marked as changed, because the product did not move. ledger status then checks every file. A change to what the product does goes through ledger add, change or remove."
+      "description": "The corpus is JSON in the repository, and its prose is yours to rewrite. You reword a name, a description, how to see it or a dev note in the feature's own file, or a \"What changed\" note, a summary item or the message in compositions.json; add the sentence a coding agent had no way of knowing; or cut what the client is better off not reading. Nothing is recorded and nothing is marked as changed, because the product did not move. ledger status then checks every file."
     }
   ],
   "events": [
@@ -25,6 +21,14 @@
       "kind": "change",
       "what": "The notes and summary an edition prints are edited in compositions.json, and a hand-edit there survives the next composition unless the entry it is about moves again.",
       "why": "The notes are composed for the whole release now, instead of being kept on each feature.",
+      "why_from": "person",
+      "date": "2026-10-12"
+    },
+    {
+      "version": 3,
+      "kind": "change",
+      "what": "How to see each entry, and the message sent with an edition, are edited by hand too.",
+      "why": "They are client-facing prose like the rest of the ledger.",
       "why_from": "person",
       "date": "2026-10-12"
     }

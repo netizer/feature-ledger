@@ -1,13 +1,17 @@
 # Coding agents
 
-The ledger is agent-agnostic: the rules live in one file every agent can read,
-and every operation is a CLI command. Two things connect it to an agent:
+The ledger is agent-agnostic: the instructions live in a short stanza every
+agent can read, and every operation is a CLI command. Two things connect it to
+an agent:
 
-1. **A stanza** in the agent's instruction file, so it records features as it
-   builds them.
-2. **Agent tasks** — `bootstrap`, `audit`, `compose`, `verify`, `paths brief`,
-   `redraft check` and `style rewrite` — which prepare a prompt for an agent
-   to work through.
+1. **A stanza** in the agent's instruction file, so it records facts as it
+   builds, and never commits for you.
+2. **Agent tasks** — `prepare`, `bootstrap`, `redraft check` and
+   `style rewrite` — which print a prompt for an agent to work through.
+
+**Agents never run unless you ask.** No command starts one on its own:
+`preview`, `cut` and `build` never do, and an agent task only hands its prompt
+to an agent when `--run` is on the command line.
 
 ## Delivering an agent task
 
@@ -15,26 +19,30 @@ Every agent task delivers its prompt the same four ways:
 
 | | |
 | --- | --- |
-| *(default)* | An explanation for you, then the prompt under a rule, to paste into a fresh agent session in the project root. |
+| *(default)* | An explanation for you, then the prompt under a rule, to paste into your agent session in the project root. |
 | `--copy` | The prompt, straight onto the clipboard (`pbcopy`, `wl-copy`, `xclip` or `xsel`). |
-| `--print` | The prompt alone, ready to pipe: `ledger compose --print \| pbcopy`. Warnings still reach your screen, on stderr. |
+| `--print` | The prompt alone, ready to pipe: `ledger prepare --print \| pbcopy`. Warnings still reach your screen, on stderr. |
 | `--run AGENT` | The prompt handed to an agent, in the project root. The CLI waits for it, then reports. |
 
-An agent that can run commands doesn't need any of this: tell it to run
-`ledger compose --print` and follow what it prints.
+`ledger prepare` is meant for your own interactive session, because it asks
+you things: the reasons nobody recorded, and what to do where the text and the
+code disagree. An agent that can run commands can also be told to run
+`ledger prepare --print` and follow what it prints.
 
 ## `--run`
 
 ```bash
-ledger audit --run claude
-ledger compose --run codex
+ledger prepare --run claude
 ledger bootstrap --run gemini
-ledger audit --run "my-agent --headless"      # any command that reads the prompt on stdin
+ledger prepare --run "my-agent --headless"      # any command that reads the prompt on stdin
 ```
 
-**Nothing runs an agent unless `--run` is on the command line.** There is no
-default. A bare `--run` uses `$LEDGER_AGENT`, or `"agent"` in
+There is no default agent. A bare `--run` uses `$LEDGER_AGENT`, or `"agent"` in
 `.ledger/config.json`, and refuses when neither is set.
+
+A headless agent has nobody to ask, so where the prompt says to ask the
+developer, it leaves that thing as it is and puts the question in its last
+message.
 
 While it works, you see what the agent says and one dim line per tool it uses.
 When it stops, you get:
@@ -42,32 +50,24 @@ When it stops, you get:
 ```
 ── Claude Code finished · 11 turns · $0.40 ──
 
-I've audited the range and recorded one new entry. …   ← its last message, which
-                                                          often says what's left
-✓ incremental audit recorded at d7e043f: 1 entry recorded (orders-csv-export)
+I've written the notes and the summary. Two reasons nobody recorded: …   ← its last message, which
+                                                                            often says what's left
+✓ prepared (October 12, 2026), and nothing recorded since
+✓ 2 reasons still not vouched for — `ledger` lists them
 
 Resume the session:  claude --resume 7744d0d3-482a-4ac2-9fd1-0e1580121146
 ```
 
 - **The last message** is held back from the progress and shown here, because
   that's where an agent puts its questions and next steps.
-- **The check** is the stamp the task is supposed to leave: an audit recorded, a
-  composition up to date, a verify recorded, every product file owned, a
-  redraft marked complete, a baseline cut. An agent that
-  exits cleanly without it is reported with ✗, and the command exits with 3.
+- **The check** is what the task is supposed to leave behind: a release
+  prepared, a redraft marked complete, entries recorded. An agent that exits
+  cleanly without it is reported with ✗, and the command exits with 3.
 - **Refused tool calls** are listed, one line each, when the agent tried
   something it wasn't allowed to do.
 - **The resume command** reopens the agent's session, so you can answer its
   questions or finish what it couldn't. Ctrl-C stops the agent, and you still
   get the resume command.
-
-`ledger cut --name "…" --run claude` hands whichever of the audit, the
-composition and (when it's on) the verify is still open to the agent, one after
-the other, asks you the open questions, then shows you
-the agent's notes and asks before it cuts. `--yes` cuts without asking.
-`ledger preview --run claude` hands over only the composition, and only when
-it's out of date: it is composed from the ledger alone, so it's cheap
-enough for a daily draft.
 
 ### The agents it knows
 
@@ -98,12 +98,14 @@ ledger init --agents claude,cursor      # only these
 ledger init --agents none               # wire nothing
 ```
 
-The stanza is a **pointer**, not a copy: it says the ledger exists, that a
-feature change isn't finished until the ledger records it, lists the commands,
-draws the line between recording a change and rewording an entry, names the
-project's tone, and tells the agent to run `ledger rules` before its first edit.
-`ledger style set` rewrites it in every agent file, so it never names a tone
-the project has left.
+The stanza says the ledger exists, that a feature change isn't finished until
+the ledger records it, and lists the commands. It tells the agent to record
+facts — what moved, in a sentence a client could read, and why, never invented
+— with how to see it when it knows; draws the line between recording a change
+and rewording an entry; names the project's tone; and says not to commit, and
+not to run `prepare` or `cut` unless asked. `ledger style set` and
+`ledger migrate` rewrite it in every agent file, so it never describes a tool
+the project has moved off.
 
 If you run the CLI through a wrapper (`./tools/ledger`), edit the stanza's
 commands to match: the agent uses exactly what's written there.
@@ -134,7 +136,7 @@ Weakest to strongest:
   normal commit. It catches a corpus that's broken, not one that's out of date.
   For out-of-date, print a reminder when a commit touches source but nothing
   under `.ledger/`, and let it through: a hard block trains people to use
-  `--no-verify`.
+  `--no-verify`. `ledger prepare` reads the code since the last edition anyway.
 - **A Stop hook** that reminds Claude to check the ledger when it finishes a
   turn. Use it only if the first two aren't landing; a hook that fires every
   turn becomes noise.
@@ -152,7 +154,7 @@ features and 150–200 KB, around 45,000 tokens. With the CLI, the same lookup i
 And because some writes are expensive to get wrong. `ledger add`, `change` and
 `remove` resolve which release an edit belongs to — the fact every New/Changed
 tag is computed from — and refuse the mistakes you'd find much later: a change
-with no explanation, an audit stamp with no sweep behind it.
+with no explanation, a removal with no reason.
 
 Neither is an argument about **wording**: once an entry exists, its prose is a
 2 KB file you open and edit ([editing.md](editing.md)).

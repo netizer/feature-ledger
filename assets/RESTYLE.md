@@ -31,18 +31,18 @@ change:
   "audience": "user",
   "category": "…",
   "size": "Medium",
-  "paths": ["…"],
   "dev_notes": "…",
   "history": [
     { "version": 1,
       "name": "The same name, in the new tone",
-      "description": "The same feature, said in the new tone." }
+      "description": "The same feature, said in the new tone.",
+      "how_to_see": "The same instructions, in the new tone." }
   ]
 }
 ```
 
-Change `name` and `description`, on whichever `history` entry carries them,
-and `dev_notes`. The "What changed" notes and summary items an edition prints
+Change `name`, `description` and `how_to_see`, on whichever `history` entry
+carries them, and `dev_notes`. The "What changed" notes and summary items an edition prints
 live in `.ledger/compositions.json`, under each release's `changes`, `new`,
 `changed` and `in_place`: rewrite their text there the same way. Nothing else
 — not `events`, which are facts somebody recorded, not prose. There is no
