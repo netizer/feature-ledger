@@ -33,7 +33,7 @@ v6 so far, against v5 (September 12, 2026):
 Then the draft, laid out exactly like the edition the cut will print. Where
 `prepare` has written a note, the note shows; where it hasn't, the recorded
 changes show instead, each with its reason, labelled "as recorded, not yet
-prepared". The summary page lists entries by name until a summary is written.
+prepared". The first page lists entries by name until a summary is written.
 
 No agent, no cache, nothing that ties code to entries. The line count is git's,
 for the whole working tree since the last edition's commit.
@@ -59,8 +59,11 @@ something to say:
 3. **Reasons nobody recorded.** Events whose reason is unknown or was read off a
    commit message. The agent asks you, one at a time, and writes your answer
    into the event.
-4. **What to write.** The "What changed" note on each updated entry, the summary
-   page, `how_to_see` for each new or updated entry, and the message to send.
+4. **What to write.** The overview that opens the edition, the "What changed"
+   note on each updated entry, why a change matters where a reason was given,
+   the summary lists, `how_to_see` for each new or updated entry, an overview
+   for any area without one, and the message to send. All of it for a reader
+   who has never seen the code.
 5. **Check it against the code.** Every sentence it wrote, and every
    description it touched. Where the text and the code disagree, it tells you,
    and you fix the code or the text right there.
@@ -75,21 +78,32 @@ Run it mid-release to see the near-final text, and again before the cut. A
 change recorded afterwards shows as news since the last prepare, everywhere;
 editing the words by hand never does.
 
+### The overview
+
+Two or three sentences under the version number on the first page: what this
+release is about, as a whole. The list under it does the itemising.
+
 ### The notes
 
-One per updated entry, one or two sentences per change: what it was in the
-last edition, and why it moved, from the recorded reasons or from you, and from
-nowhere else. Steps toward one result are one note; a change a later one undid
-is no note at all. A change whose "before" is itself new this release says how
-the entry works with the new thing and points to it by name.
+One per updated entry, one sentence per change: what it was in the last
+edition, what it is now, and why, from the recorded reasons or from you, and
+from nowhere else. Steps toward one result are one note; a change a later one
+undid is no note at all. A change whose "before" is itself new this release
+says how the entry works with the new thing and points to it by name.
 
-### The summary page
+### Why it matters
 
-A handful of one-sentence items, most important first, each followed by links
-to the entries it covers: *What's new*, *What changed*, and *Already in place*
-for capabilities recorded late. Removals and product-wide notes list
+Optional, one sentence per new or updated entry, on what the change does for the
+client: time saved, a mistake that can't happen now. Only from a reason the
+events or you gave; otherwise left out.
+
+### The summary lists
+
+A handful of items of at most 12 words, most important first, each followed by
+links to the entries it covers: *What's new*, *What changed*, and *Already in
+place* for capabilities recorded late. Removals and product-wide notes list
 themselves. The summary picks highlights; the edition still prints every
-recorded change in full after it. `quiet` only keeps an entry off this page.
+recorded change in detail after it. `quiet` only keeps an entry off the list.
 
 ### How to see it
 

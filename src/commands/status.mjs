@@ -5,7 +5,10 @@ import { resolveBrand, accentCollides } from "../render/brand.mjs";
 import { fontFaceCss } from "../render/fonts.mjs";
 import { probeBrowser } from "../render/pdf.mjs";
 import { resolveStyle, styleTitle } from "../style.mjs";
-import { prepareReport, prepareLine, textProblems, longNotes, unknownReasons, NOTE_SENTENCES } from "../compose.mjs";
+import {
+  prepareReport, prepareLine, textProblems, longNotes, longItems, unknownReasons, sentences, summaryItems,
+  NOTE_SENTENCES, ITEM_WORDS, OVERVIEW_SENTENCES,
+} from "../compose.mjs";
 import { eventLine } from "../diff.mjs";
 import { redraftReport, redraftSteps, rangeLabel } from "./redraft.mjs";
 import { cutReport, renderReport, nextStep } from "./release.mjs";
@@ -13,8 +16,22 @@ import { color } from "../ui.mjs";
 
 const out = (s) => process.stdout.write(`${s}\n`);
 
-/** About how many words a description has before it stops being two or three sentences. */
-const DESCRIPTION_WORDS = { Big: 120, Medium: 90, Small: 60 };
+/** About how many words a description has before it stops reading at a glance. */
+const DESCRIPTION_WORDS = { Big: 55, Medium: 45, Small: 35 };
+const DESCRIPTION_SENTENCES = 2;
+
+/**
+ * Words a client shouldn't have to read: code in backticks, a file name with
+ * its extension, a path into the source, a command-line flag. They belong in
+ * dev_notes. How to see it is left alone: an instruction may need a label.
+ */
+const CODE_TERMS = [
+  [/`[^`]+`/, "code in backticks"],
+  [/\b[\w.-]+\.(?:m?js|ts|tsx|jsx|json|rb|py|go|rs|java|php|css|scss|html|ya?ml|sql|sh|md|toml)\b/i, "a file name"],
+  [/(?:^|[\s(])(?:\.?\/)?(?:src|lib|app|config|bin|docs|\.ledger)\/[\w./-]+/, "a path"],
+  [/(?:^|\s)--[a-z][\w-]*/, "a command-line flag"],
+];
+const codeTerm = (text) => CODE_TERMS.find(([re]) => re.test(String(text)))?.[1] ?? null;
 const field = (k, v) => out(`  ${k.padEnd(11)} ${v}`);
 
 /**
@@ -256,25 +273,60 @@ function collectWarnings(project) {
     const long = longNotes(composition);
     if (long.length) {
       warnings.push(
-        `${long.length} "What changed" note${long.length === 1 ? " runs" : "s run"} past ${NOTE_SENTENCES} sentences ` +
+        `${long.length} "What changed" note${long.length === 1 ? " runs" : "s run"} past ${NOTE_SENTENCES} sentence ` +
         `(${[...new Set(long.map(([id]) => id))].join(", ")}). A note says what one change was and why it moved, in one ` +
-        "or two; shorten it in .ledger/compositions.json.",
+        "sentence; shorten it in .ledger/compositions.json.",
       );
+    }
+    const wordy = longItems(composition);
+    if (wordy.length) {
+      warnings.push(
+        `${wordy.length} summary item${wordy.length === 1 ? " runs" : "s run"} past ${ITEM_WORDS} words ` +
+        `(${wordy.map(([text, n]) => `“${text.slice(0, 40)}${text.length > 40 ? "…" : ""}” ${n}`).join("; ")}). ` +
+        "An item is read at a glance on the first page; shorten it in .ledger/compositions.json.",
+      );
+    }
+    if (composition.overview && sentences(composition.overview) > OVERVIEW_SENTENCES) {
+      warnings.push(`the overview of v${open} runs past ${OVERVIEW_SENTENCES} sentences. It opens the edition: say what the ` +
+        "release is about, and leave the rest to the list under it.");
     }
   }
 
-  // Two or three sentences is what a description has to work with; past this
+  // One or two sentences is what a description has to work with; past this
   // it is usually describing how, or carrying detail that belongs in dev notes.
-  const long = set.features({ audience: "user" }).map((f) => {
-    const st = f.stateAt(project.releases.latestVersion);
-    return st && !st.removed ? [f, st.description.split(/\s+/).length] : null;
-  }).filter((x) => x && x[1] > (DESCRIPTION_WORDS[x[0].size] ?? DESCRIPTION_WORDS.Medium));
+  const now = set.features({ audience: "user" })
+    .map((f) => [f, f.stateAt(project.releases.latestVersion)])
+    .filter(([, st]) => st && !st.removed);
+  const long = now
+    .map(([f, st]) => [f, st.description.split(/\s+/).length, sentences(st.description)])
+    .filter(([f, n, s]) => n > (DESCRIPTION_WORDS[f.size] ?? DESCRIPTION_WORDS.Medium) || s > DESCRIPTION_SENTENCES);
   if (long.length) {
     warnings.push(
       `${long.length} description${long.length === 1 ? " runs" : "s run"} long for ${long.length === 1 ? "its" : "their"} size ` +
-      `(${long.map(([f, n]) => `${f.id} ${n} words`).join(", ")}). A description says what the product does in two or three ` +
-      `sentences — about ${DESCRIPTION_WORDS.Big} words for a Big entry, ${DESCRIPTION_WORDS.Medium} for a Medium, ${DESCRIPTION_WORDS.Small} for a Small; ` +
+      `(${long.map(([f, n, s]) => `${f.id} ${n} words${s > DESCRIPTION_SENTENCES ? `, ${s} sentences` : ""}`).join("; ")}). ` +
+      `A description says what the product does for the people who use it, in one or two sentences — about ` +
+      `${DESCRIPTION_WORDS.Big} words for a Big entry, ${DESCRIPTION_WORDS.Medium} for a Medium, ${DESCRIPTION_WORDS.Small} for a Small; ` +
       "the mechanics go in dev_notes. Shortening one is wording: edit it in .ledger/features/<id>.json.",
+    );
+  }
+
+  // The client reads these. A file name or a flag in them is detail written
+  // for the team, and belongs in dev_notes.
+  const technical = [
+    ...now.map(([f, st]) => [f.id, st.description]),
+    ...(composition ? [
+      ...Object.entries(composition.changes ?? {}).flatMap(([id, list]) => (Array.isArray(list) ? list : []).map((n) => [id, n])),
+      ...Object.entries(composition.matters ?? {}),
+      ...summaryItems(composition).map((i) => ["the summary", i.text]),
+      ["the overview", composition.overview ?? ""],
+    ] : []),
+  ].map(([where, text]) => [where, codeTerm(text)]).filter(([, term]) => term);
+  if (technical.length) {
+    warnings.push(
+      `${technical.length} piece${technical.length === 1 ? "" : "s"} of client text read${technical.length === 1 ? "s" : ""} like code ` +
+      `(${technical.slice(0, 8).map(([where, term]) => `${where}: ${term}`).join("; ")}${technical.length > 8 ? "; …" : ""}). ` +
+      "Write for someone who uses the product and has never seen the code: say what it does for them, and put file names, " +
+      "paths and flags in dev_notes.",
     );
   }
 

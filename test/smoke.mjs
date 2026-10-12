@@ -337,9 +337,15 @@ reword((x) => { x.changed[0].text = "alpha covers the adjacent thing too."; });
 assert("an item hand-edited into lower case is reported", run(["status", "--quiet"]).includes("won't read as a sentence"));
 reword((x) => {
   x.changed[0].text = "Alpha covers the adjacent thing too.";
-  x.changes.alpha = ["It covers the adjacent thing now, said by hand. It runs on. And on. And on past two sentences."];
+  x.changes.alpha = ["It covers the adjacent thing now, said by hand. It runs on past one sentence."];
+  x.changed[0].text = "Alpha covers the adjacent thing too, and a good deal more besides, said at length.";
+  x.overview = "This edition adds a cluster of four parts. Alpha covers the adjacent thing. Beta has a new name. And more.";
 });
-assert("…a note past two sentences per change is mentioned", run(["status", "--quiet"]).includes("runs past 2 sentences"));
+const wordy = run(["status", "--quiet"]);
+assert("…a note past one sentence per change is mentioned", wordy.includes("runs past 1 sentence"));
+assert("…and so is a summary item past twelve words, and an overview past three sentences",
+  wordy.includes("past 12 words") && wordy.includes("overview of v2 runs past 3 sentences"));
+reword((x) => { x.changed[0].text = "Alpha covers the adjacent thing too."; delete x.overview; });
 reword((x) => { x.changes.alpha = ["It covers the adjacent thing now, said by hand."]; });
 assert("…but a hand-edit doesn't count as news since the prepare", run([]).includes("nothing recorded since"));
 // A change recorded afterwards does, by name, and the brief marks it.
@@ -432,7 +438,38 @@ assert("`ledger preview` opens with the size of the release, and what the prepar
 assert("…and never starts an agent", run(["preview", "--run", "claude"], { expect: "fail" }).includes("never starts an agent"));
 const v2Caught = { ...v2Composition, changes: { alpha: ["It covers the adjacent thing now, said by hand."],
   beta: ["Its window was narrower; it was widened for the overnight batch."] },
+overview: "This edition adds a cluster of four parts, and Alpha now covers the adjacent thing.",
+matters: { alpha: "Users reach the adjacent thing without a second search." },
 in_place: [{ text: "Something the product could always do is on the record.", covers: ["always-there"] }] };
+// The catalogue opens each area with its own overview, kept with the area.
+run(["categories", "add", "Third area", "--intro", "Things for a third purpose."]);
+run(["categories", "rename", "Third area", "Last area"]);
+assert("an area's overview is kept with it through a rename",
+  readJson(path.join(dir, ".ledger/config.json")).area_intros["Last area"] === "Things for a third purpose.");
+run(["categories", "remove", "Last area"]);
+assert("…and goes with it", !("Last area" in readJson(path.join(dir, ".ledger/config.json")).area_intros));
+{
+  const cfgPath = path.join(dir, ".ledger/config.json");
+  const cfg = readJson(cfgPath);
+  cfg.area_intros = { "Second area": "Everything second, in one place." };
+  fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
+}
+// What the client reads is written for someone who has never seen the code.
+const deltaPath = path.join(dir, ".ledger/features/delta.json");
+const deltaBefore = fs.readFileSync(deltaPath, "utf8");
+const deltaTech = JSON.parse(deltaBefore);
+deltaTech.history[0].description = "Does the delta thing, configured in src/delta/config.json with --delta-mode.";
+fs.writeFileSync(deltaPath, JSON.stringify(deltaTech, null, 2));
+assert("client text that reads like code is pointed out", run(["status", "--quiet"]).includes("read like code (delta: a file name)") ||
+  run(["status", "--quiet"]).includes("reads like code (delta: a file name)"));
+fs.writeFileSync(deltaPath, deltaBefore);
+// An updated entry leads with its change: the client read its description
+// last time, so only the first sentence prints above the note.
+{
+  const a = readJson(alphaPath);
+  a.history[1].description = "Does the alpha thing, and the adjacent one. It remembers where you left off.";
+  fs.writeFileSync(alphaPath, `${JSON.stringify(a, null, 2)}\n`);
+}
 run(["prepare", "--run", prepareAgent(v2Caught)]);
 fs.rmSync(writer);
 run(["build", "--pdf", "--html"]);
@@ -463,17 +500,38 @@ assert("…and nothing that only the team reads", !summary.includes("Tooling"));
 assert("every entry that moved prints in full, beta among them though the summary leaves it out",
   v2.includes('id="whats-changed"') && v2.includes('id="f-beta"><div class="content">') &&
   v2.includes("Its window was narrower; it was widened for the overnight batch."));
+{
+  const card = v2.slice(v2.indexOf('id="f-alpha"')).split('class="feature')[0];
+  assert("an updated entry's card leads with what changed, under the first sentence of its description",
+    card.includes('<div class="desc">Does the alpha thing, and the adjacent one.</div><div class="changes">') &&
+    !card.includes("It remembers where you left off."));
+}
 assert("…with how to see it under each",
   v2.slice(v2.indexOf('id="f-alpha"')).split('class="feature')[0].includes("Open Alpha, then Adjacent."));
-assert("…and what didn't move is one line: its name and first sentence",
-  v2.includes('id="everything-else"') && v2.includes('<li id="f-delta"><span class="nm">Delta</span><span class="first">Does the delta thing.</span></li>') &&
+assert("…with why it matters, where a reason was given",
+  v2.includes('<div class="matters"><span class="label">Why it matters to you</span><p>Users reach the adjacent thing without a second search.</p></div>'));
+assert("the first page opens with the overview, then the summary, then the counts",
+  v2.indexOf('class="overview">This edition adds a cluster of four parts') > 0 &&
+  v2.indexOf('class="overview"') < v2.indexOf('<section class="summary">') && v2.indexOf("</section>") < v2.indexOf('class="tally"') &&
+  v2.indexOf('class="tally"') < v2.indexOf('id="whats-changed"'));
+assert("…with what the colours and the sizes mean said once, under the counts",
+  v2.includes('class="key"') && v2.includes("Size is how much of the service a capability is") && !v2.includes('class="callout"'));
+assert("…and no contents list: the first page is the contents", !v2.includes('<div class="contents">'));
+assert("the catalogue lists every capability once, with its size, name and first sentence",
+  v2.includes('id="everything-else"') && v2.includes('<li id="f-delta"><span class="sz"><span class="size size-small">') &&
+  v2.includes('<span class="nm">Delta</span><span class="first">Does the delta thing.</span></li>') &&
   !v2.includes("nobody reads on a one-line listing") && !v2.includes('id="f-delta"><div class="content">'));
-assert("…and the cover counts it all in one line",
+assert("…marks what moved, linking to its details",
+  v2.includes('<span class="nm">Alpha<a class="moved is-updated" href="#f-alpha">updated</a></span>'));
+assert("…and opens an area with its overview", v2.includes('<p class="area-intro">Everything second, in one place.</p>'));
+assert("the cover counts it all in one line",
   /<span class="is-new"><b>4<\/b> new<\/span>/.test(v2) && /<span class="is-backfilled"><b>2<\/b> already in place<\/span>/.test(v2) &&
   /<span class="is-same"><b>1<\/b> unchanged<\/span>/.test(v2));
 run(["build", "v2", "--html", "--full"]);
 const v2Full = fs.readFileSync(path.join(dir, "docs/generated/Testbed-Feature-Ledger_2-draft.html"), "utf8");
-assert("`--full` prints every entry in full instead", v2Full.includes('id="f-delta"><div class="content">') && !v2Full.includes('id="everything-else"'));
+assert("`--full` prints every entry in full instead, with a contents list",
+  v2Full.includes('id="f-delta"><div class="content">') && !v2Full.includes('id="everything-else"') &&
+  v2Full.includes("It remembers where you left off.") && v2Full.includes('<div class="contents">'));
 const md2 = fs.readFileSync(path.join(dir, "docs/generated/FEATURES.md"), "utf8");
 assert("the living docs use the same words", md2.includes("Already in place]"));
 assert("a reason read off a commit is listed until somebody vouches for it",

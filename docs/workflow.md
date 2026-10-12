@@ -126,8 +126,9 @@ prepared". It is free, so run it as often as you like. `--open` opens the PDF,
 | 4 | `ledger cut --name "Sprint 6 demo"`: prints the PDF and the message into the client directory, and opens the next release | runs |
 | 5 | Commit `.ledger/` (and `docs/client/`, if you keep the PDFs) | git |
 
-`prepare` writes the "What changed" notes, the summary page, how to see each new
-or updated entry, and the message to send. In the same session it reads the
+`prepare` writes the overview, the "What changed" notes, the summary lists, how
+to see each new or updated entry, and the message to send, for a reader who has
+never seen the code. In the same session it reads the
 code since the last edition for work nobody recorded, asks you the reasons
 nobody gave, and checks what it wrote against the code. Run it mid-release to
 see the near-final text, and again before the cut: it keeps every note that

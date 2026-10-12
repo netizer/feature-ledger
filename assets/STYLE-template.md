@@ -27,7 +27,7 @@ reasonable place to start from.
 
 ## Three feature descriptions in this tone
 
-Finish with three, each two or three sentences, describing one capability
+Finish with three, each one or two sentences, describing one capability
 apiece. This is the shape every entry in the ledger has to take, so three
 worked ones carry further than any amount of instruction. Write them about
 capabilities you know well enough to check.

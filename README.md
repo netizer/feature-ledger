@@ -9,9 +9,10 @@ typed. Neither answers the question a client actually asks: *what does this
 software do, and what's new since last time?* The feature ledger does:
 
 - **One entry per capability** a user would name, sized so the big ones stand out.
-- **Each edition is short without dropping work**: a summary page, every new and
-  changed capability in full with how to check it yourself, and one line for
-  everything else.
+- **Each edition is short without dropping work**: a first page that is the
+  update (an overview and a short list of what's new and what changed), the
+  details of each change with how to check it yourself, and a one-line-each
+  catalogue of the whole service.
 - **Every change says why**, or says that nobody knows: the ledger never
   invents a reason.
 - **A PDF edition per release**, with the message to send beside it, so "what
@@ -100,8 +101,9 @@ ledger cut --name "Sprint 6 demo"
 ```
 
 `prepare` is one interactive session that writes everything the client reads:
-a short note on each updated entry, the summary page, how to see each new or
-updated capability, and the message to send. In the same session it reads the
+an overview of the release, a one-sentence note on each change, the summary
+list, how to see each new or updated capability, and the message to send, all
+in plain language for someone who has never seen the code. In the same session it reads the
 code since the last edition for work nobody recorded, asks you the reasons
 nobody gave, and checks what it wrote against the code, which is a good moment
 to fix either. It doesn't commit: it ends with a list of what it changed.

@@ -70,11 +70,12 @@ about how far down an entry may go.
 cycle, grey means already true and only now on the record. The first two are
 facts about the software, the third a fact about the record.
 
-**Short editions, nothing dropped.** From the second edition on, the PDF prints
-every new, updated, in-place and removed entry in full, and one line (name and
-first sentence) for each entry that didn't move. Reprinting every unchanged
-entry in full every time was most of an edition's length. `--full` prints them
-all in full.
+**Short editions, nothing dropped.** From the second edition on, the first page
+is the update: an overview and a short list of what's new and what changed.
+Then the details of every entry that moved, and a catalogue of the whole
+service, one line per capability. Reprinting every unchanged entry in full
+every time was most of an edition's length. `--full` prints them all in full.
+See [documents.md](documents.md#what-an-edition-holds).
 
 **Two highlight semantics, on purpose.** The living Markdown docs tag New and
 Changed only while the release is open, so a shipped release reads as a clean

@@ -8,6 +8,12 @@
     "Warehouse Console",
     "Platform & Reliability"
   ],
+  "area_intros": {
+    "Ordering": "Everything a customer does to place an order, from the basket to a booked delivery.",
+    "Account & Self-Service": "What a customer can see and change without calling anyone.",
+    "Warehouse Console": "How the warehouse turns the day's orders into packed vans.",
+    "Platform & Reliability": "What keeps every order accountable."
+  },
   "min_subcategory_features": 4,
   "output": {
     "dir": "docs/generated",

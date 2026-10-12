@@ -2,24 +2,28 @@
   "compositions": [
     {
       "version": 2,
+      "overview": "This edition gives customers a say in substitutions and lets them book a month ahead. In the warehouse, pickers now confirm each item by scanning it, and can hand a run to a colleague mid-shift.",
       "changes": {
         "delivery-window-picker": [
-          "The booking horizon went from fourteen days to twenty-eight. Fourteen covered the weekly shop but not the customers who plan a month ahead around a delivery. Those are the orders least likely to be cancelled, so the longer horizon costs nothing to offer and holds the more valuable bookings.",
-          "A day with no free van used to show no slots at all, which read as a fault in the site. It now says the fleet is fully committed, and offers the next day that is not."
+          "Windows can be booked 28 days ahead instead of 14, so customers who plan a month ahead can book too.",
+          "A day with no free van says so and offers the next free day, where it used to show an empty calendar that looked like a fault."
         ],
         "saved-addresses": [
-          "Was \"Saved addresses\", which read as a settings screen; customers were looking for it under the order, not under their account. The name now matches the label it sits behind."
+          "Renamed from \"Saved addresses\", which read as a settings screen, to match the label customers look for when ordering."
         ]
+      },
+      "matters": {
+        "delivery-window-picker": "Orders booked a month ahead are the ones least likely to be cancelled."
       },
       "new": [
         {
-          "text": "Customers choose, line by line, whether a substitute is acceptable and which one.",
+          "text": "Customers choose which substitutes they accept, line by line.",
           "covers": [
             "substitutions"
           ]
         },
         {
-          "text": "Pickers scan each item at the shelf, can hand a part-finished run to a colleague, and see the time left before the van leaves.",
+          "text": "Pickers scan items, hand runs over mid-shift, and see each van's deadline.",
           "covers": [
             "pick-scan",
             "pick-reassign",
@@ -30,7 +34,7 @@
       ],
       "changed": [
         {
-          "text": "Delivery windows can be booked up to 28 days ahead instead of 14.",
+          "text": "Deliveries can be booked 28 days ahead instead of 14.",
           "covers": [
             "delivery-window-picker"
           ]

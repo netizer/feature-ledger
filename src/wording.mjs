@@ -94,15 +94,18 @@ export function wording(config) {
       // headings of its first two lists. {date} is " (March 4, 2026)", the
       // last edition's date, or nothing.
       summary_title: "What's different in this edition",
-      summary_intro: "What differs from the last edition{date}, in short. The numbers after an item link to the entries it sums up.",
+      summary_intro: "The numbers after an item link to its details.",
       summary_new: "What's new",
       summary_updated: "What changed",
-      // The two halves of every edition after the first: what moved, in
-      // full, and everything else, one line each.
-      changed_title: "What's new and what changed",
-      changed_intro: "Every capability added, changed or listed for the first time in this edition, in full.",
-      rest_title: `Everything else ${product} does`,
-      rest_intro: "Unchanged since the last edition, one line each.",
+      // The two parts of every edition after the first page: what moved, in
+      // detail, and the whole service, one line per capability.
+      changed_title: "What's new and what changed, in detail",
+      changed_intro: "Each capability added or changed in this edition: what it is, what changed, and how to see it for yourself.",
+      rest_title: `What ${product} provides`,
+      rest_intro: "Every capability, area by area. A coloured mark means it moved in this edition, and its details are above.",
+      matters_label: "Why it matters to you",
+      // Under the first page's counts: what the colours and the sizes mean.
+      key_sizes: "Size is how much of the service a capability is: Big, one it is chosen for; Medium, one in its own right inside a bigger one; Small, one narrow enough to describe in a line.",
     },
   };
 

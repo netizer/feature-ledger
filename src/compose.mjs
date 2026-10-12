@@ -17,7 +17,10 @@ import { recordedLines } from "./store.mjs";
  *
  * It lives in .ledger/compositions.json, one per release:
  *
+ *   overview  two or three sentences that open the edition: what this release is about
  *   changes   { id: ["note", …] } for every updated entry
+ *   matters   { id: "sentence" }, optional: why a change matters to the client,
+ *             only from a reason someone gave
  *   new, changed, in_place   the summary lists, items { text, covers }
  *   quiet     the entries the summary leaves out on purpose (they still print in full)
  *   message   the text to send with the edition
@@ -36,7 +39,13 @@ export const LISTS = [["new", "What's new"], ["changed", "What changed"], ["in_p
 export const ITEM_LIMIT = 160;
 
 /** Sentences per change in a "What changed" note before it is worth a word. */
-export const NOTE_SENTENCES = 2;
+export const NOTE_SENTENCES = 1;
+
+/** Words in a summary item before it stops reading at a glance. */
+export const ITEM_WORDS = 12;
+
+/** Sentences in the overview that opens the edition. */
+export const OVERVIEW_SENTENCES = 3;
 
 /* ---- which entries it accounts for ------------------------------------ */
 
@@ -112,8 +121,15 @@ export function shapeProblems(composition) {
   if (composition.quiet !== undefined && !(Array.isArray(composition.quiet) && composition.quiet.every((id) => typeof id === "string"))) {
     problems.push("\"quiet\" is a list of entry ids");
   }
-  if (composition.message !== undefined && composition.message !== null && typeof composition.message !== "string") {
-    problems.push("\"message\" is text: what to send with the edition");
+  for (const key of ["message", "overview"]) {
+    if (composition[key] !== undefined && composition[key] !== null && typeof composition[key] !== "string") {
+      problems.push(`"${key}" is text`);
+    }
+  }
+  const matters = composition.matters;
+  if (matters !== undefined && (typeof matters !== "object" || Array.isArray(matters) ||
+      !Object.values(matters).every((v) => typeof v === "string" && !isBlank(v)))) {
+    problems.push("\"matters\" maps an entry id to one sentence on why the change matters to the client");
   }
   for (const item of summaryItems(composition)) {
     const where = `an item in "${item.list}"`;
@@ -169,8 +185,20 @@ export function accountingProblems(project, version, composition) {
     problems.push(`a "What changed" note on what isn't an updated entry in v${version}: ${misplaced.join(", ")}. ` +
       "A new entry has no \"before\" for the client; its description says what it does");
   }
+  const strays = Object.keys(composition.matters ?? {}).filter((id) => !ids.has(id));
+  if (strays.length) problems.push(`"matters" names what isn't a client-facing entry in v${version}: ${strays.join(", ")}`);
   return problems;
 }
+
+/** Summary items past ITEM_WORDS: [text, words]. */
+export function longItems(composition) {
+  return summaryItems(composition)
+    .filter((item) => typeof item.text === "string")
+    .map((item) => [item.text, words(item.text)])
+    .filter(([, n]) => n > ITEM_WORDS);
+}
+
+export const words = (text) => String(text).trim().split(/\s+/).filter(Boolean).length;
 
 /** Text problems per item, for `ledger status` and `prepare complete`. */
 export function textProblems(composition) {
@@ -276,11 +304,15 @@ export function stamped(project, composition, { date, commit }) {
 
 export function ordered(project, composition) {
   const out = { version: composition.version };
+  if (!isBlank(composition.overview)) out.overview = composition.overview;
   const changes = composition.changes ?? {};
   // In reading order, so the file reads like the edition.
   const order = releaseEntries(project, composition.version).map((f) => f.id);
-  const ids = Object.keys(changes).sort((a, b) => (order.indexOf(a) + 1 || 1e9) - (order.indexOf(b) + 1 || 1e9));
-  out.changes = Object.fromEntries(ids.map((id) => [id, changes[id]]));
+  const byOrder = (a, b) => (order.indexOf(a) + 1 || 1e9) - (order.indexOf(b) + 1 || 1e9);
+  out.changes = Object.fromEntries(Object.keys(changes).sort(byOrder).map((id) => [id, changes[id]]));
+  if (composition.matters && Object.keys(composition.matters).length) {
+    out.matters = Object.fromEntries(Object.keys(composition.matters).sort(byOrder).map((id) => [id, composition.matters[id]]));
+  }
   for (const [key] of LISTS) {
     if (Array.isArray(composition[key]) && composition[key].length) {
       out[key] = composition[key].map(({ text, covers, ...rest }) => ({ text, covers, ...rest }));
@@ -323,6 +355,7 @@ export function defaultMessage(project, version) {
   const label = project.releases.printedAs(version);
   const lines = [`Version ${label} of the ${product} feature ledger is attached.`];
   const composition = project.compositionOf(version);
+  if (!isBlank(composition?.overview)) lines.push("", composition.overview.trim());
   const previous = project.releases.predecessorOf(version);
   if (previous) {
     const items = summaryItems(composition);

@@ -50,7 +50,7 @@ export const STYLES = {
       "moves to a queue that a supervisor works from.",
     examples: [
       "Guided checkout: A customer moves through basket, delivery window, address, and review in four " +
-      "numbered steps. The running total shows on every step. An account is only needed on the final screen.",
+      "numbered steps, with the running total on every step. An account is only needed on the final screen.",
 
       "Approved substitutions: When an item is out of stock, the picker offers the closest match in the " +
       "same pack size. The customer approves or declines it from a link in the confirmation email, up to " +
@@ -78,11 +78,11 @@ export const STYLES = {
       "The console shows every run and the time left before its van leaves. A run that will miss its van " +
       "goes to a supervisor.",
     examples: [
-      "Guided checkout: A customer orders in four steps: basket, delivery window, address and review. The " +
-      "total shows on every step. They only need an account at the last step.",
+      "Guided checkout: A customer orders in four steps, basket, delivery window, address and review, with " +
+      "the total on every step. They only need an account at the last step.",
 
       "Approved substitutions: If an item is out of stock, the picker offers the closest match in the same " +
-      "pack size. The customer says yes or no by email. They can do this until 1 hour before the van leaves.",
+      "pack size. The customer says yes or no by email, until 1 hour before the van leaves.",
 
       "Exception queue: A run that cannot be picked in time goes to a supervisor's queue. Each one shows why " +
       "it stopped, who was picking it and which van it was for.",
@@ -107,7 +107,7 @@ export const STYLES = {
       "its van, so they can reassign it before the van leaves.",
     examples: [
       "Guided checkout: A customer completes four steps to order: basket, delivery window, address, and " +
-      "review. The running total appears on each step. The customer creates an account at the final step.",
+      "review, with the running total on each step. The customer creates an account at the final step.",
 
       "Approved substitutions: When an item is out of stock, the picker offers the closest match in the same " +
       "pack size. The customer approves or declines the substitute by email, up to one hour before the van leaves.",
@@ -137,11 +137,10 @@ export const STYLES = {
       "the console sends the run to a supervisor.",
     examples: [
       "Guided checkout: The customer does four steps: basket, delivery window, address, and review. The total " +
-      "is on each step. The customer makes an account at the last step.",
+      "is on each step, and the customer makes an account at the last step.",
 
       "Approved substitutions: If an item is not in stock, the picker offers a substitute item of the same pack " +
-      "size. The customer accepts or refuses the substitute item by email. The customer can do this until one " +
-      "hour before the van departs.",
+      "size. The customer accepts or refuses the substitute item by email until one hour before the van departs.",
 
       "Exception queue: If a run will be late, the console sends the run to a supervisor queue. Each run in the " +
       "queue shows the cause, the picker, and the van.",
@@ -234,7 +233,7 @@ export function styleSection(style, { withFooter = true } = {}) {
     "",
     "Write every description the way those three are written. Say what the product",
     "does today, in the present tense. Give the number, the limit or the step count",
-    "where there is one. Keep a description to two or three sentences.",
+    "where there is one. Keep a description to one or two sentences.",
   ].join("\n") + tail;
 }
 

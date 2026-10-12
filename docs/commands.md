@@ -33,7 +33,7 @@ ledger — a client-facing record of what your product does, kept in the repo
                                         a change that belongs to no single feature
     ledger add/change/remove --backfilled            already in the product before the last
                                                      edition, only now on the record
-    ledger categories [list | add "Name" [--after "Other"] | rename "Old" "New" | remove "Name"]
+    ledger categories [list | add "Name" [--after "Other"] [--intro "..."] | rename "Old" "New" | remove "Name"]
     ledger subcategories [list | add]   { id, category, name, intro }
     (add --dry-run to any of them to see what it would write)
 
@@ -63,7 +63,7 @@ ledger — a client-facing record of what your product does, kept in the repo
     .ledger/features/<id>.json          a name, a description, how to see it, dev notes
     .ledger/compositions.json           a "What changed" note, a summary item, the message
     .ledger/subcategories.json          sub-section headings and their overviews
-    .ledger/config.json                 product name, tagline, document titles
+    .ledger/config.json                 product name, tagline, document titles, area overviews
     .ledger/other-changes.json          the product-wide notes
 
   Delivering a prompt (prepare, bootstrap, redraft check, style rewrite)

@@ -436,8 +436,8 @@ export async function cmdCategories({ flags, positional }) {
   }
   if (sub === "rename") return renameCategory(project, flags, positional.slice(1));
   if (sub === "remove") return removeCategory(project, flags, positional.slice(1));
-  if (sub !== "add") fail('usage: ledger categories [list | add "Name" [--after "Other"] | rename "Old" "New" | remove "Name"]');
-  if (isBlank(name)) fail('usage: ledger categories add "Name" [--after "Other"]');
+  if (sub !== "add") fail('usage: ledger categories [list | add "Name" [--after "Other"] [--intro "…"] | rename "Old" "New" | remove "Name"]');
+  if (isBlank(name)) fail('usage: ledger categories add "Name" [--after "Other"] [--intro "One sentence on what the area is for."]');
   if (project.config.categories.includes(name)) fail(`category ${JSON.stringify(name)} already exists`);
 
   // Position matters: this list is the reading order of every generated
@@ -460,6 +460,8 @@ export async function cmdCategories({ flags, positional }) {
     return;
   }
   project.config.categories = list;
+  // The one sentence the edition's catalogue opens the area with.
+  if (!isBlank(flags.intro) && flags.intro !== true) project.config.area_intros = { ...project.config.area_intros, [name]: String(flags.intro) };
   project.saveConfig();
   out(`added category ${JSON.stringify(name)} (position ${list.indexOf(name) + 1} of ${list.length})`);
 }
@@ -489,6 +491,11 @@ function renameCategory(project, flags, args) {
   }
 
   project.config.categories[i] = to;
+  // The area's overview is about the area, whatever it is called.
+  if (project.config.area_intros?.[from] !== undefined) {
+    project.config.area_intros[to] = project.config.area_intros[from];
+    delete project.config.area_intros[from];
+  }
   project.saveConfig();
   for (const f of moving) {
     f.category = to;
@@ -516,6 +523,7 @@ function removeCategory(project, flags, args) {
     return;
   }
   project.config.categories = project.config.categories.filter((c) => c !== name);
+  if (project.config.area_intros) delete project.config.area_intros[name];
   project.subcategories = project.subcategories.filter((s) => s.category !== name);
   project.saveConfig();
   project.saveSubcategories();

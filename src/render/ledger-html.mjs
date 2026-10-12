@@ -288,6 +288,13 @@ class LedgerHtml {
     return `<div class="how"><span class="label">How to see it</span><p>${h(state.how_to_see)}</p></div>`;
   }
 
+  /** Why a change matters to the client, when `prepare` was given a reason to say so. */
+  mattersPanel(feature) {
+    const text = this.project.compositionOf(this.version)?.matters?.[feature.id];
+    if (!text) return "";
+    return `<div class="matters"><span class="label">${h(this.words.pdf.matters_label)}</span><p>${h(text)}</p></div>`;
+  }
+
   /**
    * The word printed on a row's chip. "new" and "updated" happen to be the
    * label as well as the key; the third register does not, and printing the key
@@ -301,7 +308,11 @@ class LedgerHtml {
 
   /** One ledger row. Shared by the "first row, glued to its section heading
    *  so the heading can never be orphaned at the foot of a page" case and by
-   *  every row after it, so the two can't drift apart. */
+   *  every row after it, so the two can't drift apart.
+   *
+   *  In a short edition an updated entry leads with what changed: the client
+   *  read its description last time, so it gets its first sentence, to say
+   *  what the entry is, and the full text stays in the catalogue. */
   featureRow(row) {
     const f = row.feature;
     const s = row.state;
@@ -309,20 +320,26 @@ class LedgerHtml {
     const classes = ["feature", badge, row.noLine ? "no-line" : null].filter(Boolean).join(" ");
     const was = s.renamedFrom ? `<span class="was">previously &ldquo;${h(s.renamedFrom)}&rdquo;</span>` : "";
     const tag = badge ? `<span class="tag tag-${badge}">${h(this.badgeLabel(badge))}</span>` : "";
+    const updated = Boolean(row.badge) && f.firstVersion !== this.version;
+    const desc = this.short && updated ? firstSentence(s.description) : s.description;
 
     return `<div class="${classes}" id="${h(this.featureId(f.id))}"><div class="content">` +
       `<div class="badges">${this.sizeChip(f.size)}${tag}</div>` +
       `<div class="body"><div class="name">${h(s.name)}${was}</div>` +
-      `<div class="desc">${h(s.description)}</div>` +
-      `${row.badge && f.firstVersion !== this.version ? this.changesPanel(s) : ""}` +
+      `<div class="desc">${h(desc)}</div>` +
+      `${updated ? this.changesPanel(s) : ""}` +
+      `${row.badge ? this.mattersPanel(f) : ""}` +
       `${row.badge || !this.short ? this.howPanel(s) : ""}</div></div></div>`;
   }
 
-  /** One line for an entry that didn't move: its name and first sentence. */
-  restLine(row) {
+  /** One capability in the catalogue: its size, its name and its first
+   *  sentence, with a mark and a link to its details when it moved. */
+  catalogueLine(row) {
     const s = row.state;
-    return `<li id="${h(this.featureId(row.feature.id))}"><span class="nm">${h(s.name)}</span>` +
-      `<span class="first">${h(firstSentence(s.description))}</span></li>`;
+    const id = this.featureId(row.feature.id);
+    const mark = row.badge ? `<a class="moved is-${row.badge}" href="#${h(id)}">${h(this.badgeLabel(row.badge).toLowerCase())}</a>` : "";
+    return `<li${row.badge ? "" : ` id="${h(id)}"`}><span class="sz">${this.sizeChip(row.feature.size)}</span>` +
+      `<span class="nm">${h(s.name)}${mark}</span><span class="first">${h(firstSentence(s.description))}</span></li>`;
   }
 
   /**
@@ -400,14 +417,10 @@ class LedgerHtml {
     return this.categoryRows.flatMap(([, rows]) => rows).filter((r) => r.badge);
   }
 
-  /** The areas as "Everything else" lists them: only the rows that didn't move. */
-  get restAreas() {
-    return this.categoryRows
-      .map(([category, , groups]) => {
-        const kept = groups.map(([sub, rows]) => [sub, rows.filter((r) => !r.badge)]).filter(([, rows]) => rows.length);
-        return { category, groups: kept, rows: kept.flatMap(([, rows]) => rows) };
-      })
-      .filter((a) => a.rows.length);
+  /** The one-sentence overview of an area, from `area_intros` in config.json, or null. */
+  areaIntro(category) {
+    const text = this.config.area_intros?.[category];
+    return typeof text === "string" && text.trim() ? text.trim() : null;
   }
 
   /**
@@ -429,17 +442,23 @@ class LedgerHtml {
       `<p class="sub">${h(w.changed_intro)}</p></div>${inner}</section>`;
   }
 
-  /** Everything that didn't move, one line each: its name and first sentence. */
-  restSection() {
-    const areas = this.restAreas;
-    if (!areas.length) return "";
+  /**
+   * What the service provides: every capability, area by area, one line
+   * each — its size, its name and its first sentence — under the area's own
+   * one-sentence overview. What moved carries a mark that links to its
+   * details. The whole service, in a page or two.
+   */
+  catalogueSection() {
+    if (!this.categoryRows.length) return "";
     const w = this.words.pdf;
-    const inner = areas.map(({ category, groups, rows }, i) => {
+    const inner = this.categoryRows.map(([category, rows, groups], i) => {
+      const intro = this.areaIntro(category);
       const head = this.set.unstructured ? "" : `<div class="cat-head" id="${this.categoryId(i)}">` +
         `<span class="num">${this.categoryNumber(i)}</span><h2>${h(category)}</h2>` +
-        `<span class="meta">${rows.length} ${rows.length === 1 ? "feature" : "features"}</span></div>`;
+        `<span class="meta">${rows.length} ${rows.length === 1 ? "feature" : "features"}</span></div>` +
+        (intro ? `<p class="area-intro">${h(intro)}</p>` : "");
       const lists = groups.map(([sub, grows]) => `${sub ? `<div class="rest-sub">${h(sub.name)}</div>` : ""}` +
-        `<ul class="rest-list">${grows.map((r) => this.restLine(r)).join("")}</ul>`).join("");
+        `<ul class="rest-list">${grows.map((r) => this.catalogueLine(r)).join("")}</ul>`).join("");
       return `<div class="rest-area">${head}${lists}</div>`;
     }).join("");
     return `<section class="part rest" id="${SECTION_IDS.rest}"><div class="part-head"><h2>${h(w.rest_title)}</h2>` +
@@ -509,25 +528,24 @@ class LedgerHtml {
     const dots = (rows) => '<i class="dot-new"></i>'.repeat(rows.filter((r) => r.badge === "new").length)
       + '<i class="dot-updated"></i>'.repeat(rows.filter((r) => r.badge === "updated").length)
       + '<i class="dot-backfilled"></i>'.repeat(rows.filter((r) => r.badge === "backfilled").length);
-    // A short edition's areas are the ones in "Everything else", numbered
-    // there; a full one's are the whole ledger.
-    const areas = this.short ? this.restAreas : this.categoryRows.map(([category, rows]) => ({ category, rows }));
-    const contents = areas.map(({ category, rows }, i) => `<li><a href="#${this.categoryId(i)}">` +
+    // Only a full edition has a contents list: a short one's first page is
+    // its contents, with every item linking to its details, and the
+    // catalogue at the end is the index of the whole service.
+    const contents = this.short ? "" : this.categoryRows.map(([category, rows], i) => `<li><a href="#${this.categoryId(i)}">` +
       `<span class="num">${this.categoryNumber(i)}</span><span class="nm">${h(category)}</span>` +
-      `<span class="flags">${this.short ? "" : dots(rows)}</span><span class="ct">${rows.length}</span></a></li>`).join("");
+      `<span class="flags">${dots(rows)}</span><span class="ct">${rows.length}</span></a></li>`).join("");
 
     // Deliberately not numbered and deliberately quieter: these are notes
     // about what moved, not areas of the product, and a reader scanning
     // "01…08" shouldn't have to wonder why the count went up.
-    const changedRows = this.changedRows;
-    const lead = this.short && changedRows.length ? [[SECTION_IDS.changed, w.changed_title, changedRows.length, ""]] : [];
-    const closingContents = [...lead, ...closing.map(([, id, title, count]) => [id, title, count, ""])]
-      .map(([id, title, count, flags]) => `<li><a href="#${id}"><span class="num">&mdash;</span><span class="nm">${h(title)}</span>` +
-        `<span class="flags">${flags}</span><span class="ct">${count}</span></a></li>`).join("");
+    const closingContents = closing.map(([, id, title, count]) =>
+      `<li><a href="#${id}"><span class="num">&mdash;</span><span class="nm">${h(title)}</span>` +
+      `<span class="ct">${count}</span></a></li>`).join("");
 
     const summary = this.summaryHtml({ removed, goneEarlier, other, predDateLabel });
+    const overview = this.predecessor ? this.project.compositionOf(this.version)?.overview : null;
 
-    // One line on the cover: what this edition holds, against the last one.
+    // One line on the first page: what this edition holds, against the last one.
     const tally = this.predecessor
       ? [[stats.new, "new", "is-new"], [stats.updated, "updated", "is-updated"],
         [stats.backfilled, this.words.tags.backfilled.toLowerCase(), "is-backfilled"],
@@ -536,24 +554,15 @@ class LedgerHtml {
         .map(([n, label, cls]) => `<span class="${cls}"><b>${n}</b> ${h(label)}</span>`).join('<span class="sep">·</span>')
       : `<span><b>${stats.features}</b> feature${stats.features === 1 ? "" : "s"}${stats.areas > 1 ? ` across <b>${stats.areas}</b> areas` : ""}</span>`;
 
-    const layoutNote = this.short
-      ? " Every new and updated entry follows it in full, with what changed and how to see it for yourself; everything else is listed after that, one line each."
+    // What the colours and the sizes mean, said once, quietly, under the
+    // counts: a key, not a paragraph to read before the news.
+    const colours = this.predecessor
+      ? [["dot-new", "new"], ["dot-updated", "changed"],
+        ...(stats.backfilled > 0 ? [["dot-backfilled", `${this.words.tags.backfilled.toLowerCase()}, listed for the first time`]] : [])]
+        .map(([cls, label]) => `<span><i class="${cls}"></i> ${h(label)}</span>`).join("")
       : "";
-    const callout = this.predecessor ? `
-      <div class="callout"><div class="callout-content">
-        <b>What's changed since the last edition${predDateLabel ? ` (${predDateLabel})` : ""}:</b>
-        ${summary ? "the page after this one sums up what's different." : "every new and updated entry is highlighted."}${layoutNote}
-        A green stripe marks a brand-new feature;
-        a blue stripe marks an existing feature that was materially reworked, with its own
-        <b>What changed</b> note.${stats.backfilled > 0 ? ` A grey stripe marks a capability that was already
-        part of ${h(this.brand.name)} and is listed here for the first time, rather than something built this
-        time.` : ""}${this.short ? "" : " Anything without a stripe hasn't changed."}
-        <div class="legend">
-          <span><i class="dot-new"></i> New feature</span>
-          <span><i class="dot-updated"></i> Updated feature</span>
-          ${stats.backfilled > 0 ? `<span><i class="dot-backfilled"></i> ${h(this.words.tags.backfilled)}</span>` : ""}
-        </div>
-      </div></div>` : "";
+    const key = `<div class="key">${colours ? `<div class="legend">${colours}</div>` : ""}` +
+      `<p>${h(w.key_sizes)}</p></div>`;
 
     // Where the green/blue callout would go, had there been something to diff
     // against. Slate, like the third register, because it is the same kind of
@@ -596,8 +605,11 @@ class LedgerHtml {
       </div>` : "";
 
     const pages = this.short
-      ? `${this.changedSection()}${removedBlock}${goneEarlierBlock}${otherBlock}${this.restSection()}`
+      ? `${this.changedSection()}${removedBlock}${goneEarlierBlock}${otherBlock}${this.catalogueSection()}`
       : `${body}${removedBlock}${goneEarlierBlock}${otherBlock}`;
+    const since = predDateLabel ? `Compared with the edition of ${predDateLabel}.` : "";
+    const meta = [dateLabel, since].filter(Boolean).map(h).join(" · ") +
+      (rel.future ? '<span class="edition is-draft">Draft, not yet presented</span>' : "");
 
     return `<!doctype html>
 <html lang="en">
@@ -615,28 +627,25 @@ ${this.project.themeCss()}
 </style>
 </head>
 <body>
-  <header class="front">
+  <header class="front${this.short ? " is-short" : ""}">
     <div class="masthead">
       ${mastheadHtml(this.brand, this.project.root)}
-      <div class="imprint">Feature Ledger<br>Version ${this.label}${dateLabel ? ` · ${dateLabel}` : ""}</div>
+      <div class="imprint">${w.title_html}</div>
     </div>
 
-    <h1 class="title">${w.title_html}</h1>
-    <div class="edition ${rel.future ? "is-draft" : "is-final"}">
-      Version ${this.label}${rel.name ? ` · ${h(rel.name)}` : ""}${rel.future ? " · draft, not yet presented" : ""}
-    </div>
-    <p class="intro">${h(w.intro)}</p>
+    <h1 class="release-title">Version ${this.label}${rel.name ? `<span class="release-name"> · ${h(rel.name)}</span>` : ""}</h1>
+    <div class="release-meta">${meta}</div>
+    ${overview ? `<p class="overview">${h(overview)}</p>` : this.predecessor ? "" : `<p class="intro">${h(w.intro)}</p>`}
+    ${redraftBlock}
+    ${summary}
     <div class="tally">${tally}</div>
-    ${callout}${redraftBlock}
+    ${key}
   </header>
 
-  ${summary}
-
-  ${this.set.unstructured ? "" : `<div class="contents">
+  ${this.set.unstructured || this.short ? "" : `<div class="contents">
     <div class="kicker">Contents</div>
-    ${this.short && closingContents ? `<ul class="closing lead">${closingContents}</ul>` : ""}
-    ${contents ? `${this.short ? `<div class="contents-sub">${h(w.rest_title)}</div>` : ""}<ol>${contents}</ol>` : ""}
-    ${!this.short && closingContents ? `<ul class="closing">${closingContents}</ul>` : ""}
+    <ol>${contents}</ol>
+    ${closingContents ? `<ul class="closing">${closingContents}</ul>` : ""}
   </div>`}
 
   ${pages}
@@ -711,9 +720,11 @@ const STYLES = `
   .serif { font-family: var(--font-display); }
 
   /* ======================= FRONT MATTER ======================= */
-  /* Kept to its own page so the ledger proper always opens clean at the top
-     of page 2, whatever length the intro runs to. */
-  .front { break-after: page; }
+  /* The first page is the update: which edition this is, what it is about,
+     and what changed, in a list. Most readers stop there, so nothing on it is
+     decoration. A short edition's details start clean on page 2; an
+     inventory's contents follow on the same page. */
+  .front.is-short { break-after: page; }
 
   .masthead {
     display: flex; align-items: flex-end; justify-content: space-between;
@@ -728,19 +739,29 @@ const STYLES = `
     letter-spacing: -.015em; color: var(--accent-deep);
   }
   .masthead .imprint {
-    font-size: 7.5pt; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
-    color: var(--ink-faint); text-align: right;
+    font-family: var(--font-display); font-size: 13pt; font-weight: 700; color: var(--ink); text-align: right;
   }
+  .masthead .imprint em { font-style: normal; color: var(--accent); }
 
-  h1.title {
-    font-family: var(--font-display); font-size: 52pt; font-weight: 900; letter-spacing: -.025em;
-    margin-top: 42px; line-height: 1.02;
+  h1.release-title {
+    font-family: var(--font-display); font-size: 30pt; font-weight: 900; letter-spacing: -.02em;
+    margin-top: 30px; line-height: 1.08;
   }
-  h1.title em { font-style: normal; color: var(--accent); }
+  h1.release-title .release-name { font-weight: 700; color: var(--ink-soft); }
+  .release-meta { margin-top: 8px; font-size: 9.5pt; color: var(--ink-faint); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+  .overview { margin: 18px 0 0; font-size: 11.5pt; line-height: 1.55; color: var(--ink); max-width: 560px; }
+  .front .summary { margin: 26px 0 0; }
+
+  /* The key under the counts: colours and sizes, said once and quietly. */
+  .key { margin-top: 14px; font-size: 8.5pt; color: var(--ink-faint); max-width: 560px; }
+  .key p { margin: 6px 0 0; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--ink-soft); }
+  .legend i { width: 4px; height: 12px; border-radius: 2px; display: inline-block; }
 
   .edition {
-    display: inline-flex; align-items: center; gap: 7px; margin-top: 18px; font-weight: 700; font-size: 8pt;
-    letter-spacing: .1em; text-transform: uppercase; border-radius: 3px; padding: 5px 11px 5px 9px;
+    display: inline-flex; align-items: center; gap: 7px; font-weight: 700; font-size: 7.5pt;
+    letter-spacing: .1em; text-transform: uppercase; border-radius: 3px; padding: 4px 10px 4px 8px;
   }
   .edition::before { content: ""; width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
   .edition.is-draft { background: var(--accent-pale); color: var(--accent-deep); }
@@ -766,9 +787,6 @@ const STYLES = `
   .callout.redraft .callout-content { background: var(--slate-soft); }
   .callout.redraft b { color: var(--slate-deep); }
   .callout .redraft-note { margin: 10px 0 0; }
-  .callout .legend { margin-top: 12px; display: flex; gap: 20px; flex-wrap: wrap; }
-  .callout .legend span { display: inline-flex; align-items: center; gap: 7px; font-size: 8.5pt; color: var(--ink-soft); font-weight: 600; }
-  .callout .legend i { width: 4px; height: 13px; border-radius: 2px; display: inline-block; }
   .dot-new { background: var(--green); }
   .dot-updated { background: var(--blue); }
   .dot-backfilled { background: var(--slate); }
@@ -782,7 +800,8 @@ const STYLES = `
      One line, read as a sentence: what this edition holds against the last
      one. Each count wears the colour its entries wear inside. */
   .tally {
-    margin-top: 26px; font-family: var(--font-display); font-size: 14pt; color: var(--ink-soft);
+    margin-top: 24px; padding-top: 14px; border-top: 1px solid var(--line);
+    font-family: var(--font-display); font-size: 14pt; color: var(--ink-soft);
     display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px;
   }
   .tally b { font-weight: 700; font-size: 20pt; color: var(--ink); margin-right: 3px; }
@@ -799,8 +818,9 @@ const STYLES = `
      entries wear in the ledger, so the page is visibly an index of the
      highlights rather than a fourth way of drawing them. The whole sentence is
      the link, so it stays the same ink as the text around it. */
-  .summary { padding-top: 14px; border-top: 2px solid var(--accent); margin-bottom: 34px; }
+  .summary { padding-top: 14px; border-top: 2px solid var(--accent); }
   .summary h2 { font-family: var(--font-display); font-size: 15pt; font-weight: 700; }
+  .sum-group:first-of-type { margin-top: 16px; }
   .summary p.sub { margin: 3px 0 0; font-size: 9pt; color: var(--ink-faint); max-width: var(--measure); }
   .sum-group { margin-top: 22px; }
   .sum-group h3 {
@@ -1055,6 +1075,9 @@ const STYLES = `
     margin: 16px 0 4px; font-size: 7.5pt; font-weight: 800; letter-spacing: .12em;
     text-transform: uppercase; color: var(--ink-faint); break-after: avoid;
   }
+  /* The catalogue is its own part of the document, read on its own: it starts
+     on a fresh page rather than leaving its heading at the foot of the last. */
+  .part.rest { break-before: page; margin-top: 0; }
   .rest .cat-head { border-top-width: 1px; margin-top: 18px; }
   .rest-area { break-inside: auto; }
   .rest-sub { margin: 10px 0 2px; font-family: var(--font-display); font-weight: 700; font-size: 10.5pt; color: var(--accent-deep); }
@@ -1063,14 +1086,28 @@ const STYLES = `
     break-inside: avoid; padding: 6px 0; border-bottom: 1px solid var(--line-soft);
     display: flex; gap: 12px; align-items: baseline;
   }
-  .rest-list .nm { flex: 0 0 34%; font-family: var(--font-display); font-weight: 700; font-size: 10.5pt; }
+  .rest-list .sz { flex: 0 0 82px; }
+  .rest-list .sz .size { font-size: 6.5pt; padding: 3px 7px; }
+  .rest-list .nm { flex: 0 0 30%; font-family: var(--font-display); font-weight: 700; font-size: 10.5pt; }
   .rest-list .first { flex: 1; color: var(--ink-soft); font-size: 9.5pt; }
-  .contents-sub {
-    margin-top: 14px; font-size: 7.5pt; font-weight: 800; letter-spacing: .12em;
-    text-transform: uppercase; color: var(--ink-faint);
+  /* What moved, marked where it sits in the service, and one click from its details. */
+  .rest-list .moved {
+    display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 3px; vertical-align: 1px;
+    font-family: var(--font-body); font-size: 6.5pt; font-weight: 800; letter-spacing: .08em;
+    text-transform: uppercase; color: #fff; text-decoration: none;
   }
-  .contents .closing.lead { margin: 10px 0 0; }
-  .contents .closing.lead .nm { font-weight: 600; color: var(--ink); }
+  .rest-list .moved.is-new { background: var(--green); }
+  .rest-list .moved.is-updated { background: var(--blue); }
+  .rest-list .moved.is-backfilled { background: var(--slate); }
+  .area-intro { margin: 2px 0 6px; font-size: 9.5pt; color: var(--ink-soft); max-width: var(--measure); }
+
+  /* Why a change matters: the client's side of it, in the row's own ink. */
+  .matters { margin-top: 10px; max-width: var(--measure); }
+  .matters .label {
+    display: block; font-weight: 800; font-size: 7.2pt; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--ink-faint); margin-bottom: 3px;
+  }
+  .matters p { margin: 0; color: var(--ink); }
 
   .removed-box { margin-top: 12px; background: var(--accent-deep); border-radius: 7px; overflow: hidden; break-inside: avoid; }
   .removed-box-content { background: var(--accent-pale); margin-left: 5px; padding: 13px 16px; font-size: 9.5pt; }

@@ -125,7 +125,7 @@ const HELP = `ledger — a client-facing record of what your product does, kept 
                                         a change that belongs to no single feature
     ledger add/change/remove --backfilled            already in the product before the last
                                                      edition, only now on the record
-    ledger categories [list | add "Name" [--after "Other"] | rename "Old" "New" | remove "Name"]
+    ledger categories [list | add "Name" [--after "Other"] [--intro "..."] | rename "Old" "New" | remove "Name"]
     ledger subcategories [list | add]   { id, category, name, intro }
     (add --dry-run to any of them to see what it would write)
 
@@ -155,7 +155,7 @@ const HELP = `ledger — a client-facing record of what your product does, kept 
     .ledger/features/<id>.json          a name, a description, how to see it, dev notes
     .ledger/compositions.json           a "What changed" note, a summary item, the message
     .ledger/subcategories.json          sub-section headings and their overviews
-    .ledger/config.json                 product name, tagline, document titles
+    .ledger/config.json                 product name, tagline, document titles, area overviews
     .ledger/other-changes.json          the product-wide notes
 
 ${DELIVERY_HELP}
@@ -198,7 +198,7 @@ const FLAGS = {
     "backfilled", "reason-inferred", "dry-run"],
   remove: ["why", "why-from", "reason", "backfilled", "reason-inferred", "dry-run"],
   note: ["file", "audience", "description", "dry-run"],
-  categories: { default: "list", list: [], add: ["after", "before", "dry-run"], rename: ["dry-run"], remove: ["dry-run"] },
+  categories: { default: "list", list: [], add: ["after", "before", "intro", "dry-run"], rename: ["dry-run"], remove: ["dry-run"] },
   subcategories: { default: "list", list: [], add: ["file", "id", "category", "name", "intro", "dry-run"] },
 
   preview: ["out", "html", "open", "full"],

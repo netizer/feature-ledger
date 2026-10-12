@@ -2,7 +2,7 @@ import { openProject } from "../store.mjs";
 import { fail, today, longDate, isBlank, COPY_BLOCK } from "../util.mjs";
 import * as git from "../git.mjs";
 import {
-  LISTS, ITEM_LIMIT, composes, composeTargets, releaseEntries, kindAt, needsNote, accountingProblems,
+  LISTS, ITEM_LIMIT, ITEM_WORDS, composes, composeTargets, releaseEntries, kindAt, needsNote, accountingProblems,
   shapeProblems, textProblems, prepareReport, prepareLine, unknownReasons, stamped, messageFor,
 } from "../compose.mjs";
 import { eventLine } from "../diff.mjs";
@@ -77,6 +77,7 @@ function complete(flags) {
     ? `: ${plural(notes, "\"What changed\" note")}, and a summary of ${plural(composeTargets(project, version).length, "client-facing entry", "client-facing entries")}.`
     : ", a first edition: it prints as an inventory.") +
     " A change recorded after this shows as news since the last prepare; editing the words by hand doesn't.");
+  if (next.overview) { out(""); out(next.overview); }
   const lists = printedLists(next);
   if (lists) { out(""); out(lists); }
   out("");
@@ -167,9 +168,9 @@ function brief(flags) {
     p("summary to write.");
   } else {
     p(`client reads. The client has the ${P} edition (${longDate(previous.date)}) and never saw anything in`);
-    p(`between. The ${N} edition opens with a short summary page, then prints every new,`);
-    p("updated and removed entry in full, each updated one with a \"What changed\" note, and");
-    p("then one line for everything else.");
+    p(`between. The ${N} edition's first page is the update: an overview and a short list of`);
+    p("what's new and what changed. Most readers stop there. Then the details of every new,");
+    p("updated and removed entry, and last a one-line-each catalogue of the whole service.");
   }
   p("");
   p("The developer is here in this session. Ask them what only they know, and nothing");
@@ -317,7 +318,9 @@ function brief(flags) {
   p("{");
   p(`  "version": ${version},`);
   if (!inventory) {
+    p("  \"overview\": \"Two or three sentences on what this release is about.\",");
     p("  \"changes\":  { \"entry-id\": [\"One note per change.\"] },");
+    p("  \"matters\":  { \"entry-id\": \"Why it matters to the client, when someone said so.\" },");
     p("  \"new\":      [{ \"text\": \"One sentence.\", \"covers\": [\"entry-id\", \"another-entry-id\"] }],");
     p("  \"changed\":  [{ \"text\": \"One sentence.\", \"covers\": [\"entry-id\"] }],");
     p("  \"in_place\": [],");
@@ -327,16 +330,30 @@ function brief(flags) {
   p("}");
   p("```");
   p("");
+  p("**Who reads it.** Someone who uses the product, has never seen the code, and reads");
+  p("the first page and little else. Say what each capability does for them, in their");
+  p("words: \"Customers can book a month ahead\", not \"the booking window is configurable");
+  p("up to 28 days\". No commands, flags, file names, paths or code terms anywhere the");
+  p("client reads; those go in \"dev_notes\". `ledger status` points out what reads like code.");
+  p("");
   if (!inventory) {
-    p("**Descriptions.** Each changed entry's description says what it does now, in two or");
-    p("three present-tense sentences. If it no longer does, update it with `ledger change`");
-    p("(a new entry: `ledger change <id> --description \"…\"`). Wording alone is a hand-edit");
-    p("of the feature file.");
+    p("**The overview (\"overview\").** Two or three sentences that open the edition, under");
+    p("the version number: what this release is about, as a whole. Not a list; the summary");
+    p("under it is the list.");
     p("");
+  }
+  p("**Descriptions.** One or two present-tense sentences, about 40 words, saying what the");
+  p(`capability does for the people who use it. ${inventory ? "Check every entry's" : "Each new or changed entry's"} description says that`);
+  p("now. If it no longer does, update it with `ledger change` (a new entry:");
+  p("`ledger change <id> --description \"…\"`). Shortening one is wording: a hand-edit of");
+  p("the feature file. In the edition, an updated entry prints only its first sentence");
+  p("above its note, so that sentence has to say what the capability is.");
+  p("");
+  if (!inventory) {
     p("**The notes (\"changes\").** One for every entry marked `updated`, and nothing else: a");
     p("new entry has no \"before\" for the client.");
     p("");
-    p(`- Each change is one or two sentences: what it was in ${P}, and why it moved.`);
+    p(`- Each change is one sentence: what it was in ${P}, what it is now, and why.`);
     p("- The reason comes from the recorded events, or from the developer in this");
     p("  session, and from nowhere else. Where nobody knows, say what changed and stop.");
     p("- Events are steps; a note is the result. Several toward one result are one note.");
@@ -345,14 +362,19 @@ function brief(flags) {
     p("  this entry works with the new thing, point to it by name (\"see “Name”\"), and stop.");
     p("- An event marked [combined] is an older note that carries its own reason.");
     p("");
+    p("**Why it matters (\"matters\").** Optional, one sentence per new or updated entry, on");
+    p("what the change does for the client: time saved, a mistake that can't happen now, a");
+    p("question they no longer have to ask. Only from a reason the events or the developer");
+    p("gave; where there is none, leave the entry out of \"matters\".");
+    p("");
     p("**The summary (\"new\", \"changed\", \"in_place\", \"quiet\").** Many readers stop at this");
     p("page, so it picks what is worth knowing. The edition still prints every recorded");
     p("change in full after it; \"quiet\" only keeps an entry off this page.");
     p("");
-    p("- A handful of items, most important first. Each is one sentence, usually under");
-    p(`  fifteen words and never over ${ITEM_LIMIT} characters, starting with a capital, never`);
-    p("  with a command or a file name. \"covers\" lists the entries it sums up, the one");
-    p("  that says most first.");
+    p(`- A handful of items, most important first. Each is one sentence of at most ${ITEM_WORDS}`);
+    p(`  words (never over ${ITEM_LIMIT} characters), starting with a capital, never with a`);
+    p("  command or a file name. \"covers\" lists the entries it sums up, the one that says");
+    p("  most first.");
     p("- \"new\": what someone can do that they couldn't before. \"changed\": what a client who");
     p(`  knows ${P} will notice is different. "in_place": only entries marked \`in place\`, and`);
     p("  nothing there may say or imply they arrived or changed this cycle.");
@@ -362,6 +384,15 @@ function brief(flags) {
     p("  \"quiet\". Removals and product-wide notes list themselves.");
     p("- Never a reason the events and the developer didn't give. Not \"we\", nothing");
     p("  promotional.");
+    p("");
+  }
+  const areas = project.featureSet.categories({ audience: "user" });
+  const bare = project.featureSet.unstructured ? [] : areas.filter((a) => isBlank(project.config.area_intros?.[a]));
+  if (bare.length) {
+    p("**Areas (\"area_intros\" in .ledger/config.json).** The catalogue at the end of the");
+    p("edition opens each area with one sentence on what that part of the service is for.");
+    p(`These have none yet: ${bare.map((a) => `“${a}”`).join(", ")}. Add them as`);
+    p("`\"area_intros\": { \"Area name\": \"One sentence.\" }`.");
     p("");
   }
   p("**How to see it (\"how_to_see\" in the feature file).** Every new or updated entry");

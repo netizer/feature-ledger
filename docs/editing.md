@@ -54,7 +54,7 @@ On any entry in a feature's `history`:
 | | |
 | --- | --- |
 | `name` | What the feature is called. The newest entry's name is what it goes by; every document footnotes the previous one on its own. |
-| `description` | The whole present-tense text, in two or three sentences. `ledger status` says when one runs long for its size. |
+| `description` | The whole present-tense text, in one or two sentences, for someone who has never seen the code. The first sentence says what the capability is: it is all an updated entry prints above its note. `ledger status` says when one runs long for its size, or reads like code. |
 | `how_to_see` | How a reader checks the claim themselves. Carried forward to later versions until one sets its own. |
 
 At the top of the same file:
@@ -71,8 +71,8 @@ Elsewhere in `.ledger/`:
 | | |
 | --- | --- |
 | `subcategories.json` | A sub-section's `name` and `intro`. |
-| `compositions.json` | A release's "What changed" notes (`changes`, by entry id), a summary item's `text` and `covers`, `quiet`, and the `message`. `ledger prepare complete` writes `prepared`. |
-| `config.json` | Product name, tagline, and the `docs` block that overrides document titles and intros. |
+| `compositions.json` | A release's `overview`, its "What changed" notes (`changes`, by entry id), why a change matters (`matters`, by entry id), a summary item's `text` and `covers`, `quiet`, and the `message`. `ledger prepare complete` writes `prepared`. |
+| `config.json` | Product name, tagline, each area's one-sentence overview (`area_intros`), and the `docs` block that overrides document titles and intros. |
 | `other-changes.json` | The `description` of a product-wide note. |
 | `releases.json` | A release's `display_version` and `redraft` (see [documents.md](documents.md#carrying-on-from-earlier-reports) and [releasing.md](releasing.md#a-redraft-done-by-hand)). Nothing else in the file. |
 | `STYLE.md`, `theme.css` | Prose and CSS. They were always yours. |

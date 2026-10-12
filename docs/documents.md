@@ -44,23 +44,32 @@ cover, then every entry in full, area by area, each with how to see it.
 
 **Every later edition** is short without dropping work:
 
-1. **The cover**: the masthead, the version and date, and one line —
-   "5 new · 8 updated · 12 unchanged".
-2. **The summary page** (below).
-3. **What's new and what changed**: every new, updated, in-place and removed
-   entry, in full: its description, its "What changed" note, and how to see it.
-   Then the product-wide notes. The summary picks highlights; this section never
-   leaves recorded work out.
-4. **Everything else the product does**: one line per entry that didn't move,
-   its name and first sentence, area by area.
+1. **The first page is the update**, the page most clients stop at: the
+   version, its name and date, an overview of two or three sentences on what the
+   release is about, the summary lists (below), one line of counts —
+   "5 new · 2 updated · 6 unchanged" — and a quiet key to the colours and sizes.
+2. **What's new and what changed, in detail**: every new, updated, in-place and
+   removed entry, with its size. A new entry prints its description; an updated
+   one leads with what changed, under the first sentence of its description,
+   since the client read the rest last time. Each can say why it matters to the
+   client and how to see it. Then the product-wide notes. The summary picks
+   highlights; this section never leaves recorded work out.
+3. **What the product provides**: every capability, area by area, one line each
+   (its size, its name and its first sentence) under the area's one-sentence
+   overview. What moved carries a mark that links to its details.
 
 `ledger cut --full` (or `ledger build vN --full`) prints any edition as a full
-inventory instead, with what moved still marked. An edition cut with `--full`
-reprints that way on its own.
+inventory instead, with a contents list and what moved still marked. An edition
+cut with `--full` reprints that way on its own.
+
+Area overviews are `area_intros` in `.ledger/config.json`
+(`{ "Ordering": "Everything a customer does to place an order." }`), or
+`ledger categories add "Name" --intro "…"`. `ledger prepare` asks for any that
+are missing.
 
 ## The summary page
 
-From the second edition on, the page after the cover lists what differs from
+From the second edition on, the first page lists what differs from
 the last edition as short numbered lists, each under a plain heading in the
 colour its entries wear: *What's new*, *What changed*, *Already in place*, *No
 longer available*, and the product-wide notes. The first three are written by
@@ -83,8 +92,24 @@ builds a plain one from the summary.
 The summary page's heading, the sentence under it and its first two list
 headings are `summary_title`, `summary_intro`, `summary_new` and
 `summary_updated` in the `docs.pdf` block of `.ledger/config.json` (`{date}` in
-the intro becomes the last edition's date). The two halves after it are
-`changed_title`, `changed_intro`, `rest_title` and `rest_intro`.
+the intro becomes the last edition's date). The two parts after it are
+`changed_title`, `changed_intro`, `rest_title` and `rest_intro`; the label over
+a reason for the client is `matters_label`, and the line on sizes is `key_sizes`.
+
+## Writing for the client
+
+The person reading has never seen the code, and reads the first page and
+little else. `ledger status` warns when what they read drifts from that:
+
+- a description past one or two sentences, or about 55 words for a Big entry,
+  45 for a Medium and 35 for a Small;
+- a "What changed" note past one sentence per change;
+- a summary item past 12 words, or an overview past three sentences;
+- client text that reads like code: something in backticks, a file name, a
+  path into the source or a command-line flag. Those go in `dev_notes`.
+
+All of it is a warning, never a refusal. The `prepare` brief and the agent
+stanza ask for the same.
 
 ## Where they go
 

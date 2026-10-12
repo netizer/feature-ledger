@@ -35,9 +35,12 @@ the most defensible call, write down that you made it, and keep going.
 Read the sample before you write the first entry, and keep matching it as you
 go. The sample is the brief; the name of the guide is only where it came from.
 
-Each description is a present-tense statement of what the product does, in two
-or three sentences: "A guest can book without an account." Every sentence states something a reader
-could confirm by using the product. Never authorship, never history: no
+Each description is a present-tense statement of what the product does for the
+people who use it, in one or two sentences, about 40 words: "A guest can book
+without an account." Every sentence states something a reader could confirm by
+using the product. The reader has never seen the code: no file names, paths,
+flags or code terms in a name, a description or how to see it; those go in
+`dev_notes`. Never authorship, never history: no
 "added", "we now support", "improved", "new". Someone reading the finished
 document must not be able to tell whether a feature shipped last week or three
 years ago. The first edition is a snapshot of the product as it already
@@ -72,7 +75,7 @@ Below the bar, and therefore **not** entries:
 - Anything you can only describe as the absence of a problem.
 
 None of that is unimportant — it is just not what this document is for. A
-description is two or three sentences, so a capability has room to mention the
+description is one or two sentences, so a capability has room to mention the
 guardrail that makes it trustworthy without that guardrail becoming its own
 line in the contents.
 
@@ -135,9 +138,12 @@ someone using it would recognise and name.
   than it looks.
 
 ```
-ledger categories add "First area"
-ledger categories add "Second area" --after "First area"
+ledger categories add "First area" --intro "One sentence on what this part of the service is for."
+ledger categories add "Second area" --after "First area" --intro "…"
 ```
+
+The intro opens the area in the edition's catalogue of the whole service, so
+write it for the client: what that part gives them, not what it contains.
 
 If the product has grown parts since the last time, `ledger categories rename`
 and `ledger categories remove` move the structure without touching the

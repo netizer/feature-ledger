@@ -63,9 +63,15 @@ JSON
 - **`size`**: **Big** for a capability the product is chosen for, **Medium** for
   one in its own right inside a bigger one, **Small** for one narrow enough to
   describe in a line.
-- **`description`**: what the product *does*, present tense, two or three
-  sentences, each one something a reader could confirm by using the product.
+- **`description`**: what the product *does* for the people who use it,
+  present tense, one or two sentences (about 40 words), each one something a
+  reader could confirm by using the product. The first sentence says what the
+  capability is: an edition prints only that one above an updated entry's note.
   Never authorship: not "added X", not "we now support X".
+- **Plain language.** The client has never seen the code. No file names,
+  paths, flags or code terms in a name, a description or how to see it; those
+  go in `dev_notes`. Say what it does for them: "Customers can book a month
+  ahead", not "the booking window is configurable up to 28 days".
 - **`how_to_see`** (optional): plain instructions a client follows to check the
   claim themselves. Give it when you know; leave it out rather than guess.
 - **`dev_notes`** (optional): implementation detail for the team.

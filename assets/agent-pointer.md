@@ -41,9 +41,11 @@ they could ask for, or would miss if it went away. Guardrails, defaults,
 plumbing and polish are described inside the capability they belong to, or go
 in as `dev`, or as `ledger note`. They never get an entry of their own.
 
-Descriptions are present-tense statements of what the product does, in two or
-three sentences, never of who did what to it. Every sentence states something a
-reader could confirm by using the product.
+Descriptions are present-tense statements of what the product does for the
+people who use it, in one or two sentences (about 40 words), never of who did
+what to it. Every sentence states something a reader could confirm by using the
+product. The client has never seen the code: no file names, paths, flags or
+code terms in anything they read; those go in `dev_notes`.
 
 **Don't commit.** What you record lands in the working tree, and the developer
 commits it with everything else. Don't run `ledger prepare` or `ledger cut`
