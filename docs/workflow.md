@@ -20,13 +20,16 @@ The commands come in two kinds:
 | 1 | `ledger init --product "Acme Portal"` (add `--commit-pdfs` to keep the client PDFs in the repo) | runs |
 | 2 | `ledger bootstrap`: the agent surveys the codebase, writes every entry, records the survey as a full audit, and cuts the baseline, which prints its PDF | agent task |
 | 3 | Read the PDF, and fix the wording in `.ledger/features/<id>.json` | by hand |
+| — | `ledger paths`: check every product file belongs to an entry, or is ignored | runs |
 | 4 | `ledger status`: checks every file you edited | runs |
 | 5 | Commit `.ledger/` | git |
 
 The survey runs start to finish without asking you anything. The agent lists
 the capabilities first, against [the entry bar](concepts.md#one-altitude-whatever-the-size-of-the-project),
 then decides whether the product needs areas at all, writes the entries a batch
-at a time, and finally records the survey and cuts the baseline:
+at a time, each with the code it lives in (`paths`), makes sure every product
+file is owned by an entry or ignored, and finally records the survey and cuts
+the baseline:
 
 ```bash
 ledger status
@@ -66,7 +69,8 @@ ledger add saved-baskets <<'JSON'
   "category": "Ordering",
   "size": "Medium",
   "name": "Saved baskets",
-  "description": "A customer keeps more than one basket — the weekly shop, the party order — and switches between them without either losing its contents."
+  "description": "A customer keeps more than one basket, such as the weekly shop and a party order, and switches between them without either losing its contents.",
+  "paths": ["web/basket/**", "api/baskets/**"]
 }
 JSON
 ```
@@ -74,42 +78,74 @@ JSON
 Something that already exists changes:
 
 ```bash
-ledger update delivery-windows <<'JSON'
+ledger change delivery-windows <<'JSON'
 {
-  "description": "The full current-state text, rewritten. Not a diff.",
-  "changes": [
-    "The booking horizon went from fourteen days to twenty-eight. Fourteen covered the weekly shop but not the customers who plan a month ahead around a delivery, and those are the orders least likely to be cancelled."
-  ]
+  "what": "Windows can be booked up to twenty-eight days ahead instead of fourteen.",
+  "why": "Fourteen covered the weekly shop but not the customers who plan a month ahead, and those are the orders least likely to be cancelled.",
+  "description": "The full current-state text, rewritten. Not a diff."
 }
 JSON
 ```
 
-Each `changes` bullet says what the feature was before **and why it moved**.
-The description already shows what it is now; the reason is the part only you
-know. `ledger update` refuses a change to an existing feature without one. That
-refusal is deliberate, and it's the single most valuable thing the CLI does.
+A change is two facts, **what** moved and **why**, recorded as they are. Nobody
+phrases them for the client at this point: the "What changed" note the edition
+prints is composed once, for the whole release, from what the last edition
+said, what the entry says now and these facts. So a feature that changes three
+times in a release is three `ledger change`s, and none of them is ever revised.
 
-`ledger` or `ledger status` shows what the open release has collected so far.
-`ledger preview --run claude` prints it as a draft PDF, having the agent bring
-the summary on its first page up to date first. The summary is written from
-the ledger alone, never from the code, so that's cheap enough to do daily.
+`ledger change` refuses a change to an existing feature with no reason. When
+nobody can say why, `--why-unknown` records the gap; a reason read off a commit
+message takes `--why-from commit`. Either becomes a question
+(`ledger questions`) that the cut asks before it prints. That refusal is
+deliberate, and it's the most valuable thing the CLI does.
+
+### Seeing how big the release is
+
+```bash
+ledger preview --size          # or `ledger diff`
+```
+
+```
+v6 so far, against v5 (September 12, 2026):
+  new         2   1 Big · 1 Small
+  updated     4   1 Big · 3 Medium                7 events
+  weight     13   new and updated, Big 3 · Medium 2 · Small 1
+  code            1,240 lines since 3f9c21a, working tree included · 1,180 under 5 entries · 60 in 2 files no entry owns
+  check           pick-list: 84 lines of its own code moved, and the ledger says nothing changed
+
+Since your last look (October 9, 2026, 16:02 UTC, at 9e1d0aa): 1 entry newly in the release (saved-baskets), 2 events on it, 3 commits.
+```
+
+It is worked out from the ledger and git alone, so it is instant and free. The
+`check` lines are where the record and the code disagree about how much
+happened: code that moved under an entry the release says nothing about, or an
+entry recorded as moved whose code didn't. `ledger diff --full` prints each
+entry as the last edition showed it, as it is now, and what was recorded
+between.
+
+`ledger preview --run claude` adds the draft PDF, having the agent compose what
+changed first, and only when something has moved since it was last composed.
+Composing reads the ledger alone, never the code, so that's cheap enough to do
+daily.
 
 ## A feature was built without an agent
 
 | | Command | Kind |
 | --- | --- | --- |
-| 1 | `ledger audit`: the agent reads everything that landed since the last audit, records what the ledger missed, and stamps the commit it checked (`--full` sweeps the whole codebase) | agent task |
-| 2 | `ledger audit confirm <id>`: vouch for a reason the audit took from a commit message (`ledger status` lists them) | runs |
+| 1 | `ledger audit`: the agent reads the code that moved without the ledger hearing about it, with the diffs, records what the ledger missed, claims unowned code, and stamps the commit it checked (`--full` sweeps the whole codebase) | agent task |
+| 2 | `ledger questions`: answer or accept the reasons the audit took from commit messages | runs |
 
 If you know exactly what shipped, skip the audit and record it yourself with
-`ledger add <id>` or `ledger update <id>`.
+`ledger add <id>` or `ledger change <id>`.
 
 ## Reading the current state
 
 | | Command | Kind |
 | --- | --- | --- |
-| — | `ledger list`, `ledger show <id>`: the corpus in the terminal, one line or one entry at a time | runs |
-| — | `ledger preview`: the open release as a draft PDF (`--open` opens it) | runs |
+| — | `ledger list`, `ledger show <id>`: the corpus in the terminal, one line or one entry at a time (`show --diff` for the last edition beside now) | runs |
+| — | `ledger diff`: the size of the open release, and the code under each entry | runs |
+| — | `ledger paths`: which code each entry lives in, and what no entry owns | runs |
+| — | `ledger preview`: the size readout, then the open release as a draft PDF (`--open` opens it) | runs |
 | — | `ledger build`: the Markdown docs, any cut edition not yet printed, and the draft | runs |
 | — | Edit names, descriptions and dev notes in `.ledger/features/<id>.json`, then `ledger status` | by hand |
 | — | `ledger style rewrite`: the agent rewrites the whole ledger in the project's tone, without changing what it says | agent task |
@@ -123,10 +159,10 @@ mistaken for one, or committed as one.
 | | Command | Kind |
 | --- | --- | --- |
 | 1 | `ledger`: says whether the release is ready, and what's in the way | runs |
-| 2 | `ledger audit`, if code landed since the last one | agent task |
-| 3 | `ledger summary`: the agent writes the short lists of what's new and what changed that the edition opens with, from what the entries already say | agent task |
-| 4 | `ledger review`: the agent reads the release against the edition the client already has, fixes the wording, and records the review | agent task |
-| 5 | `ledger cut --name "Sprint 6 demo"`: runs every check, prints the PDF into the client directory, and opens the next release | runs |
+| 2 | `ledger audit`, if code moved that the ledger hasn't accounted for | agent task |
+| 3 | `ledger compose`: the agent writes the "What changed" notes and the short lists the edition opens with, from the last edition, now, and what was recorded | agent task |
+| 4 | `ledger verify`, if you turned it on: the agent checks what the edition says against the code, and files what it doubts as questions | agent task |
+| 5 | `ledger cut --name "Sprint 6 demo"`: runs every check, asks the open questions, prints the PDF into the client directory, and opens the next release | runs |
 | 6 | Commit `.ledger/` (and `docs/client/`, if you keep the PDFs) | git |
 
 Steps 2 to 5 in one command, with an agent doing the agent tasks:
@@ -135,10 +171,10 @@ Steps 2 to 5 in one command, with an agent doing the agent tasks:
 ledger cut --name "Sprint 6 demo" --run claude
 ```
 
-It hands whichever of the audit, the summary and the review is still open to
-the agent, one after the other, checks what each left behind, then shows you the agent's notes
-and asks before it cuts. `--yes` cuts without asking, for when nobody is at a
-terminal.
+It hands whichever of the audit, the composition and the verify is still open
+to the agent, one after the other, checks what each left behind, asks you the
+open questions one at a time, then shows you the agent's notes and asks before
+it cuts. `--yes` cuts without asking, for when nobody is at a terminal.
 
 When a check is open, `ledger cut` refuses, lists every check, and says what
 to run for each:
@@ -147,16 +183,17 @@ to run for each:
 $ ledger cut --name "Sprint 6 demo"
 ✗ v6 was NOT cut — 2 checks are open:
 
-  ✓ redraft  no redraft waiting to be checked
-  ✗ audit    23 commits since the last audit (a1b3f9c, September 12, 2026), changing 41 files …
-             → ledger audit        (or `ledger audit --run <agent>` to hand it to one)
-  ✓ content  14 entries recorded against v6
-  ✓ summary  the summary of v6 accounts for all 14 entries, and none has changed since …
-  ✗ review   2 client-facing entries have changed since v6 was reviewed on September 25, 2026 …
-             → ledger review       (or `ledger review complete`, if you have read them yourself)
-  ✓ moment   cutting at 3f9c21a on 2026-10-10
+  ✓ redraft   no redraft waiting to be checked
+  ✗ audit     since the last audit (a1b3f9c, September 12, 2026): 3 files under 1 entry changed without the entry moving (pick-list) …
+              → ledger audit        (or `ledger audit --run <agent>` to hand it to one)
+  ✓ content   14 entries recorded against v6
+  ✓ compose   the composition of v6 accounts for all 14 entries, and nothing has moved since it was composed …
+  ✓ verify    off (`"checks": { "verify": true }` in config.json turns it on)
+  ✗ questions 1 question open on v6 (1 reason nobody has vouched for)
+              → ledger questions    (at a terminal, `ledger cut` asks them one at a time)
+  ✓ moment    cutting at 3f9c21a on 2026-10-10
 
-Nothing was written. Fix the above and cut again, or skip a check on purpose: --skip audit,review
+Nothing was written. Fix the above and cut again, or skip a check on purpose: --skip audit,questions
 ```
 
 It exits with code 3, so a script can tell a refusal from an error. What each
@@ -187,6 +224,19 @@ and the editions already printed are kept. See [checks.md](checks.md#starting-ov
 | 6 | `ledger cut --name "…"`: the first edition in the new structure, opening with a note that it is reorganized | runs |
 
 `ledger redraft` on its own says where a redraft stands and what comes next.
+
+## Upgrading a ledger written by an earlier version
+
+```bash
+ledger migrate --run claude
+git commit -am "Migrate the ledger"
+```
+
+The migration itself needs no agent: every "What changed" note an edition
+already printed is kept verbatim, the open release's notes become recorded
+changes and a draft to compose, and dev notes move to the entry. With `--run`,
+an agent then says which code each entry lives in. Until it is migrated, the
+ledger refuses to load and says to run this.
 
 ## Reprinting an edition the client already has
 

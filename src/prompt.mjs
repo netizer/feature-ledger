@@ -43,7 +43,7 @@ export const TASKS = {
   audit: {
     label: "audit",
     brief: async (flags) => (await import("./commands/audit.mjs")).cmdAudit({ flags, positional: [] }),
-    snapshot: (p) => ({ audits: p.audits.length, entries: fingerprints(p) }),
+    snapshot: (p) => ({ audits: p.audits.length, entries: fingerprints(p), questions: p.questions.length }),
     verify(p, before) {
       if (p.audits.length <= before.audits) {
         return [{ ok: false, line: "no audit was recorded — the agent stopped before `ledger audit complete`" }];
@@ -54,36 +54,54 @@ export const TASKS = {
       const moved = movedSince(p, before.entries);
       const checks = [{ ok: true, line: `${a.mode} audit recorded${a.commit ? ` at ${shortSha(a.commit)}` : ""}: ` +
         (moved.length
-          ? `${moved.length} entr${moved.length === 1 ? "y" : "ies"} recorded (${moved.join(", ")})` +
+          ? `${moved.length} entr${moved.length === 1 ? "y" : "ies"} recorded or claimed code (${moved.join(", ")})` +
             (inPlace ? `, ${inPlace} of them already in place before the last cut` : "")
           : "nothing was missing from the ledger") }];
-      if (a.unconfirmed_reasons) {
-        checks.push({ ok: true, line: `${a.unconfirmed_reasons} reason${a.unconfirmed_reasons === 1 ? "" : "s"} taken from commit ` +
-          "messages, waiting for you to confirm — `ledger status` lists them, `ledger audit confirm <id>` vouches for one" });
+      const asked = p.questions.length - before.questions;
+      if (asked > 0) {
+        checks.push({ ok: true, line: `${asked} reason${asked === 1 ? "" : "s"} read off commit messages, waiting for you — ` +
+          "`ledger questions` lists them" });
       }
       return checks;
     },
   },
-  summary: {
-    label: "summary",
-    brief: async (flags) => (await import("./commands/summary.mjs")).cmdSummary({ flags, positional: [] }),
+  compose: {
+    label: "composition",
+    brief: async (flags) => (await import("./commands/compose.mjs")).cmdCompose({ flags, positional: [] }),
     snapshot: () => ({}),
     async verify(p) {
-      const { summaryReport, summaryLine } = await import("./summary.mjs");
-      const r = summaryReport(p);
-      return [{ ok: r.ok, line: summaryLine(r) }];
+      const { composeReport, composeLine } = await import("./compose.mjs");
+      const r = composeReport(p);
+      return [{ ok: r.ok, line: composeLine(r) }];
     },
   },
-  review: {
-    label: "review",
-    brief: async (flags) => (await import("./commands/review.mjs")).cmdReview({ flags, positional: [] }),
+  verify: {
+    label: "check against the code",
+    brief: async (flags) => (await import("./commands/verify.mjs")).cmdVerify({ flags, positional: [] }),
+    snapshot: (p) => ({ questions: p.questions.length }),
+    async verify(p, before) {
+      const { verifyFingerprint } = await import("./compose.mjs");
+      const version = p.releases.current.version;
+      const v = p.compositionOf(version)?.verified;
+      const found = p.questions.length - before.questions;
+      return [v && v.fingerprint === verifyFingerprint(p, version)
+        ? { ok: true, line: `v${version} is verified${found > 0 ? `, with ${found} finding${found === 1 ? "" : "s"} for you (\`ledger questions\`)` : ", nothing found"}` }
+        : { ok: false, line: "the check wasn't recorded — the agent stopped before `ledger verify complete`" }];
+    },
+  },
+  "paths brief": {
+    label: "ownership survey",
+    brief: async (flags) => (await import("./commands/paths.mjs")).cmdPaths({ flags, positional: ["brief"] }),
     snapshot: () => ({}),
     async verify(p) {
-      const { unreviewedReport, unreviewedLine } = await import("./commands/review.mjs");
-      const r = unreviewedReport(p);
-      return [r.ok
-        ? { ok: true, line: `v${p.releases.current.version} is reviewed` }
-        : { ok: false, line: unreviewedLine(r) }];
+      const { coverage } = await import("./commands/paths.mjs");
+      const cov = coverage(p);
+      if (!cov) return [{ ok: false, line: "no git repository, so ownership can't be checked" }];
+      const lines = [cov.unowned.length
+        ? { ok: false, line: `${cov.unowned.length} product file${cov.unowned.length === 1 ? " is" : "s are"} still owned by no entry — \`ledger paths\`` }
+        : { ok: true, line: `every one of ${cov.product.length} product files is owned by an entry` }];
+      if (cov.dead.length) lines.push({ ok: false, line: `${cov.dead.length} entr${cov.dead.length === 1 ? "y has" : "ies have"} a glob that matches no file` });
+      return lines;
     },
   },
   "redraft check": {
@@ -115,15 +133,15 @@ const movedSince = (p, before) => p.featureSet.features()
 
 /** The task a command line names, or null when it doesn't print a prompt. */
 export function taskFor(command, sub) {
-  if (TASKS[command] && ["bootstrap", "audit", "summary", "review"].includes(command) &&
+  if (TASKS[command] && ["bootstrap", "audit", "compose", "verify"].includes(command) &&
       (sub === undefined || sub === "brief")) return command;
   const key = `${command} ${sub}`;
   return TASKS[key] ? key : null;
 }
 
 /** Every command line that prints a prompt, for messages that list them. */
-export const PROMPT_COMMANDS = ["ledger bootstrap", "ledger audit", "ledger summary", "ledger review", "ledger redraft check",
-  "ledger style rewrite"];
+export const PROMPT_COMMANDS = ["ledger bootstrap", "ledger audit", "ledger compose", "ledger verify", "ledger redraft check",
+  "ledger style rewrite", "ledger paths brief"];
 
 /**
  * Runs a brief with stdout held back, and splits what it printed at the rule.

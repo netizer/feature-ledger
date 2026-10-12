@@ -4,12 +4,12 @@
   "category": "Warehouse Console",
   "subcategory": "picking-day",
   "size": "Medium",
+  "paths": [],
   "history": [
     {
       "version": 2,
       "name": "Hand a run to someone else",
-      "description": "A part-finished run moves to another picker with everything already collected still ticked off, so a shift change costs nothing.",
-      "changes": null
+      "description": "A part-finished run moves to another picker with everything already collected still ticked off, so a shift change costs nothing."
     }
   ]
 }

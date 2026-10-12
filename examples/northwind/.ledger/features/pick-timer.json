@@ -4,12 +4,12 @@
   "category": "Warehouse Console",
   "subcategory": "picking-day",
   "size": "Small",
+  "paths": [],
   "history": [
     {
       "version": 2,
       "name": "Running clock against the van",
-      "description": "Each run shows the time left before its van is due out, counting down against the real departure rather than a target duration.",
-      "changes": null
+      "description": "Each run shows the time left before its van is due out, counting down against the real departure rather than a target duration."
     }
   ]
 }

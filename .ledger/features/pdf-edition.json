@@ -3,32 +3,54 @@
   "audience": "user",
   "category": "The documents it produces",
   "size": "Big",
+  "paths": [
+    "src/commands/build.mjs",
+    "src/render/ledger-html.mjs",
+    "src/render/pdf.mjs",
+    "src/render/fonts.mjs",
+    "assets/fonts/**",
+    "src/wording.mjs"
+  ],
+  "dev_notes": "src/render/ledger-html.mjs builds the document, src/render/pdf.mjs drives Chromium via playwright-core (channel chrome, msedge, chromium, or $LEDGER_CHROME). editionFile() and printEdition() in src/commands/build.mjs decide where a file goes: a released version goes to output.client_dir under pdf_name, the future one to output.dir with -draft appended; `ledger cut` and `ledger build` share them. `ledger build [v3|all|draft]` picks editions (`--version N` still works), `--html` writes the page instead of printing it. Contents entries are plain <a href=\"#id\"> anchors onto ids on the area heads (area-N) and the closing sections (closing-*); Chromium turns those into named destinations in the PDF. Fonts are static instances, not variable ones, or Chromium emits Type 3 glyphs that copy out shredded; after rendering, pdf.mjs asks Chromium (CSS.getPlatformFontsForNode) which font drew each element's text and fails the build if any is a system font; Noto Sans Symbols 2 is embedded last in both stacks for quoted UI icons. Before printing, releaseOversizedBlocks() in pdf.mjs lays the page out at Letter size and lifts break-inside: avoid from any block taller than a page, because Chromium otherwise pushes such a block to a fresh page and splits it there anyway, leaving a heading alone on an empty page; .cat-head, .sub-head and .feature .name keep break-after: avoid so a heading still travels with the first lines below it. The printed number comes from ReleaseSet.labelOf, which carries the nearest earlier display_version forward; it reaches the cover, footer, colophon, title, redraft note and pdf_name, and nothing else.",
   "history": [
     {
       "version": 1,
       "name": "The printed edition for the client",
-      "description": "The command ledger build prints a PDF of one release: a front page carrying the masthead, the feature count, a bar breaking those features down by size, and a note of what changed since the last edition, then every entry in reading order. The document is real HTML and CSS, printed through the Chrome or Edge already on the machine, with the two fonts embedded so text copies cleanly out of the finished file. Any edition can be reprinted at any time, and it reproduces exactly what was presented that day.",
-      "changes": null,
-      "dev_notes": "src/render/ledger-html.mjs builds the document, src/render/pdf.mjs drives Chromium via playwright-core (channel chrome, msedge, chromium, or $LEDGER_CHROME). Fonts are static instances, not variable ones, or Chromium emits Type 3 glyphs that copy out shredded; After rendering, pdf.mjs asks Chromium (CSS.getPlatformFontsForNode) which font drew each element's text and fails the build if any is a system font; Noto Sans Symbols 2 is embedded last in both stacks for quoted UI icons. `--version N|all` picks the edition, `--html` writes the page instead of printing it."
+      "description": "The command ledger build prints a PDF of one release: a front page carrying the masthead, the feature count, a bar breaking those features down by size, and a note of what changed since the last edition, then every entry in reading order. The document is real HTML and CSS, printed through the Chrome or Edge already on the machine, with the two fonts embedded so text copies cleanly out of the finished file. Any edition can be reprinted at any time, and it reproduces exactly what was presented that day."
     },
     {
       "version": 2,
-      "description": "Each edition is a PDF: a front page carrying the masthead, the feature count, a bar breaking those features down by size, and a note of what changed since the last edition, then a contents list that links into the document, then every entry in reading order. ledger cut prints it into the client folder; ledger preview prints the open release as a draft, named with -draft and kept in the gitignored docs folder, so a draft is never mistaken for an edition. ledger build prints every cut edition that isn't on disk yet, and ledger build v3 reprints one with its entries as they stood that day, in their current wording. The fonts are embedded, so text copies cleanly out of the finished file, and display_version on a release in releases.json sets the number its edition prints.",
-      "changes": [
-        "The contents list was a printed index: it named each area and how many features were in it, but reaching a section meant scrolling for it. Every line is now a link to the section it names, and the closing sections on what was withdrawn and what else changed are listed there too, because the edition is usually read on screen rather than on paper.",
-        "Every edition printed the ledger's own version number, starting from 1, so a project whose client already held reports sent another way before the ledger started handed them a second Version 1. A release can now set the number its edition prints, and later editions carry on from it; the ledger's own numbering is unchanged.",
-        "ledger build printed one PDF: the newest edition, or the open release as a draft once it had work in it, under the same file name and in the same folder the cut edition would use. A draft could be mistaken for the edition the client was handed. A draft is now named with -draft and kept out of the client folder, only ledger cut writes into it, and ledger build also prints any cut edition that isn't on disk."
-      ],
-      "dev_notes": "src/render/ledger-html.mjs builds the document, src/render/pdf.mjs drives Chromium via playwright-core (channel chrome, msedge, chromium, or $LEDGER_CHROME). editionFile() and printEdition() in src/commands/build.mjs decide where a file goes: a released version goes to output.client_dir under pdf_name, the future one to output.dir with -draft appended; `ledger cut` and `ledger build` share them. `ledger build [v3|all|draft]` picks editions (`--version N` still works), `--html` writes the page instead of printing it. Contents entries are plain <a href=\"#id\"> anchors onto ids on the area heads (area-N) and the closing sections (closing-*); Chromium turns those into named destinations in the PDF. Fonts are static instances, not variable ones, or Chromium emits Type 3 glyphs that copy out shredded; after rendering, pdf.mjs asks Chromium (CSS.getPlatformFontsForNode) which font drew each element's text and fails the build if any is a system font; Noto Sans Symbols 2 is embedded last in both stacks for quoted UI icons. Before printing, releaseOversizedBlocks() in pdf.mjs lays the page out at Letter size and lifts break-inside: avoid from any block taller than a page, because Chromium otherwise pushes such a block to a fresh page and splits it there anyway, leaving a heading alone on an empty page; .cat-head, .sub-head and .feature .name keep break-after: avoid so a heading still travels with the first lines below it. The printed number comes from ReleaseSet.labelOf, which carries the nearest earlier display_version forward; it reaches the cover, footer, colophon, title, redraft note and pdf_name, and nothing else."
+      "description": "Each edition is a PDF: a front page carrying the masthead, the feature count, a bar breaking those features down by size, and a note of what changed since the last edition, then a contents list that links into the document, then every entry in reading order. ledger cut prints it into the client folder; ledger preview prints the open release as a draft, named with -draft and kept in the gitignored docs folder, so a draft is never mistaken for an edition. ledger build prints every cut edition that isn't on disk yet, and ledger build v3 reprints one with its entries as they stood that day, in their current wording. The fonts are embedded, so text copies cleanly out of the finished file, and display_version on a release in releases.json sets the number its edition prints."
     },
     {
       "version": 3,
-      "description": "Each edition is a PDF: a front page carrying the masthead, the feature count, a bar breaking those features down by size, and a note of what changed since the last edition, then short lists of what's new and what changed, then a contents list that links into the document, then every entry in reading order. ledger cut prints it into the client folder; ledger preview prints the open release as a draft, named with -draft and kept in the gitignored docs folder, so a draft is never mistaken for an edition. With --run, a coding agent first brings the draft's summary up to date. ledger build prints every cut edition that isn't on disk yet, and ledger build v3 reprints one with its entries as they stood that day, in their current wording. The fonts are embedded, so text copies cleanly out of the finished file, and display_version on a release in releases.json sets the number its edition prints.",
-      "changes": [
-        "The front page led straight into the contents list, so the changes were only visible as stripes spread through the whole document. A summary page now sits between the two; see “Summary of changes”.",
-        "ledger preview takes --run, which hands an out-of-date summary to a coding agent before printing, and nothing else: a preview is for checking the release day to day, and an audit or a review costs a read of the code or of the whole release. See “Summary of changes”."
-      ],
-      "dev_notes": "src/render/ledger-html.mjs builds the document, src/render/pdf.mjs drives Chromium via playwright-core (channel chrome, msedge, chromium, or $LEDGER_CHROME). editionFile() and printEdition() in src/commands/build.mjs decide where a file goes: a released version goes to output.client_dir under pdf_name, the future one to output.dir with -draft appended; `ledger cut` and `ledger build` share them. `ledger build [v3|all|draft]` picks editions (`--version N` still works), `--html` writes the page instead of printing it. Contents entries are plain <a href=\"#id\"> anchors onto ids on the area heads (area-N) and the closing sections (closing-*); Chromium turns those into named destinations in the PDF. Fonts are static instances, not variable ones, or Chromium emits Type 3 glyphs that copy out shredded; after rendering, pdf.mjs asks Chromium (CSS.getPlatformFontsForNode) which font drew each element's text and fails the build if any is a system font; Noto Sans Symbols 2 is embedded last in both stacks for quoted UI icons. Before printing, releaseOversizedBlocks() in pdf.mjs lays the page out at Letter size and lifts break-inside: avoid from any block taller than a page, because Chromium otherwise pushes such a block to a fresh page and splits it there anyway, leaving a heading alone on an empty page; .cat-head, .sub-head and .feature .name keep break-after: avoid so a heading still travels with the first lines below it. The printed number comes from ReleaseSet.labelOf, which carries the nearest earlier display_version forward; it reaches the cover, footer, colophon, title, redraft note and pdf_name, and nothing else."
+      "description": "Each edition is a PDF: a front page with the masthead, the feature count and a note of what changed since the last edition, then short lists of what's new and what changed, a contents list that links into the document, and every entry in reading order. ledger cut prints it into the client folder. ledger preview prints the open release as a draft, kept apart and named so it can't be mistaken for an edition, and opens with the size of the release; with --run, a coding agent first composes what changed. Any edition can be reprinted with its entries as they stood that day."
+    }
+  ],
+  "events": [
+    {
+      "version": 3,
+      "kind": "change",
+      "what": "The front page led straight into the contents list, so the changes were only visible as stripes spread through the whole document. A summary page now sits between the two; see “Summary of changes”.",
+      "why": null,
+      "why_from": "person",
+      "combined": true
+    },
+    {
+      "version": 3,
+      "kind": "change",
+      "what": "ledger preview takes --run, which hands an out-of-date summary to a coding agent before printing, and nothing else: a preview is for checking the release day to day, and an audit or a review costs a read of the code or of the whole release. See “Summary of changes”.",
+      "why": null,
+      "why_from": "person",
+      "combined": true
+    },
+    {
+      "version": 3,
+      "kind": "change",
+      "what": "ledger preview opens with the size of the release and what moved since the last look, and a draft prints the recorded changes, marked as such, until they are composed.",
+      "why": "A preview is how the size of the latest changes gets checked, and that shouldn't need a PDF or an agent. A draft with no notes at all hid the very changes it was printed to show.",
+      "why_from": "person",
+      "date": "2026-10-12"
     }
   ]
 }

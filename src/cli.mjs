@@ -11,8 +11,12 @@ import * as build from "./commands/build.mjs";
 import * as status from "./commands/status.mjs";
 import * as style from "./commands/style.mjs";
 import * as audit from "./commands/audit.mjs";
-import * as review from "./commands/review.mjs";
-import * as summary from "./commands/summary.mjs";
+import * as compose from "./commands/compose.mjs";
+import * as verify from "./commands/verify.mjs";
+import * as questions from "./commands/questions.mjs";
+import * as diff from "./commands/diff.mjs";
+import * as paths from "./commands/paths.mjs";
+import * as migrate from "./commands/migrate.mjs";
 import * as redraft from "./commands/redraft.mjs";
 
 const COMMANDS = {
@@ -22,13 +26,18 @@ const COMMANDS = {
   list: read.cmdList,
   show: read.cmdShow,
   status: status.cmdStatus,
+  diff: diff.cmdDiff,
+  paths: paths.cmdPaths,
+  questions: questions.cmdQuestions,
   rules: read.cmdRules,
   style: style.cmdStyle,
   export: read.cmdExport,
 
   add: write.cmdAdd,
+  change: write.cmdChange,
   update: write.cmdUpdate,
   remove: write.cmdRemove,
+  own: write.cmdOwn,
   note: write.cmdOtherChange,
   categories: write.cmdCategories,
   subcategories: write.cmdSubcategory,
@@ -36,9 +45,10 @@ const COMMANDS = {
   cut: release.cmdCut,
   releases: release.cmdReleases,
   audit: audit.cmdAudit,
-  review: review.cmdReview,
-  summary: summary.cmdSummary,
+  compose: compose.cmdCompose,
+  verify: verify.cmdVerify,
   redraft: redraft.cmdRedraft,
+  migrate: migrate.cmdMigrate,
 
   build: build.cmdBuild,
   preview: build.cmdPreview,
@@ -54,7 +64,8 @@ const COMMANDS = {
  * `release cut` became `cut` because cutting is the verb people reach for,
  * and the nesting only ever made them type it twice. `other-change` became
  * `note` because that is what it records. `subcategory` became
- * `subcategories` to match `categories`.
+ * `subcategories` to match `categories`. `summary` became `compose`, which
+ * writes the summary and the "What changed" notes together.
  */
 const ALIASES = [
   { from: ["release", "cut"], to: ["cut"] },
@@ -63,6 +74,7 @@ const ALIASES = [
   { from: ["release"], to: ["releases"] },
   { from: ["other-change"], to: ["note"] },
   { from: ["subcategory"], to: ["subcategories"] },
+  { from: ["summary"], to: ["compose"] },
 ];
 
 /** Commands that used to exist. `check` (is the corpus sound?), `doctor` (is
@@ -86,17 +98,23 @@ const RETIRED = {
 release and nothing is tagged, which was the whole point of the command. Run \`ledger status\`
 afterwards — it validates every file. Sub-section headings live in subcategories.json, and document
 titles in config.json. \`ledger rules\` has the section on editing by hand.`,
+  review: `two steps now, and neither edits what a person wrote:
+  \`ledger compose\`  writes the "What changed" notes and the summary for the whole release at
+                    once, from what the client's last edition said, what it says now, and
+                    what was recorded between — so there are no mid-cycle drafts to repair.
+  \`ledger verify\`   checks what the edition says against the code, and files what it doubts
+                    as questions (\`ledger questions\`). Opt in with "checks": { "verify": true }.`,
   rename: `two different things, and the one command never told them apart:
   the name was badly chosen      → edit "name" in .ledger/features/<id>.json. A wording fix;
                                    nothing is recorded and no reader is told anything moved.
-  the product renamed the thing  → \`ledger update <id> --name "New name" --description "…" --change "…"\`
+  the product renamed the thing  → \`ledger change <id> --name "New name" --what "…" --why "…"\`
                                    The client is told, on this release, with the reason. Every
                                    document footnotes the old name on its own, as it always did.`,
 };
 
-const DELIVERY_HELP = `  Delivering a prompt (bootstrap, audit, summary, review, redraft check, style rewrite)
+const DELIVERY_HELP = `  Delivering a prompt (bootstrap, audit, compose, verify, paths brief, redraft check, style rewrite)
     (default)        an explanation for you, then the prompt to paste into a fresh agent session
-    --print          the prompt alone, ready to pipe: \`ledger review --print | pbcopy\`
+    --print          the prompt alone, ready to pipe: \`ledger compose --print | pbcopy\`
     --copy           the prompt, straight onto the clipboard
     --run AGENT      hand it to ${Object.keys(AGENTS).join(", ")} — or to "any command" that reads the prompt on
                      stdin — wait, check what it recorded, and print how to resume its session.
@@ -108,37 +126,47 @@ const HELP = `ledger — a client-facing record of what your product does, kept 
   Where you are
     ledger                              what's open, whether it's ready to cut, the next command
     ledger status [--json] [--quiet]    the release, the corpus and the setup, all checked
+    ledger diff [--since vN|last] [--full] [--json]
+                                        the size of the open release: entries by kind and size,
+                                        and the code that moved under each, from the ledger and git
+    ledger questions [--all]            what only you can answer: reasons nobody vouched for,
+                                        and what a check doubted
+    ledger questions answer <n> "..." | accept <n> | dismiss <n> | add <id> "..."
 
   Reading (cheap; don't read .ledger/ by hand — it's big)
     ledger list [--category C] [--audience user|dev] [--size S] [--changed] [--json]
-    ledger show <id> [--history] [--json]
+    ledger show <id> [--history | --at vN | --diff] [--json]
+    ledger paths [--unowned] [--json]   which code each entry lives in, and what no entry owns
     ledger rules                        the authoring rules, in full
     ledger style [show|list|set <id>]   the tone every entry is written in
     ledger export [--out FILE]          the whole corpus as one JSON document
 
   Recording (payload as JSON on stdin, or --file f.json; add --dry-run to preview)
-    ledger add <id>                     { audience, size, name, description, category?, dev_notes? }
-    ledger update <id>                  { description, changes[], name?, size?, dev_notes?, add_changes[]? }
-                                        (--name here is a rename the client is told about)
-    ledger remove <id> --reason "..."
+    ledger add <id>                     { audience, size, name, description, paths[], category?, dev_notes? }
+    ledger change <id>                  { what, why, description?, name? }   something about it moved
+                                        --why-from commit   the reason was read off a commit message
+                                        --why-unknown       nobody can say; asked as a question
+                                        (size, category, paths, dev_notes alone record nothing)
+    ledger remove <id> --why "..."
     ledger note --audience user --description "..."
                                         a change that belongs to no single feature
+    ledger own <id> <glob...> [--remove]   which code an entry lives in
+    ledger own --ignore <glob...>       files that aren't product code: tests, fixtures, CI
     ledger categories [list | add "Name" [--after "Other"] | rename "Old" "New" | remove "Name"]
     ledger subcategories [list | add]   { id, category, name, intro }
-    ledger add/update/remove --backfilled            the product didn't move this cycle,
+    ledger add/change/remove --backfilled            the product didn't move this cycle,
                                                      the record did — see \`ledger audit\`
 
   Releasing
+    ledger preview [--size] [--open] [--run AGENT]
+                                        the size readout, then the open release as a draft PDF.
+                                        --run composes first, only if anything moved since
     ledger cut --name "..." [--date YYYY-MM-DD] [--commit SHA] [--skip CHECKS] [--no-pdf] [--run AGENT]
-                                        runs every check, prints the edition into the client
-                                        directory, and opens the next release. A refusal lists
-                                        every open check; --skip audit,review passes named ones.
-                                        --run hands an open audit, summary or review to an
-                                        agent first, then asks before cutting (--yes doesn't ask)
-    ledger preview [--open] [--run AGENT]
-                                        the open release as a draft PDF, never in the client directory.
-                                        --run has an agent write the summary first, if it's out of date
-    ledger build [v3 | all | draft] [--md] [--pdf] [--out DIR] [--html]
+                                        runs every check, asks the open questions, prints the
+                                        edition into the client directory, and opens the next
+                                        release. --run hands an open audit, composition or verify
+                                        to an agent first, then asks before cutting (--yes doesn't)
+    ledger build [v3 | all | draft] [--md] [--pdf] [--out DIR] [--html] [--run AGENT]
                                         the Markdown docs, every cut edition not yet printed, and
                                         the draft of the open release; or just the one named
     ledger releases                     the timeline: every version, its date and its commit
@@ -147,15 +175,19 @@ const HELP = `ledger — a client-facing record of what your product does, kept 
 
   Agent tasks (each prints a prompt for a coding agent; delivery options below)
     ledger bootstrap [--no-audit]       survey the codebase and write the baseline
-    ledger audit [--full] [--since SHA] find what shipped without the ledger hearing about it
+    ledger audit [--full] [--since SHA] find what shipped without the ledger hearing about it:
+                                        code that moved under an entry that didn't, and code
+                                        no entry owns, with the diffs
     ledger audit complete [--commit SHA]    stamp the audited commit (default: HEAD)
-    ledger audit confirm <id>           vouch for a reason an audit inferred
     ledger audit log [--json]           every audit so far
-    ledger summary                      write the short lists of what's new and what changed that
-                                        the edition opens with, from what the ledger already says
-    ledger summary complete             check the summary accounts for every entry, and stamp it
-    ledger review                       read the release as the client will, before the cut
-    ledger review complete              stamp what was reviewed
+    ledger compose                      write the "What changed" notes and the summary the
+                                        edition opens with, from the last edition, now, and
+                                        what was recorded between. Reads no code
+    ledger compose complete             check it accounts for every entry, and stamp it
+    ledger verify                       check what the edition says against the code; files
+                                        what it doubts as questions. Opt-in for the cut
+    ledger verify complete              stamp what was checked
+    ledger paths brief                  say which code every entry lives in
     ledger style rewrite                bring every entry into the project's tone
 
   Redrafting (writing the corpus again from scratch, keeping the client's record)
@@ -167,13 +199,16 @@ const HELP = `ledger — a client-facing record of what your product does, kept 
   Setup
     ledger init [--product "Name"] [--accent "#hex"] [--logo path] [--agents auto|none|claude,agents,...]
                 [--style google|govuk|plain-language|ste] [--commit-pdfs]
+    ledger migrate [--run AGENT]        bring a ledger written by an earlier version over; --run
+                                        then has an agent say which code each entry lives in
     ledger completion zsh|bash|fish     shell completion; the script says how to load it
 
   Editing the words (no command — the corpus is yours to edit)
-    .ledger/features/<id>.json          a name, a description, dev notes, the text of a change
-                                        bullet. Edit in place, then run \`ledger status\`.
+    .ledger/features/<id>.json          a name, a description, dev notes. Edit in place, then
+                                        run \`ledger status\`.
+    .ledger/compositions.json           a "What changed" note, a summary item
     .ledger/subcategories.json          sub-section headings and their overviews
-    .ledger/config.json                 product name, tagline, document titles
+    .ledger/config.json                 product name, tagline, document titles, ignore
     .ledger/other-changes.json          the product-wide notes
 
 ${DELIVERY_HELP}
@@ -199,18 +234,25 @@ const DELIVERY_FLAGS = ["print", "prompt-only", "copy", "run"];
 const FLAGS = {
   init: ["root", "product", "tagline", "prepared-for", "logo", "accent", "agents", "style", "commit-pdfs", "force", "gitignore"],
   bootstrap: ["audit"],
+  migrate: ["run", "yes", "dry-run"],
 
   list: ["category", "audience", "size", "changed", "json"],
-  show: ["history", "json"],
+  show: ["history", "at", "diff", "json"],
   status: ["json", "quiet"],
+  diff: ["since", "full", "json"],
+  paths: { default: "list", list: ["unowned", "json"], brief: [] },
+  questions: { default: "list", list: ["all", "json"], answer: ["dry-run"], accept: ["dry-run"], dismiss: ["dry-run"], add: ["dry-run"] },
   rules: [],
   style: { default: "show", show: ["json"], list: ["json"], set: [], rewrite: [] },
   export: ["out"],
 
-  add: ["file", "audience", "category", "subcategory", "size", "name", "description", "dev-notes", "backfilled", "dry-run"],
-  update: ["file", "description", "change", "add-change", "name", "size", "category", "subcategory", "dev-notes",
+  add: ["file", "audience", "category", "subcategory", "size", "name", "description", "dev-notes", "paths", "backfilled", "dry-run"],
+  change: ["file", "what", "why", "why-from", "why-unknown", "description", "name", "size", "category", "subcategory",
+    "dev-notes", "paths", "backfilled", "dry-run"],
+  update: ["file", "description", "change", "add-change", "name", "size", "category", "subcategory", "dev-notes", "paths",
     "backfilled", "reason-inferred", "dry-run"],
-  remove: ["reason", "backfilled", "reason-inferred", "dry-run"],
+  remove: ["why", "why-from", "reason", "backfilled", "reason-inferred", "dry-run"],
+  own: ["ignore", "remove", "clear", "dry-run"],
   note: ["file", "audience", "description", "dry-run"],
   categories: { default: "list", list: [], add: ["after", "before", "dry-run"], rename: ["dry-run"], remove: ["dry-run"] },
   subcategories: { default: "list", list: [], add: ["file", "id", "category", "name", "intro", "dry-run"] },
@@ -219,19 +261,20 @@ const FLAGS = {
   releases: { default: "list", list: [], amend: ["commit", "force", "dry-run"] },
   audit: { default: "brief", brief: ["full", "since"], complete: ["commit", "full", "since", "dry-run"],
     confirm: ["version", "dry-run"], log: ["json"] },
-  review: { default: "brief", brief: [], complete: ["dry-run"] },
-  summary: { default: "brief", brief: [], complete: ["dry-run"] },
+  compose: { default: "brief", brief: [], complete: ["dry-run"] },
+  verify: { default: "brief", brief: [], complete: ["dry-run"] },
   redraft: { default: "status", status: [], start: ["force", "dry-run"], check: [], complete: ["note", "dry-run"] },
 
-  build: ["md", "pdf", "version", "out", "html"],
-  preview: ["out", "html", "open", "run"],
+  build: ["md", "pdf", "version", "out", "html", "run"],
+  preview: ["out", "html", "open", "run", "size"],
   completion: [],
 };
 
 const NEGATED = ["cut pdf", "bootstrap audit", "init gitignore"];
 
 const BOOLEANS = ["dry-run", "json", "history", "changed", "md", "pdf", "html", "open", "force", "quiet", "commit-pdfs",
-  "backfilled", "reason-inferred", "full", "print", "prompt-only", "copy", "yes"];
+  "backfilled", "reason-inferred", "full", "print", "prompt-only", "copy", "yes", "why-unknown", "diff", "unowned",
+  "all", "ignore", "remove", "clear"];
 
 function checkFlags(command, flags, positional) {
   const task = taskFor(command, positional[0]);
@@ -283,7 +326,7 @@ function commandHelp(name, sub) {
     if (taking) picked.push(line);
   }
   if (!picked.length) return null;
-  const prompts = taskFor(name, sub) || ["bootstrap", "audit", "summary", "review"].includes(name);
+  const prompts = taskFor(name, sub) || ["bootstrap", "audit", "compose", "verify"].includes(name);
   return `${picked.join("\n")}\n${prompts ? `\n${DELIVERY_HELP}\n` : ""}\n  Global: --dir PATH, --json where offered.\n` +
     "  `ledger --help` lists every command.\n";
 }
@@ -294,10 +337,12 @@ function commandHelp(name, sub) {
  * (`ledger amend` → `ledger releases amend`).
  */
 const SUBCOMMANDS = {
-  amend: ["releases amend"], complete: ["audit complete", "summary complete", "review complete", "redraft complete"],
-  confirm: ["audit confirm"], log: ["audit log"], start: ["redraft start"], rewrite: ["style rewrite"],
+  amend: ["releases amend"], complete: ["audit complete", "compose complete", "verify complete", "redraft complete"],
+  confirm: ["questions accept"], answer: ["questions answer"], accept: ["questions accept"], dismiss: ["questions dismiss"],
+  log: ["audit log"], start: ["redraft start"], rewrite: ["style rewrite"], brief: ["paths brief"],
   draft: ["preview", "build draft"], publish: ["cut"], release: ["cut"], print: ["build"], check: ["status"],
-  headline: ["summary"], headlines: ["summary"], highlights: ["summary"],
+  headline: ["compose"], headlines: ["compose"], highlights: ["compose"], size: ["diff", "preview --size"],
+  ignore: ["own --ignore"], owner: ["own"], owners: ["paths"], upgrade: ["migrate"],
 };
 
 function unknownCommand(word) {
@@ -424,8 +469,11 @@ function complete(words) {
   if (before.length === 1 && subs.length) return say(subs);
   if (command === "completion") return say(Object.keys(COMPLETION));
   if (command === "style" && sub === "set") return say([...Object.keys(STYLES), CUSTOM_STYLE_ID]);
-  if (["show", "update", "remove"].includes(command) || (command === "audit" && sub === "confirm")) {
+  if (["show", "change", "update", "remove", "own"].includes(command) || (command === "audit" && sub === "confirm")) {
     return say(featureIds());
+  }
+  if (command === "questions" && ["answer", "accept", "dismiss"].includes(sub)) {
+    try { return say(questions.questionIds(openProject({}))); } catch { return say([]); }
   }
   if (command === "build" && before.length === 1) {
     const versions = (() => { try { return openProject({}).releases.versions; } catch { return []; } })();

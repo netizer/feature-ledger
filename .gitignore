@@ -2,3 +2,4 @@ node_modules/
 *.tgz
 docs/generated/
 examples/*/docs/
+.ledger/.cache/

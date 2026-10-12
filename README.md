@@ -9,7 +9,8 @@ typed. Neither answers the question a client actually asks: *what does this
 software do, and what's new since last time?* The feature ledger does:
 
 - **One entry per capability** a user would name, sized so the big ones stand out.
-- **Each release highlights only what moved**, and every change says *why*.
+- **Each release highlights only what moved**, and every change says *why*, or
+  says that nobody knows: the ledger never invents a reason.
 - **A PDF edition per release**, so "what did we show them in March" always has
   an answer. [Here's what one looks like](docs/client).
 
@@ -34,7 +35,7 @@ ledger bootstrap --run claude
 
 `init` creates `.ledger/` and tells your agent about it, in `CLAUDE.md` or
 `AGENTS.md`. `bootstrap` has the agent survey the codebase, write an entry per
-capability, and print the first edition.
+capability with the code it lives in, and print the first edition.
 
 Don't want the CLI to start an agent? Leave off `--run`: the prompt is printed
 for you to paste (or add `--copy` to put it on the clipboard). `--run` also
@@ -45,47 +46,54 @@ Then read the PDF, and fix whatever doesn't sound like you. The words live in
 
 ## Day to day
 
-Mostly nothing to do: your agent records each feature as it ships it
-(`ledger add`, `ledger update`). When you want to know where things stand, run:
+Mostly nothing to do: your agent records each feature as it ships it, as two
+facts, what moved and why (`ledger add`, `ledger change`). Nobody writes the
+client's "What changed" notes as they go; those are composed once per release.
+When you want to know where things stand, or how big the release has got:
 
 ```bash
-ledger
+ledger preview --run claude
 ```
 
-It shows what the open release holds, whether it's ready to cut, and the one
-command to run next.
+It opens with the size of the release, worked out from the ledger and git:
+new and updated entries by size, how much code moved under each, and what
+moved since you last looked. Then it prints a draft PDF, having an agent compose
+what changed first, and only when something moved since it was last composed.
+`ledger preview --size` stops at the readout, and bare `ledger` shows whether
+the release is ready to cut and the one command to run next.
 
 ## Showing it to the client
-
-```bash
-ledger cut --name "Sprint 6 demo"
-```
-
-That checks the release is ready, prints `docs/client/…_6.pdf`, and opens the
-next release. If something's in the way, it says what — all of it at once — and
-what to run:
-
-```
-✗ v6 was NOT cut — 2 checks are open:
-  ✗ audit    23 commits since the last audit …     → ledger audit
-  ✗ review   v6 has not been reviewed …            → ledger review
-```
-
-`ledger audit` finds work that shipped without the ledger hearing about it.
-`ledger summary` writes the short lists of what's new and what changed that
-the edition opens with, from what the ledger already says, so a reader can see
-what moved without reading the rest.
-`ledger review` reads the release the way the client will, against the edition
-they already have. All three are agent tasks, so you can hand them over too, or let
-the cut do it:
 
 ```bash
 ledger cut --name "Sprint 6 demo" --run claude
 ```
 
-The agent runs the open checks, you read its notes, and you say yes before
-anything is printed. Want a look first? `ledger preview` prints a draft, which
-never lands next to the real editions.
+That runs whatever is still open, asks you the questions only you can answer,
+and prints `docs/client/…_6.pdf`:
+
+- **the audit**, only when code moved that the ledger hasn't accounted for:
+  code under an entry that didn't move, or code no entry owns. Each entry names
+  the code it lives in, so the agent gets those diffs and nothing else;
+- **the composition**, the "What changed" notes and the short lists the edition
+  opens with, written from what the last edition said, what the entries say now,
+  and what was recorded between. It reads no code;
+- **the verify**, if you turn it on: every sentence checked against the code,
+  with what it doubts filed as a question;
+- **the questions**: reasons nobody recorded or that were read off a commit,
+  and anything the verify doubted. The ledger never invents a reason.
+
+You say yes before anything is printed. Without `--run`, a cut that isn't
+ready says what's in the way, all of it at once, and what to run:
+
+```
+✗ v6 was NOT cut — 2 checks are open:
+  ✗ audit     since the last audit (a1b3f9c): 3 files under 1 entry changed without the entry moving …  → ledger audit
+  ✗ compose   the composition of v6 is out of date: 2 moved since (pick-list, saved-baskets)       → ledger compose
+```
+
+Upgrading from an earlier version? `ledger migrate --run claude` brings the
+ledger over, keeps every edition already handed over exactly as it printed,
+and has the agent say which code each entry lives in.
 
 ## Learn more
 
@@ -93,8 +101,8 @@ never lands next to the real editions.
   old edition.
 - **[Editing by hand](docs/editing.md)**: what's yours to change, and what stays
   with the CLI.
-- **[The checks](docs/checks.md)**: the audit, the review, and starting over
-  with a redraft.
+- **[The checks](docs/checks.md)**: the audit, composing, verifying, questions,
+  and starting over with a redraft.
 - **[Coding agents](docs/agents.md)**: `--run`, resuming sessions, wiring the
   stanza, Claude Code permissions and hooks.
 - **[The documents](docs/documents.md)**: editions and drafts, where they go,

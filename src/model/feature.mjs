@@ -1,23 +1,51 @@
 import { fail, isBlank } from "../util.mjs";
 
+/** Where a change's reason came from. `person`: whoever decided it said why.
+ *  `commit`: an agent read it off a commit message, and nobody has vouched for
+ *  it yet. `unknown`: nobody recorded one. The last two open a question (see
+ *  src/questions.mjs) until someone answers it. */
+export const WHY_FROM = ["person", "commit", "unknown"];
+
 /**
- * One feature's full version history.
+ * One feature: what it is at every version, and what happened to it.
  *
- * The core idea is in #stateAt: a version only appears in `history` when
- * something about the feature actually changed. Absent versions just mean
- * "still whatever the last entry said" — so the corpus stays a list of
- * moments that mattered rather than a full snapshot per release, and
- * "what did this look like as of version N" is always answerable.
+ * Two lists, kept apart on purpose.
+ *
+ * `history` is the feature's *state*, and is the core idea of #stateAt: a
+ * version only appears in it when something about the feature changed, and
+ * absent versions mean "still whatever the last entry said". That is what
+ * makes "what did this look like at version N" answerable, and why an old
+ * edition reprints exactly as it was.
+ *
+ * `events` are the *facts* recorded as work landed: what changed and why,
+ * with where the reason came from. They are written by whoever did the work,
+ * one `ledger change` at a time, and nobody has to phrase them for the client.
+ * The client reads a "What changed" note composed for the whole release at
+ * once (`ledger compose`), from the state the last edition showed, the state
+ * now, and the events between. Those notes live in compositions.json, and the
+ * store hands them to each feature as `bullets`, so every renderer reads them
+ * off #stateAt as it always has.
+ *
+ * `paths` are the globs the capability's code lives in (src/paths.mjs), and
+ * `dev_notes` the team's detail. Both describe the feature, not one moment in
+ * its history, so each is kept once.
  */
 export class Feature {
-  constructor(data, { file } = {}) {
+  constructor(data, { file, bullets = {}, drafts = {} } = {}) {
     this.file = file;
     this.id = data.id;
     this.audience = data.audience;
     this.category = data.category;
     this.subcategory = data.subcategory ?? null;
     this.size = data.size ?? null;
+    this.paths = data.paths ?? [];
+    this.dev_notes = data.dev_notes ?? null;
     this.history = [...(data.history ?? [])].sort((a, b) => a.version - b.version);
+    this.events = [...(data.events ?? [])];
+    // Composed "What changed" notes, by version (compositions.json), and for
+    // the open release before anything is composed, the events themselves.
+    this.bullets = bullets;
+    this.drafts = drafts;
     this.validate();
   }
 
@@ -54,13 +82,18 @@ export class Feature {
 
     const names = entries.map((h) => h.name).filter(Boolean);
     const renamedFrom = current.name && names.length > 1 ? names[names.length - 2] : null;
+    const composed = this.bullets[current.version] ?? null;
+    const draft = composed ? null : (this.drafts[current.version] ?? null);
 
     return {
       version: current.version,
       name: names[names.length - 1],
       description: current.description,
-      dev_notes: current.dev_notes ?? null,
-      changes: current.changes ?? null,
+      dev_notes: this.dev_notes,
+      changes: composed ?? draft,
+      // The events themselves, standing in for a note nobody has composed
+      // yet. Only ever on the open release, and drawn as a draft.
+      changes_draft: Boolean(draft),
       removed: false,
       // Set when this entry records something the audit found late: the
       // product did not move at this version, the record did. The renderers
@@ -79,6 +112,11 @@ export class Feature {
     return this.history.find((h) => h.version === version) ?? null;
   }
 
+  /** What happened to it at `version`, in the order it was recorded. */
+  eventsAt(version) {
+    return this.events.filter((e) => e.version === version);
+  }
+
   toJSON() {
     // One canonical key order, so a file rewritten by the CLI diffs against
     // the previous one in a line or two rather than reshuffling wholesale.
@@ -89,22 +127,30 @@ export class Feature {
     };
     if (this.subcategory) out.subcategory = this.subcategory;
     out.size = this.size;
+    out.paths = this.paths;
+    if (this.dev_notes) out.dev_notes = this.dev_notes;
     out.history = this.history.map((h) => {
       if (h.removed) {
         const r = { version: h.version, removed: true, reason: h.reason };
         if (h.backfilled) r.backfilled = true;
-        if (h.reason_inferred) r.reason_inferred = true;
         return r;
       }
       const e = { version: h.version };
       if (h.name) e.name = h.name;
       e.description = h.description;
-      e.changes = h.changes ?? null;
-      if (h.dev_notes) e.dev_notes = h.dev_notes;
       if (h.backfilled) e.backfilled = true;
-      if (h.reason_inferred) e.reason_inferred = true;
       return e;
     });
+    if (this.events.length) {
+      out.events = this.events.map((e) => {
+        const o = { version: e.version, kind: e.kind ?? "change", what: e.what, why: e.why ?? null, why_from: e.why_from };
+        if (e.combined) o.combined = true;
+        if (e.backfilled) o.backfilled = true;
+        if (e.commit) o.commit = e.commit;
+        if (e.date) o.date = e.date;
+        return o;
+      });
+    }
     return out;
   }
 
@@ -123,6 +169,10 @@ export class Feature {
         "than a capability — see `ledger rules`.",
       );
     }
+    if (!Array.isArray(this.paths) || !this.paths.every((p) => typeof p === "string" && p.trim())) {
+      fail(`feature ${this.id}: "paths" is a list of globs naming the files the capability lives in${where}`);
+    }
+    if (this.dev_notes !== null && typeof this.dev_notes !== "string") fail(`feature ${this.id}: "dev_notes" is text`);
     if (this.history.length === 0) fail(`feature ${this.id}: history is empty`);
 
     const versions = this.history.map((h) => h.version);
@@ -133,6 +183,14 @@ export class Feature {
 
     for (const h of this.history) {
       if (!Number.isInteger(h.version)) fail(`feature ${this.id}: every history entry needs an integer "version"`);
+      // Where these lived before the ledger kept events: a ledger written by
+      // an earlier version of the tool, which `ledger migrate` brings over.
+      for (const old of ["changes", "dev_notes", "reason_inferred"]) {
+        if (old in h) {
+          fail(`feature ${this.id} v${h.version}: "${old}" no longer lives in "history"${where}. ` +
+            "This ledger was written by an earlier version of feature-ledger: run `ledger migrate`.");
+        }
+      }
       // Written only by an audit, and only ever true — an explicit `false`
       // would be a third state to reason about in every renderer.
       if ("backfilled" in h && h.backfilled !== true) {
@@ -141,29 +199,23 @@ export class Feature {
           "It marks an entry an audit recorded after the fact; leave it out for ordinary work.",
         );
       }
-      // Deliberately absent from #stateAt, so no renderer can put it in front
-      // of a client: it says the reason came from an audit reading a commit
-      // message rather than from whoever made the decision, which is a note to
-      // the team. `ledger status` lists them; `ledger audit confirm` clears one.
-      if ("reason_inferred" in h && h.reason_inferred !== true) {
-        fail(
-          `feature ${this.id} v${h.version}: "reason_inferred" is either absent or true ` +
-          `(got ${JSON.stringify(h.reason_inferred)}).`,
-        );
-      }
       if (h.removed) {
         if (isBlank(h.reason)) fail(`feature ${this.id} v${h.version}: a removal needs a "reason"`);
         continue;
       }
       if (isBlank(h.description)) fail(`feature ${this.id} v${h.version}: needs a description`);
-      const changes = h.changes ?? null;
-      if (changes === null) continue;
-      const ok = Array.isArray(changes) && changes.every((c) => typeof c === "string" && c.trim() !== "");
-      if (!ok) {
-        fail(
-          `feature ${this.id} v${h.version}: "changes" must be a list of strings (one standalone bullet each), ` +
-          `not ${Array.isArray(changes) ? "a list containing something else" : typeof changes}`,
-        );
+    }
+
+    for (const e of this.events) {
+      const at = `feature ${this.id}: an event${Number.isInteger(e.version) ? ` at v${e.version}` : ""}`;
+      if (!Number.isInteger(e.version)) fail(`${at} needs an integer "version"`);
+      if (!["change", "remove"].includes(e.kind ?? "change")) fail(`${at} has kind ${JSON.stringify(e.kind)}; it is "change" or "remove"`);
+      if (isBlank(e.what)) fail(`${at} needs "what": what changed, in a sentence`);
+      if (e.why !== null && e.why !== undefined && typeof e.why !== "string") fail(`${at}: "why" is text, or null`);
+      if (!WHY_FROM.includes(e.why_from)) fail(`${at}: "why_from" is one of ${WHY_FROM.join(", ")}`);
+      if (e.why_from === "unknown" && !isBlank(e.why)) fail(`${at} says its reason is unknown, and gives one`);
+      if (e.why_from !== "unknown" && isBlank(e.why) && !e.combined) {
+        fail(`${at} has no "why". Record one, or say it isn't known (\`--why-unknown\`)`);
       }
     }
 

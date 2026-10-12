@@ -3,31 +3,42 @@
   "audience": "user",
   "category": "The documents it produces",
   "size": "Big",
+  "paths": [
+    "src/commands/release.mjs",
+    "src/model/release-set.mjs"
+  ],
+  "dev_notes": "src/commands/release.mjs: cutChecks() is the one list cut, status and bare `ledger` all show, and renderChecks() draws it. The PDF is printed before releases.json is saved, so a failed print leaves nothing cut; --no-pdf skips it. A refusal is a raw UserError with exit code 3. The commit comes from HEAD, or from --commit for a retrospective cut, verified as an ancestor of HEAD. --run hands an open audit, composition or verify to an agent through runTask() in src/prompt.mjs; at a TTY the open questions are asked through askInline() before composing and again after a verify; then it asks before cutting (--yes skips that). `--skip summary,review` map to compose and verify. `release cut|list|amend` stay as aliases in src/cli.mjs.",
   "history": [
     {
       "version": 1,
       "name": "Cutting a release",
-      "description": "The command ledger release cut gives the release in progress its name and date and opens the next one behind it, which is where everything recorded from then on lands. The release just cut becomes an edition that never changes again, and ledger release list shows the timeline with the number of entries each release covers. Cutting a release with nothing recorded against it is refused, because the edition would be identical to the one before it.",
-      "changes": null,
-      "dev_notes": "src/commands/release.mjs; the timeline is .ledger/releases.json, validated as 1..N with at most one trailing future release. --force covers a deliberate re-issue."
+      "description": "The command ledger release cut gives the release in progress its name and date and opens the next one behind it, which is where everything recorded from then on lands. The release just cut becomes an edition that never changes again, and ledger release list shows the timeline with the number of entries each release covers. Cutting a release with nothing recorded against it is refused, because the edition would be identical to the one before it."
     },
     {
       "version": 2,
-      "description": "The command ledger cut gives the open release its name and date, prints its PDF edition into the client folder, and opens the next release, where everything recorded from then on lands. Before it writes anything, it runs five checks: no redraft is waiting to be checked, no code has changed since the last audit, something is recorded, the release is reviewed, and the cut stands for a different moment from the last one. When a check is open, the cut writes nothing, lists every check with the command that fixes it, and --skip passes only the checks you name. Each cut records its commit, so two demos on one day stay two editions, and ledger releases shows the timeline with each release's commit.",
-      "changes": [
-        "A release was a name and a date, and the date was doing work it could not do: two demos in one day are ordinary, and nothing said which of the two editions a reader was holding or which state of the code it came from. Every cut now records its commit. Sharing a date is still fine, but sharing a date and a commit is refused, because the two editions would stand for the same moment; --skip moment covers a deliberate re-issue.",
-        "A release could be cut as soon as it had something recorded against it, and nothing checked that its entries read correctly as one release. A cut now needs the release reviewed first, unless it is the first edition, and it also waits for the ledger audit and for any redraft to be checked. See “Reviewing a release before it goes out”, “The ledger audit” and “Redrafting the ledger”.",
-        "Cutting was ledger release cut followed by a separate ledger build, and a refused cut printed one line about the first problem it hit. That refusal was easy to miss: the build that followed printed the open release under the file name the cut edition would have had, so it looked as though the cut had worked. The command is now ledger cut, it prints the edition itself, and a refusal says plainly that the release was not cut and lists every open check at once."
-      ],
-      "dev_notes": "src/commands/release.mjs: cutChecks() is the one list cut, status and bare `ledger` all show, and renderChecks() draws it. The PDF is printed before releases.json is saved, so a failed print leaves nothing cut; --no-pdf skips it. A refusal is a raw UserError with exit code 3. The commit comes from HEAD, or from --commit for a retrospective cut, verified as an ancestor of HEAD; it is null outside a repository, which releases.json carries as nullable. --run hands an open audit or review to an agent through runTask() in src/prompt.mjs, then asks before cutting (--yes skips the question). `release cut|list|amend` stay as aliases in src/cli.mjs and print the new name on stderr."
+      "description": "The command ledger cut gives the open release its name and date, prints its PDF edition into the client folder, and opens the next release, where everything recorded from then on lands. Before it writes anything, it runs five checks: no redraft is waiting to be checked, no code has changed since the last audit, something is recorded, the release is reviewed, and the cut stands for a different moment from the last one. When a check is open, the cut writes nothing, lists every check with the command that fixes it, and --skip passes only the checks you name. Each cut records its commit, so two demos on one day stay two editions, and ledger releases shows the timeline with each release's commit."
     },
     {
       "version": 3,
-      "description": "The command ledger cut gives the open release its name and date, prints its PDF edition into the client folder, and opens the next release, where everything recorded from then on lands. Before it writes anything, it runs six checks: no redraft is waiting to be checked, no code has changed since the last audit, something is recorded, the release's summary is up to date, the release is reviewed, and the cut stands for a different moment from the last one. When a check is open, the cut writes nothing, lists every check with the command that fixes it, and --skip passes only the checks you name. With --run, it hands an open audit, summary or review to a coding agent first. Each cut records its commit, so two demos on one day stay two editions, and ledger releases shows the timeline with each release's commit.",
-      "changes": [
-        "A cut ran five checks. It now also waits until the release's summary is written and up to date, so an edition never opens with lists that leave out or misstate what moved, and ledger cut --run hands the summary to an agent along with the audit and the review. See “Summary of changes”."
-      ],
-      "dev_notes": "src/commands/release.mjs: cutChecks() is the one list cut, status and bare `ledger` all show, and renderChecks() draws it. The PDF is printed before releases.json is saved, so a failed print leaves nothing cut; --no-pdf skips it. A refusal is a raw UserError with exit code 3. The commit comes from HEAD, or from --commit for a retrospective cut, verified as an ancestor of HEAD; it is null outside a repository, which releases.json carries as nullable. --run hands an open audit, summary or review to an agent through runTask() in src/prompt.mjs, then asks before cutting (--yes skips the question). `release cut|list|amend` stay as aliases in src/cli.mjs and print the new name on stderr."
+      "description": "The command ledger cut gives the open release its name and date, prints its PDF edition into the client folder, and opens the next release. First it runs its checks: no redraft waiting, nothing left for an audit, something recorded, the composition up to date, the edition verified when that is turned on, no question open, and a different moment from the last cut. When one is open, it writes nothing and lists them all, each with the command that fixes it. At a terminal it asks the open questions one at a time, and with --run it hands an open audit, composition or verify to a coding agent first. Each cut records its commit."
+    }
+  ],
+  "events": [
+    {
+      "version": 3,
+      "kind": "change",
+      "what": "A cut ran five checks. It now also waits until the release's summary is written and up to date, so an edition never opens with lists that leave out or misstate what moved, and ledger cut --run hands the summary to an agent along with the audit and the review. See “Summary of changes”.",
+      "why": null,
+      "why_from": "person",
+      "combined": true
+    },
+    {
+      "version": 3,
+      "kind": "change",
+      "what": "The cut checks the composition, the opt-in verify and the open questions where it checked the summary and the review, asks open questions one at a time at a terminal, and with --run hands over an audit, a composition or a verify.",
+      "why": "The summary and the review became one composition and an optional check against the code, and an agent's questions printed at the end of its run were gone with the terminal.",
+      "why_from": "person",
+      "date": "2026-10-12"
     }
   ]
 }

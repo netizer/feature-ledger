@@ -155,7 +155,7 @@ export class FeatureSet {
       }
     };
     for (const f of this.featureList) {
-      for (const h of f.history) {
+      for (const h of [...f.history, ...f.events]) {
         if (!known.has(h.version)) fail(`feature ${f.id}: version ${h.version} isn't in releases.json`);
         notArchived(`feature ${f.id}`, h.version);
       }

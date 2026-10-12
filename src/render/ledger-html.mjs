@@ -2,7 +2,7 @@ import { escapeHtml as h, longDate } from "../util.mjs";
 import { wording, redraftBody } from "../wording.mjs";
 import { resolveBrand, mastheadHtml } from "./brand.mjs";
 import { fontFaceCss, SYMBOL_FACE } from "./fonts.mjs";
-import { summaryReportFor, summaryLine } from "../summary.mjs";
+import { composeReportFor, composeLine } from "../compose.mjs";
 
 /**
  * The client-facing "feature ledger" for one specific release — an archival
@@ -272,7 +272,10 @@ class LedgerHtml {
   changesPanel(state) {
     if (!state.changes?.length) return "";
     const items = state.changes.map((c) => `<li>${h(c)}</li>`).join("");
-    return `<div class="changes"><span class="label">What changed</span><ul>${items}</ul></div>`;
+    // On a draft, before anything is composed: the changes as they were
+    // recorded, said to be that, so nobody reads them as the finished note.
+    const label = state.changes_draft ? "What changed · as recorded, not yet composed" : "What changed";
+    return `<div class="changes${state.changes_draft ? " is-draft" : ""}"><span class="label">${label}</span><ul>${items}</ul></div>`;
   }
 
   /**
@@ -310,7 +313,7 @@ class LedgerHtml {
    * so a reader can see what differs from the last edition without reading
    * the ledger for its stripes.
    *
-   * The lists are the release's summary (src/summary.mjs): each item is a
+   * The lists are the release's summary (src/compose.mjs): each item is a
    * sentence written to be read on its own, followed by numbered links to the
    * entries it sums up, in the order it names them. An entry the summary left
    * out still prints in the ledger, striped, and links to nothing here.
@@ -334,7 +337,10 @@ class LedgerHtml {
     const item = (href, text) => `<li><a href="#${h(href)}">${h(text)}</a></li>`;
     const byName = (badge) => rows.filter((r) => r.badge === badge)
       .map((r) => item(this.featureId(r.feature.id), r.state.name));
-    const written = this.project.summaryOf(this.version);
+    // A composition that only carries notes (an edition cut before summaries
+    // existed) has no lists, and prints its entries by name as it always did.
+    const composed = this.project.compositionOf(this.version);
+    const written = composed && ["new", "changed", "in_place", "quiet"].some((k) => composed[k] !== undefined) ? composed : null;
     const curated = (key) => (written?.[key] ?? []).map((it) => {
       const refs = (it.covers ?? []).filter((id) => printed.has(id))
         .map((id, n) => `<a class="ref" href="#${h(this.featureId(id))}">[${n + 1}]</a>`).join("");
@@ -352,11 +358,11 @@ class LedgerHtml {
     ].filter(([, , items]) => items.length);
     if (!groups.length) return "";
 
-    const report = this.release.future ? summaryReportFor(this.project, this.version) : null;
+    const report = this.release.future ? composeReportFor(this.project, this.version) : null;
     const draftNote = report && !report.ok
       ? `<p class="draft-note">Draft: ${h(report.missing
-        ? "no summary has been written for this edition yet, so its entries are listed by name."
-        : `${summaryLine(report).replace(/^the summary/, "this summary")}.`)}</p>`
+        ? "nothing has been composed for this edition yet, so its entries are listed by name."
+        : `${composeLine(report).replace(/^the composition/, "this summary")}.`)}</p>`
       : "";
     const intro = w.summary_intro.replaceAll("{date}", predDateLabel ? ` (${predDateLabel})` : "");
     return `<section class="summary">
@@ -779,6 +785,7 @@ const STYLES = `
   .summary a { color: inherit; text-decoration: none; }
   .summary .refs { white-space: nowrap; font-size: 8.5pt; }
   .summary a.ref { color: var(--accent-deep); font-variant-numeric: tabular-nums; margin-left: 2px; }
+  .changes.is-draft .label { font-style: italic; }
   .summary p.draft-note {
     margin: 10px 0 0; padding: 6px 10px; max-width: var(--measure); font-size: 9pt;
     background: var(--accent-pale); color: var(--accent-deep); border-radius: 3px;

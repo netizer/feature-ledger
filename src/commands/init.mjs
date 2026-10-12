@@ -5,6 +5,7 @@ import { writeJson, exists, fail, isBlank, COPY_BLOCK } from "../util.mjs";
 import { LEDGER_DIRNAME, DEFAULT_CONFIG, DEFAULT_BRAND, COMMITTED_CLIENT_DIR, pdfsAreCommitted } from "../store.mjs";
 import { resolveStyle, styleTitle, styleLine, STYLES, CUSTOM_STYLE_ID } from "../style.mjs";
 import * as git from "../git.mjs";
+import { DEFAULT_IGNORE } from "../paths.mjs";
 
 const PKG_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const asset = (name) => fs.readFileSync(path.join(PKG_ROOT, "assets", name), "utf8");
@@ -72,7 +73,7 @@ export function refreshAgents(root, config, ledgerDir) {
 }
 
 /** The one line in `.ledger/README.md` that depends on where the editions go. */
-function ledgerReadmeOutputLine(config) {
+export function ledgerReadmeOutputLine(config) {
   const dir = String(config.output.dir).replace(/\/+$/, "");
   const clientDir = String(config.output.client_dir).replace(/\/+$/, "");
   if (!pdfsAreCommitted(config)) {
@@ -119,6 +120,9 @@ export async function cmdInit({ flags }) {
     // product and would quietly become the one nobody revisits; the first
     // survey of the codebase is what decides the areas.
     categories: [],
+    // Tests, lockfiles and CI say nothing about what the product does, so
+    // they never read as code no entry owns. See src/paths.mjs.
+    ignore: DEFAULT_IGNORE,
     style: styleFlag(flags),
     output: {
       ...DEFAULT_CONFIG.output,
@@ -163,6 +167,8 @@ export async function cmdInit({ flags }) {
   if (flags.gitignore !== false) {
     const added = addGitignore(root, config.output.dir);
     if (added) out(`added ${config.output.dir}/ to .gitignore (generated docs are build output — the corpus is what's committed)`);
+    // What the last `ledger preview` saw belongs to whoever looked.
+    addGitignore(root, `${path.relative(root, ledgerDir).split(path.sep).join("/")}/.cache`);
   }
 
   out("");
@@ -172,7 +178,7 @@ export async function cmdInit({ flags }) {
   out(`  2. …the agent runs it to the end on its own: one entry per capability at v1 (areas`);
   out(`      only if the product needs them), then it cuts the baseline, which prints its edition`);
   out(`  3. read the result and edit it — the words are yours: open .ledger/features/<id>.json and`);
-  out(`      change, add to or cut anything that isn't how you'd say it to this client. \`ledger update\``);
+  out(`      change, add to or cut anything that isn't how you'd say it to this client. \`ledger change\``);
   out(`      and \`ledger remove\` for anything that actually moved, then \`ledger status\` and \`ledger preview\``);
   out("");
   out("From then on the agent records each change against the open release, and `ledger cut` mints the next edition.");

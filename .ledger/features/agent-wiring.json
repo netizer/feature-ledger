@@ -3,13 +3,30 @@
   "audience": "user",
   "category": "Setting up a ledger",
   "size": "Medium",
+  "paths": [
+    "assets/agent-pointer.md",
+    "src/commands/init.mjs"
+  ],
+  "dev_notes": "AGENT_FILES, wireAgents() and refreshAgents() in src/commands/init.mjs; the text is assets/agent-pointer.md, fenced by <!-- feature-ledger --> markers so a second run skips a file it has already written.",
   "history": [
     {
       "version": 1,
       "name": "Wiring into a coding agent",
-      "description": "Setup appends a short stanza to whichever agent instruction files the repo already has — CLAUDE.md, AGENTS.md, GEMINI.md, .cursor/rules, .github/copilot-instructions.md or .windsurfrules — and creates AGENTS.md when there are none. The stanza is a pointer rather than a copy: it names six commands, the tone the project writes in, the line between recording a change and rewording an entry, and the rule that a feature change is not finished until the ledger records it. The --agents flag chooses the files, and changing the tone rewrites the stanza in every one of them.",
-      "changes": null,
-      "dev_notes": "AGENT_FILES, wireAgents() and refreshAgents() in src/commands/init.mjs; the text is assets/agent-pointer.md, fenced by <!-- feature-ledger --> markers so a second run skips a file it has already written."
+      "description": "Setup appends a short stanza to whichever agent instruction files the repo already has — CLAUDE.md, AGENTS.md, GEMINI.md, .cursor/rules, .github/copilot-instructions.md or .windsurfrules — and creates AGENTS.md when there are none. The stanza is a pointer rather than a copy: it names six commands, the tone the project writes in, the line between recording a change and rewording an entry, and the rule that a feature change is not finished until the ledger records it. The --agents flag chooses the files, and changing the tone rewrites the stanza in every one of them."
+    },
+    {
+      "version": 3,
+      "description": "Setup appends a short stanza to whichever agent instruction files the repo already has, CLAUDE.md, AGENTS.md, GEMINI.md, .cursor/rules, .github/copilot-instructions.md or .windsurfrules, and creates AGENTS.md when there are none. The stanza is a pointer rather than a copy: the commands, the tone, the line between recording a change and rewording an entry, and the rule that a feature change isn't finished until the ledger records it."
+    }
+  ],
+  "events": [
+    {
+      "version": 3,
+      "kind": "change",
+      "what": "The stanza tells an agent to record a change as what and why, to name the code a new feature lives in, and to leave a reason it doesn't know as a question.",
+      "why": "That is how a change is recorded now, and the stanza is often all an agent reads before it records one.",
+      "why_from": "person",
+      "date": "2026-10-12"
     }
   ]
 }

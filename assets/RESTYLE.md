@@ -31,18 +31,21 @@ change:
   "audience": "user",
   "category": "…",
   "size": "Medium",
+  "paths": ["…"],
+  "dev_notes": "…",
   "history": [
     { "version": 1,
       "name": "The same name, in the new tone",
-      "description": "The same feature, said in the new tone.",
-      "changes": null,
-      "dev_notes": "…" }
+      "description": "The same feature, said in the new tone." }
   ]
 }
 ```
 
-Change `name`, `description`, `dev_notes` and the text of any `changes`
-bullet, on whichever `history` entry carries them. Nothing else. There is no
+Change `name` and `description`, on whichever `history` entry carries them,
+and `dev_notes`. The "What changed" notes and summary items an edition prints
+live in `.ledger/compositions.json`, under each release's `changes`, `new`,
+`changed` and `in_place`: rewrite their text there the same way. Nothing else
+— not `events`, which are facts somebody recorded, not prose. There is no
 command for this and there should not be: nothing is being recorded, because
 the product did not move — so no release collects anything and nothing is
 marked as changed. A sub-section's heading and overview are the `name` and
@@ -57,10 +60,10 @@ is true of the product, and a rewrite that makes a description clearer at the
 cost of making it slightly wrong is worse than the sentence it replaced. If a
 description says something you cannot verify, keep it as it is and tell me.
 
-Nor the structure. Do not add or remove a `history` entry, do not touch a
-`version`, and do not add or remove a `changes` bullet — every one of those
-says the product moved, and it did not. You are rewriting the words that are
-already there.
+Nor the structure. Do not add or remove a `history` entry or an event, do not
+touch a `version`, and do not add or remove a "What changed" bullet — every one
+of those says the product moved, and it did not. You are rewriting the words
+that are already there.
 
 **The names carry the document.** Most readers go down the contents list and
 stop there, so a retone is the moment to fix a name that was never really a
@@ -77,7 +80,7 @@ ledger*), not a question (*What moved since the last edition* → *New and
 changed highlighting*). Two to six words is usual.
 
 This is still only the words. If the *product* renamed something, that is a
-change the client is told about (`ledger update <id> --name "…"` with a reason)
+change the client is told about (`ledger change <id> --name "…"` with what and why)
 and it is not part of a retone — tell me instead.
 
 **Work in this order.**
@@ -90,7 +93,7 @@ and it is not part of a retone — tell me instead.
    than by opening the corpus: the whole of `.ledger/` is far more than you
    need in context at once.
 4. Rewrite each entry's name, description, and any dev notes and change
-   bullets, editing `.ledger/features/<id>.json` in place. Do the names first
+   notes, editing `.ledger/features/<id>.json` and `.ledger/compositions.json` in place. Do the names first
    and hold them to the test above — they are the part of the area a reader is
    most likely to be left with.
 5. Run `ledger status` — it revalidates every file you touched — then stop and
@@ -104,5 +107,5 @@ description in `.ledger/config.json`, if it has one.
 **Then check your own work.** `ledger status` should be clean, and its release
 section should show the same contents it showed before you started. If a
 feature has appeared as new or changed, something was recorded that should
-only have been reworded — a `ledger update`, or a `history` entry that grew a
+only have been reworded — a `ledger change`, or a `history` entry that grew a
 version — and that needs undoing.

@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { openProject } from "../store.mjs";
 import { fail, exists, writeJson } from "../util.mjs";
 import { resolveStyle, styleSection } from "../style.mjs";
+import { eventLine } from "../diff.mjs";
 
 const PKG_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const out = (s) => process.stdout.write(`${s}\n`);
@@ -67,10 +68,15 @@ export async function cmdList({ flags }) {
 
 export async function cmdShow({ flags, positional }) {
   const id = positional[0];
-  if (!id) fail("usage: ledger show <id> [--history]");
+  if (!id) fail("usage: ledger show <id> [--history | --at vN | --diff]");
   const project = openProject(flags);
   const f = project.featureSet.find(id);
-  const target = project.releases.latestVersion;
+  let target = project.releases.latestVersion;
+  if (flags.at !== undefined && flags.at !== true) {
+    const m = /^v?(\d+)$/.exec(String(flags.at));
+    if (!m || !project.releases.versions.includes(Number(m[1]))) fail(`--at names a version: ${project.releases.versions.map((v) => `v${v}`).join(", ")}`);
+    target = Number(m[1]);
+  }
   const state = f.stateAt(target);
 
   if (flags.json) {
@@ -79,21 +85,44 @@ export async function cmdShow({ flags, positional }) {
   }
 
   out(`${f.id}  ·  ${f.audience}  ·  ${f.category}${f.subcategory ? ` / ${f.subcategory}` : ""}  ·  ${f.size ?? "unsized"}`);
-  if (state?.removed) {
+  if (!state) {
+    out(`Not in the product yet at v${target}; it arrives at v${f.firstVersion}.`);
+  } else if (state.removed) {
     out(`REMOVED at v${state.version}: ${state.reason}`);
-  } else if (state) {
+  } else {
     out(`Name: ${state.name}`);
     if (state.renamedFrom) out(`Previously: ${state.renamedFrom}`);
     out(`Description: ${state.description}`);
-    if (state.dev_notes) out(`Dev notes: ${state.dev_notes}`);
-    if (state.changes?.length) {
-      out(`What changed at v${state.version}:`);
+    if (state.changes?.length && state.version === target) {
+      out(`What changed at v${state.version}${state.changes_draft ? " (as recorded, not yet composed)" : ""}:`);
       for (const c of state.changes) out(`  - ${c}`);
     }
   }
+  out(`Paths: ${f.paths.length ? f.paths.join(", ") : "none — `ledger own` says which code it lives in"}`);
+  if (f.dev_notes) out(`Dev notes: ${f.dev_notes}`);
 
   const versions = f.history.map((h, i) => `v${h.version}${h.removed ? " removed" : i === 0 ? " new" : " changed"}`);
   out(`History: ${versions.join(", ")}`);
+
+  if (flags.diff) {
+    const open = project.releases.current;
+    const previous = project.releases.predecessorOf(open.version);
+    out("");
+    if (!previous) out("A first edition: there is nothing to compare it with.");
+    else {
+      const before = f.stateAt(previous.version);
+      out(`── v${previous.version}, what the client has ──`);
+      out(before ? (before.removed ? `removed: ${before.reason}` : `${before.name}: ${before.description}`) : "(not in the product yet)");
+      out(`── v${open.version}, now ──`);
+      const now = f.stateAt(open.version);
+      out(now.removed ? `removed: ${now.reason}` : `${now.name}: ${now.description}`);
+      const events = f.eventsAt(open.version);
+      if (events.length) {
+        out("── recorded since ──");
+        for (const e of events) out(`  - ${eventLine(e)}`);
+      }
+    }
+  }
 
   if (flags.history) {
     for (const h of f.history) {
@@ -102,8 +131,8 @@ export async function cmdShow({ flags, positional }) {
       if (h.removed) { out(`removed: ${h.reason}`); continue; }
       if (h.name) out(`name: ${h.name}`);
       out(`description: ${h.description}`);
-      if (h.dev_notes) out(`dev_notes: ${h.dev_notes}`);
-      for (const c of h.changes ?? []) out(`  - ${c}`);
+      for (const c of f.bullets[h.version] ?? []) out(`  - ${c}`);
+      for (const e of f.eventsAt(h.version)) out(`  · ${eventLine(e)}`);
     }
   }
 }
@@ -145,12 +174,14 @@ export async function cmdRules({ flags }) {
 export async function cmdExport({ flags }) {
   const project = openProject(flags);
   const doc = {
-    schema_version: 1,
+    schema_version: 2,
     product: project.config.product,
     releases: project.releases.toJSON(),
     categories: project.config.categories,
     subcategories: project.subcategories,
     other_changes: project.otherChangesList,
+    compositions: project.compositions,
+    questions: project.questions,
     features: project.featureSet.features().map((f) => f.toJSON()),
   };
   if (flags.out) {

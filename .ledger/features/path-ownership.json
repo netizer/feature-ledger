@@ -1,0 +1,18 @@
+{
+  "id": "path-ownership",
+  "audience": "user",
+  "category": "Recording what the product does",
+  "size": "Medium",
+  "paths": [
+    "src/paths.mjs",
+    "src/commands/paths.mjs"
+  ],
+  "dev_notes": "src/paths.mjs holds the glob subset (**, *, ?, a bare path is a file or a whole directory), DEFAULT_IGNORE, ownership() and deadGlobs(). `ledger own` lives in src/commands/write.mjs (cmdOwn); `ledger paths` and its agent brief in src/commands/paths.mjs. Ownership is worked out over git.files(): tracked plus untracked-but-not-ignored, so work in progress counts.",
+  "history": [
+    {
+      "version": 3,
+      "name": "Which code each feature lives in",
+      "description": "Every entry names the code its capability lives in, as globs, and files that say nothing about the product, such as tests and tooling, are listed once as ignored. The command ledger own adds or removes a glob, and ledger paths shows who owns what, which product files no entry owns, and any glob that no longer matches a file. The audit and the size readout read the code through them."
+    }
+  ]
+}

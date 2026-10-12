@@ -27,6 +27,10 @@
     "release-review",
     "redraft-the-ledger",
     "agent-handoff",
-    "edition-summary"
+    "edition-summary",
+    "path-ownership",
+    "open-questions",
+    "release-size",
+    "migrate-ledger"
   ]
 }

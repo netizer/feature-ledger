@@ -1,0 +1,164 @@
+{
+  "compositions": [
+    {
+      "version": 2,
+      "changes": {
+        "baseline-survey": [
+          "The survey counts as the first full sweep of the ledger audit; see “The ledger audit”. The brief records it just before the baseline is cut, the one moment when what the ledger holds and what the codebase does are known to agree. Pass --no-audit for a survey that is deliberately partial."
+        ],
+        "change-highlighting": [
+          "There were two stripes, so a capability recorded late printed as new or updated. A capability that had been in the product for two years then read as this sprint's work, which is the one thing a client would take issue with. The grey stripe says what is actually true: the product did not move this cycle, the record did. Entries the ledger audit turns up are the usual case; see “The ledger audit”. It is a neutral grey rather than a fourth hue because green and blue are already spoken for, an accent in that band is refused for the same reason, and a fifth hue would leave a brand only reds, oranges, purples and browns to choose from.",
+          "Whether an entry printed as new or updated depended on whether it had change bullets. A new feature that picked up a change bullet during the release printed as updated, with a \"What changed\" note about a version the client never saw. It is now new whenever the feature first appears in that release, and a new entry never prints a change note."
+        ],
+        "init-a-ledger": [
+          "Setup gitignored the client PDFs along with the Markdown docs, so the repo kept none of the editions handed over. A team that hands a printed edition to a client at each release wants the repo to hold what was handed over, so where the editions land is now a choice made once at setup."
+        ],
+        "pdf-edition": [
+          "The contents list was a printed index: it named each area and how many features were in it, but reaching a section meant scrolling for it. Every line is now a link to the section it names, and the closing sections on what was withdrawn and what else changed are listed there too, because the edition is usually read on screen rather than on paper.",
+          "Every edition printed the ledger's own version number, starting from 1, so a project whose client already held reports sent another way before the ledger started handed them a second Version 1. A release can now set the number its edition prints, and later editions carry on from it; the ledger's own numbering is unchanged.",
+          "ledger build printed one PDF: the newest edition, or the open release as a draft once it had work in it, under the same file name and in the same folder the cut edition would use. A draft could be mistaken for the edition the client was handed. A draft is now named with -draft and kept out of the client folder, only ledger cut writes into it, and ledger build also prints any cut edition that isn't on disk."
+        ],
+        "product-wide-change": [
+          "The command was ledger other-change. It is now ledger note, which names what it records; the old name still works and says what it is called now."
+        ],
+        "record-a-change": [
+          "A change bullet could be added to a feature that was new in the same release, and a second change in one release got no warning. Each bullet then described the state just before its own update, which the client never saw, so an edition could explain a fix to something that was new in the same release. The command now refuses bullets on a new feature and reminds you which edition a second change is measured against."
+        ],
+        "release-editions": [
+          "A release was a name and a date, and the date was doing work it could not do: two demos in one day are ordinary, and nothing said which of the two editions a reader was holding or which state of the code it came from. Every cut now records its commit. Sharing a date is still fine, but sharing a date and a commit is refused, because the two editions would stand for the same moment; --skip moment covers a deliberate re-issue.",
+          "A release could be cut as soon as it had something recorded against it, and nothing checked that its entries read correctly as one release. A cut now needs the release reviewed first, unless it is the first edition, and it also waits for the ledger audit and for any redraft to be checked. See “Reviewing a release before it goes out”, “The ledger audit” and “Redrafting the ledger”.",
+          "Cutting was ledger release cut followed by a separate ledger build, and a refused cut printed one line about the first problem it hit. That refusal was easy to miss: the build that followed printed the open release under the file name the cut edition would have had, so it looked as though the cut had worked. The command is now ledger cut, it prints the edition itself, and a refusal says plainly that the release was not cut and lists every open check at once."
+        ],
+        "status-check": [
+          "ledger status showed what the open release held and warned about what would print badly, but it did not say whether the release could be cut: you found out by trying, one refusal at a time. It now shows the checklist ledger cut runs (see “Cutting a release”), and ledger on its own says where things stand and what to run next, so nobody has to remember the order of audit, review and cut."
+        ]
+      }
+    },
+    {
+      "version": 3,
+      "changes": {
+        "init-a-ledger": [
+          "Setup named nothing as outside the product. It now also lists the files that aren't product code, such as tests, lockfiles and CI, so that ownership starts with only the product's own code to account for; see “Which code each feature lives in”. What the last preview saw stays out of the repository, since when somebody last looked is theirs."
+        ],
+        "agent-wiring": [
+          "The stanza told an agent to record a change as a bullet written for the client. It now says to record what moved and why, to name the code a new feature lives in, and to leave a reason it doesn't know as a question: that is how a change is recorded now, and the stanza is often all an agent reads before it records one."
+        ],
+        "baseline-survey": [
+          "The survey recorded each capability without saying where its code was. It now gives every entry the code it lives in, and ends with every product file owned by an entry or marked as not product code, because the audit and the size readout read the code through those paths."
+        ],
+        "authoring-rules": [
+          "The rules taught how to write a client-facing note as each change landed. They now describe a change as what moved and why, the code each entry lives in, and editing the composed notes. Those rules existed to keep mid-release notes honest, and the notes are composed now; an agent reads the rules before its first edit, so every line it doesn't need is paid for on every edit."
+        ],
+        "record-a-change": [
+          "ledger update took a bullet written for the client as the change landed. ledger change records two facts instead, what moved and why, and the note the edition prints is composed once for the whole release; see “Composing what changed”. A bullet written mid-release described the state just before that update, which the client often never saw, so the release needed repairing before every cut. ledger update still works."
+        ],
+        "editing-by-hand": [
+          "A \"What changed\" note was edited in the feature's own file. Notes and summary items are now edited in compositions.json, because they are composed for the whole release, and a hand-edit there survives the next composition unless the entry it is about moves again."
+        ],
+        "codebase-audit": [
+          "The audit counted every commit since the last one, and handed the agent the changed paths and the commit subjects. It now looks only at code the ledger hasn't accounted for, and hands over the diffs. Counting every commit made a cut wait for an audit after work that had been recorded properly, and an agent given only file names had to work out again which entry each file belonged to."
+        ],
+        "release-review": [
+          "This was “Reviewing a release before it goes out”, which had an agent reword the release in place before every cut. It now checks what the edition says against the code, edits nothing and reports what it doubts as questions, and the cut asks for it only once a project turns it on. Composing the notes from the two editions removed the drafts the review existed to repair; what is left worth a second read is whether the text is true."
+        ],
+        "agent-handoff": [
+          "The agent tasks were bootstrap, audit, review, redraft check and style rewrite. Compose, verify and paths brief are tasks now, and review is not: compose and verify replace it, and saying which code each entry lives in needs something that can read the code."
+        ],
+        "read-the-corpus": [
+          "ledger show printed an entry's current text and, on request, its history. It now also prints the code the entry lives in and its recorded changes, the entry as it stood at any version with --at, and with --diff the last edition's text beside the current one: what a person or an agent needs in front of them before saying what changed."
+        ],
+        "status-check": [
+          "Status said nothing about the code or about what the edition says about its changes. It now reports the composition, the open questions and how much of the code belongs to an entry, and warns about a description that runs long for its size and a glob that matches no file, the new ways a ledger drifts from its product."
+        ],
+        "release-editions": [
+          "A cut ran five checks, the review among them. It now checks that what the edition says about its changes is composed and up to date, that the edition is verified when that is turned on, and that no question is open; see “Composing what changed” and “Questions only you can answer”. The summary and the review became one composition and an optional check against the code.",
+          "At a terminal, the cut asks the open questions one at a time, and with --run it hands an open audit, composition or verify to a coding agent first. An agent's questions printed at the end of its run were gone with the terminal."
+        ],
+        "pdf-edition": [
+          "The front page led straight into the contents list, so the changes were only visible as stripes spread through the whole document. Short lists of what's new and what changed now sit between the two; see “Composing what changed”.",
+          "ledger preview printed a draft and nothing else. It now opens with the size of the release and what moved since the last look, and with --run composes what changed first, because a preview is how the size of the latest changes gets checked, and that shouldn't need a PDF or an agent. Until the changes are composed, a draft prints them as recorded and says so."
+        ]
+      },
+      "new": [
+        {
+          "text": "What changed is composed once for the whole release, from the last edition and the current one, rather than written as each change landed.",
+          "covers": [
+            "edition-summary",
+            "record-a-change",
+            "editing-by-hand",
+            "authoring-rules",
+            "agent-wiring",
+            "agent-handoff"
+          ]
+        },
+        {
+          "text": "Every feature names the code it lives in, so the audit looks only at work the ledger hasn't heard about.",
+          "covers": [
+            "path-ownership",
+            "codebase-audit",
+            "baseline-survey",
+            "init-a-ledger"
+          ]
+        },
+        {
+          "text": "The size of the open release, and how much code moved under each feature, shows in the terminal without printing anything.",
+          "covers": [
+            "release-size",
+            "pdf-edition",
+            "read-the-corpus"
+          ]
+        },
+        {
+          "text": "A reason nobody recorded is kept as a question, and the cut asks it before printing.",
+          "covers": [
+            "open-questions",
+            "release-editions"
+          ]
+        },
+        {
+          "text": "An older ledger upgrades in one step, and every edition already handed over prints as before.",
+          "covers": [
+            "migrate-ledger"
+          ]
+        }
+      ],
+      "changed": [
+        {
+          "text": "The release review is now an optional check of the edition against the code, and it edits nothing.",
+          "covers": [
+            "release-review"
+          ]
+        },
+        {
+          "text": "Status also reports open questions, code no feature owns, and descriptions that run long for their size.",
+          "covers": [
+            "status-check"
+          ]
+        }
+      ],
+      "quiet": [],
+      "date": "2026-10-12",
+      "commit": "847e774421c3c0ae8e7776fa9f3718faf1b06e48",
+      "inputs": {
+        "init-a-ledger": "2ef16dedd024c384",
+        "agent-wiring": "8c3ac9125e6d8e88",
+        "baseline-survey": "6b5536b36ca4225a",
+        "authoring-rules": "23f85f6a8ab7bb65",
+        "migrate-ledger": "92786c77b127c8fe",
+        "record-a-change": "b3fe0681e485b199",
+        "editing-by-hand": "75dedb605014f680",
+        "codebase-audit": "10cf4a14d41a4fb5",
+        "release-review": "a884e4277c99dfc0",
+        "agent-handoff": "0008b0a6b68be432",
+        "path-ownership": "99ad3265cd4634f9",
+        "open-questions": "34c2cee247cff1b5",
+        "read-the-corpus": "fdee0138d1e306b8",
+        "status-check": "7aae1c8e671f83a8",
+        "release-size": "6f879a1dcc8afea1",
+        "release-editions": "0d87475be90517f0",
+        "pdf-edition": "3e946e9e7f135925",
+        "edition-summary": "646db11ca477e513"
+      }
+    }
+  ]
+}

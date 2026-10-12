@@ -1,6 +1,10 @@
 import { openProject } from "../store.mjs";
 import { fail, today, longDate, COPY_BLOCK } from "../util.mjs";
+import fs from "node:fs";
+import path from "node:path";
 import * as git from "../git.mjs";
+import { ownership, deadGlobs } from "../paths.mjs";
+import { openQuestions, settle } from "../questions.mjs";
 
 const out = (s) => process.stdout.write(`${s}\n`);
 
@@ -15,9 +19,10 @@ const out = (s) => process.stdout.write(`${s}\n`);
  *
  * Like `bootstrap` and `style rewrite`, the command prints a brief rather than
  * doing the work — only something that can read the codebase can say what it
- * does. What the CLI does do first is the cheap deterministic half: resolve the
- * range, cluster the changed paths into batches, and collect the commit
- * subjects, so the agent is handed a worked checklist instead of a diff.
+ * does. What the CLI does first is the cheap deterministic half: resolve the
+ * range, set aside everything that was recorded, owned or ignored, and hand
+ * the agent the rest with its diffs, so it reads changes rather than a list
+ * of file names.
  */
 export async function cmdAudit({ flags, positional }) {
   const sub = positional[0] ?? "brief";
@@ -25,18 +30,72 @@ export async function cmdAudit({ flags, positional }) {
   if (sub === "complete") return complete(flags);
   if (sub === "log") return log(flags);
   if (sub === "confirm") return confirm(flags, positional.slice(1));
-  fail('usage: ledger audit [--full] [--since <sha>] | audit complete [--commit <sha>] | audit log | audit confirm <id>');
+  fail('usage: ledger audit [--full] [--since <sha>] | audit complete [--commit <sha>] | audit log');
 }
 
 /* ---- what is unaudited ------------------------------------------------- */
 
 /**
- * How much of the repository has never been examined against the record.
+ * What has landed since the last audit that the ledger may not have heard
+ * about. Not every commit: each entry's `paths` say which code is whose, so
+ * the residue is only
  *
- * Only paths that could say something about the product count: a commit that
- * writes nothing but `.ledger/` and the generated docs is not unaudited work,
- * and counting it would make the `ledger cut` gate fire on the audit's own
- * commit every time.
+ *   - code that moved under an entry whose record didn't move with it — not
+ *     in the same commit, and not anywhere in the open release (for a file
+ *     several entries share, any one of them moving accounts for it);
+ *   - changed code that no entry owns; and
+ *   - globs that no longer match any file, which is a capability whose code
+ *     went or moved.
+ *
+ * A commit that only writes the ledger, the generated docs, or files the
+ * config ignores (tests, lockfiles, CI) leaves no residue. A project whose
+ * entries have no paths yet owns nothing, so every changed file is residue:
+ * the same as a range with no map at all.
+ */
+export function residue(project, since) {
+  const root = project.root;
+  const own = ownership(project);
+  const open = project.releases.current.future ? project.releases.current.version : null;
+  const featuresDir = `${path.relative(root, project.featuresDir).split(path.sep).join("/")}/`;
+  const commits = git.commitFiles(root, since);
+
+  const entries = new Map();
+  const unowned = new Map();
+  for (const c of commits) {
+    const recorded = new Set(c.files.filter((f) => f.startsWith(featuresDir)).map((f) => path.basename(f, ".json")));
+    for (const file of c.files) {
+      if (!own.product(file)) continue;
+      const owners = own.owners(file);
+      if (!owners.length) {
+        // A file that is gone can't be claimed; a capability that went with
+        // it shows as an entry whose paths match nothing.
+        if (!fs.existsSync(path.join(root, file))) continue;
+        if (!unowned.has(file)) unowned.set(file, []);
+        unowned.get(file).push(c);
+        continue;
+      }
+      // A file several entries share is accounted for when any of them moved
+      // with it: the change was recorded, under the entry it was about.
+      if (owners.some((f) => recorded.has(f.id) || (open !== null && f.touchedAt(open)))) continue;
+      for (const f of owners) {
+        if (!entries.has(f.id)) entries.set(f.id, { feature: f, files: new Set(), commits: [] });
+        entries.get(f.id).files.add(file);
+        entries.get(f.id).commits.push(c);
+      }
+    }
+  }
+  const dead = commits.length ? deadGlobs(project, git.files(root)) : [];
+  return {
+    commits,
+    entries: [...entries.values()].map((e) => ({ ...e, files: [...e.files].sort() })),
+    unowned: [...unowned.entries()].map(([file, cs]) => ({ file, commits: cs })).sort((a, b) => a.file.localeCompare(b.file)),
+    dead,
+  };
+}
+
+/**
+ * How much of the repository's recent work has never been checked against
+ * the record. `ok` when the residue is empty, however many commits landed.
  *
  * With no audit ever recorded there is nothing to measure drift from, so this
  * reports `ok` rather than treating the whole history as a backlog — the audit
@@ -56,55 +115,38 @@ export function unauditedReport(project) {
   const head = git.head(root);
   if (head === last.commit) return { ok: true, reason: "audited up to HEAD" };
 
-  const paths = git.changes(root, last.commit)
-    .filter((c) => !git.isLedgerPath(project.config, c.path));
-  if (!paths.length) return { ok: true, reason: "nothing but the ledger has changed since" };
-
-  return {
-    ok: false,
-    since: last.commit,
-    date: last.date,
-    head,
-    commits: git.countCommits(root, last.commit),
-    paths: paths.length,
-  };
+  const r = residue(project, last.commit);
+  const n = r.commits.length;
+  if (!r.entries.length && !r.unowned.length && !r.dead.length) {
+    return { ok: true, reason: `${n} commit${n === 1 ? "" : "s"} since the last audit, all of it recorded, owned or ignored` };
+  }
+  return { ok: false, since: last.commit, date: last.date, head, commits: n, ...r };
 }
 
 /** The sentence the gate and `ledger status` both print, so the two can't
  *  drift apart in how they describe the same gap. */
 export function unauditedLine(report) {
   const when = report.date ? `, ${longDate(report.date)}` : "";
-  return `${report.commits} commit${report.commits === 1 ? "" : "s"} since the last audit ` +
-    `(${git.shortSha(report.since)}${when}), changing ${report.paths} ` +
-    `file${report.paths === 1 ? "" : "s"} besides the ledger's own`;
+  const parts = [];
+  const n = report.entries.length;
+  if (n) {
+    const files = report.entries.reduce((k, e) => k + e.files.length, 0);
+    parts.push(`${files} file${files === 1 ? "" : "s"} under ${n} entr${n === 1 ? "y" : "ies"} changed without the ` +
+      `entr${n === 1 ? "y" : "ies"} moving (${report.entries.slice(0, 4).map((e) => e.feature.id).join(", ")}${n > 4 ? ", …" : ""})`);
+  }
+  const u = report.unowned.length;
+  if (u) parts.push(`${u} changed file${u === 1 ? "" : "s"} no entry owns`);
+  const d = report.dead.length;
+  if (d) parts.push(`${d} entr${d === 1 ? "y's" : "ies'"} paths match no file`);
+  return `since the last audit (${git.shortSha(report.since)}${when}): ${parts.join("; ")}`;
 }
 
 /** The same gap as a state rather than a problem, for `ledger status`. Work
  *  landing between audits is the normal condition: the audit is periodic, and
- *  only `ledger cut` needs it done. Phrased as a warning, it read as "run the
- *  audit now" to people and agents alike. */
+ *  only `ledger cut` needs it done. */
 export function unauditedSince(report) {
-  return `${report.commits} commit${report.commits === 1 ? "" : "s"} and ${report.paths} ` +
-    `file${report.paths === 1 ? "" : "s"} since, due for a sweep before the next \`ledger cut\``;
-}
-
-/**
- * Entries whose `changes` reason an audit took from a commit message rather
- * than from the person who made the decision. Kept as corpus state on purpose:
- * a list printed once at the end of an audit dies with the terminal, and the
- * whole point is that someone can still check it tomorrow.
- *
- * Deliberately never exposed through `Feature#stateAt`, so no renderer can put
- * it in front of a client. It is a note to the team, not to the reader.
- */
-export function unconfirmedReasons(project) {
-  const found = [];
-  for (const f of project.featureSet.features()) {
-    for (const h of f.history) {
-      if (h.reason_inferred) found.push({ id: f.id, version: h.version, name: f.currentName });
-    }
-  }
-  return found;
+  const n = report.entries.length + report.unowned.length + report.dead.length;
+  return `${report.commits} commit${report.commits === 1 ? "" : "s"} since, ${n} thing${n === 1 ? "" : "s"} for the next sweep to look at`;
 }
 
 /* ---- audit complete ---------------------------------------------------- */
@@ -146,7 +188,7 @@ function complete(flags) {
 
   const version = project.workingVersion;
   const counts = backfilledCounts(project, version);
-  const unconfirmed = unconfirmedReasons(project).length;
+  const unconfirmed = openQuestions(project).filter((q) => q.kind === "why").length;
 
   const entry = {
     commit,
@@ -168,12 +210,12 @@ function complete(flags) {
   project.recordAudit(entry);
 
   const total = counts.added + counts.changed + counts.removed;
-  out(`recorded a ${entry.mode} audit${commit ? ` at ${git.shortSha(commit)}` : ""} (${entry.date})`);
+  out(`recorded ${entry.mode === "incremental" ? "an" : "a"} ${entry.mode} audit${commit ? ` at ${git.shortSha(commit)}` : ""} (${entry.date})`);
   out(total
     ? `  ${counts.added} added, ${counts.changed} changed, ${counts.removed} removed as already in place`
     : "  nothing turned up from before the last cut (anything newer is recorded as this release's work)");
   if (unconfirmed) {
-    out(`  ${unconfirmed} inferred reason${unconfirmed === 1 ? "" : "s"} still to confirm — \`ledger status\` lists them`);
+    out(`  ${unconfirmed} inferred reason${unconfirmed === 1 ? "" : "s"} still to confirm — \`ledger questions\` lists them`);
   }
 }
 
@@ -221,36 +263,39 @@ function log(flags) {
 
 /* ---- audit confirm ----------------------------------------------------- */
 
-/** Confirming an inferred reason: the sentence stands, and someone has now
- *  vouched for it. Rewriting the bullet by hand is the stronger form of the
- *  same act, and clears the flag the same way — delete the `reason_inferred`
- *  line while you're in the file. */
+/** The old way to vouch for an inferred reason, kept working: it accepts the
+ *  open `why` questions on one entry. `ledger questions` is the new home. */
 function confirm(flags, rest) {
   const project = openProject(flags);
   const id = rest[0];
-  if (!id) fail('usage: ledger audit confirm <id> [--version N]   (`ledger status` lists what is waiting)');
-
-  const feature = project.featureSet.find(id);
+  if (!id) fail("usage: ledger audit confirm <id>   (now `ledger questions accept <n>` — `ledger questions` lists them)");
+  project.featureSet.find(id);
   const asked = flags.version !== undefined && flags.version !== true ? Number(flags.version) : null;
-  const pending = feature.history.filter((h) => h.reason_inferred);
-  if (!pending.length) fail(`${id} has no inferred reason waiting to be confirmed`);
-
-  const targets = asked === null ? pending : pending.filter((h) => h.version === asked);
-  if (!targets.length) {
-    fail(`${id} has no inferred reason at v${asked} — it has ${pending.map((h) => `v${h.version}`).join(", ")}`);
-  }
-  for (const h of targets) delete h.reason_inferred;
-
+  const pending = openQuestions(project).filter((q) => q.kind === "why" && q.feature === id && (asked === null || q.version === asked));
+  if (!pending.length) fail(`${id} has no reason waiting to be confirmed — \`ledger questions\` lists what's open`);
   if (flags["dry-run"]) {
-    out(JSON.stringify(feature.toJSON(), null, 2));
+    out(JSON.stringify(pending, null, 2));
     out("(--dry-run: nothing written)");
     return;
   }
-  project.saveFeature(feature);
-  out(`confirmed ${id} at ${targets.map((h) => `v${h.version}`).join(", ")}`);
+  const touched = new Map();
+  for (const q of pending) {
+    const f = settle(project, q.id, "accept");
+    if (f) touched.set(f.id, f);
+  }
+  for (const f of touched.values()) project.saveFeature(f);
+  project.saveQuestions();
+  process.stderr.write("note: `ledger audit confirm` is now `ledger questions accept <n>`; the old form still works.\n");
+  out(`confirmed ${pending.length} reason${pending.length === 1 ? "" : "s"} on ${id}`);
 }
 
 /* ---- the brief --------------------------------------------------------- */
+
+/** How much diff a brief carries: enough to see each change, not the whole range. */
+const DIFF_PER_GROUP = 80;
+const DIFF_TOTAL = 1200;
+
+const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 function brief(flags) {
   const project = openProject(flags);
@@ -278,18 +323,16 @@ function brief(flags) {
 
   const sweep = full || since === null;
   const head = hasGit ? git.head(root) : null;
-
   const version = project.workingVersion;
   const previous = project.releases.predecessorOf(version);
+  const own = ownership(project);
 
-  const changed = since ? git.changes(root, since).filter((c) => !git.isLedgerPath(project.config, c.path)) : [];
-  const paths = sweep
-    ? git.tracked(root).filter((p) => !git.isLedgerPath(project.config, p))
-    : changed.map((c) => c.path);
-  const batches = git.cluster(paths);
-  const subjects = since ? git.commits(root, since) : [];
+  const r = sweep ? null : residue(project, since);
+  const changed = since ? git.changes(root, since).filter((c) => own.product(c.path)) : [];
   const renamed = changed.filter((c) => c.status === "renamed");
   const deleted = changed.filter((c) => c.status === "deleted");
+  const sweepFiles = sweep && hasGit ? git.files(root).filter((f) => own.product(f)) : [];
+  const residueCount = r ? r.entries.length + r.unowned.length + r.dead.length : 0;
 
   /* ---- the part for the human ---- */
   out(`ledger audit — ${sweep ? "full sweep" : "incremental"}`);
@@ -300,15 +343,16 @@ function brief(flags) {
     out("so it is worth running at a major release even once incrementals are routine.");
   } else {
     out(`Everything that has landed since ${git.shortSha(since)}${last?.date ? ` (${longDate(last.date)})` : ""}: ` +
-      `${subjects.length} commit${subjects.length === 1 ? "" : "s"}, ${paths.length} file${paths.length === 1 ? "" : "s"}.`);
+      `${plural(r.commits.length, "commit")}. What the ledger may not have heard about:`);
+    out(`  ${plural(r.entries.length, "entry", "entries")} whose code moved without the record, ` +
+      `${plural(r.unowned.length, "changed file")} no entry owns, ${plural(r.dead.length, "entry", "entries")} whose paths match nothing.`);
   }
-  out(`${batches.length} batch${batches.length === 1 ? "" : "es"} for the agent to work through.`);
   out("");
   out("The prompt itself is everything under the rule below. Copy it whole, from");
   out("there to the end of this output, into a fresh agent session in the project");
   out("root. It runs start to finish without asking you anything, records what it");
-  out("finds, stamps the audited commit, and ends by listing the reasons it had to");
-  out("take from commit messages for you to confirm.");
+  out("finds, stamps the audited commit, and leaves every reason it had to read off a");
+  out("commit as a question for you (`ledger questions`).");
   out("");
   out(COPY_BLOCK);
   out("");
@@ -319,118 +363,164 @@ function brief(flags) {
 
   p(`Audit the feature ledger of ${project.config.product} against its own codebase.`);
   p("");
-  p("The ledger is a client-facing record of what this product does. It stays current");
-  p("only for work done through a coding agent that read the project's agent");
-  p("instructions — so anything shipped without one is missing from it entirely. That");
-  p("is what you are looking for.");
+  p("The ledger is a client-facing record of what this product does, one entry per");
+  p("capability, each with the globs its code lives in (`paths`). It stays current only");
+  p("for work done through a coding agent that read the project's instructions, so");
+  p("anything shipped without one is missing from it. That is what you are looking for.");
   p("");
   p(sweep
-    ? `Mode: FULL SWEEP. Every tracked file in the project (${paths.length}).`
-    : `Mode: INCREMENTAL. Everything between ${git.shortSha(since)} and ${git.shortSha(head)} ` +
-      `(${subjects.length} commits, ${paths.length} files).`);
+    ? `Mode: FULL SWEEP. Every tracked product file (${sweepFiles.length}).`
+    : `Mode: INCREMENTAL. ${git.shortSha(since)}..${git.shortSha(head)}, ${plural(r.commits.length, "commit")}. The CLI has ` +
+      "already set aside everything that was recorded, owned or ignored; what follows is only the rest.");
   p("");
-  p("Before your first write, run `ledger rules` and `ledger style`. Every entry you");
-  p("write has to clear the same bar and be in the same voice as the ones already");
-  p("there: one entry is one capability someone using the product would name.");
-  p("Guardrails, defaults, plumbing and polish go inside the capability they belong");
-  p("to, or in as `dev`, or as `ledger note` — never as an entry of their own.");
-  p("Never read or edit the JSON under .ledger/; use `ledger list` and `ledger show`.");
+  p("Before your first write, run `ledger style` once for the voice.");
   p("");
-  p("Give the same care to the names. Most readers go down the contents list and");
-  p("stop there, so a name has to state the capability on its own — a short noun");
-  p("phrase, or the action someone takes, in the words the people who use the");
-  p("product use for their own work. Not a caption, not a comment on the thing, not");
-  p("the mechanism. `ledger rules` has the test and the worked examples.");
+  p("## The bar");
   p("");
-  p("## The one judgement specific to an audit");
+  p("One entry is one capability someone using the product would name: something they");
+  p("could ask for, or would miss if it went away. Could you demo it, and would the demo");
+  p("look different from the entry next to it? Guardrails, defaults, plumbing and polish");
+  p("go inside the capability they belong to, or in as `dev`, or as `ledger note`, never");
+  p("as an entry of their own. A name is a short noun phrase or the action someone takes,");
+  p("in the users' own words: not a caption, not a comment, not the mechanism.");
   p("");
-  p(previous
-    ? `For each finding, decide one thing: did it happen during the open release (v${version}), ` +
-      `or before the last cutoff (v${previous.version}, ${longDate(previous.date)})?`
-    : `This ledger has no cut release yet, so everything belongs to v${version} as ordinary work ` +
-      "and nothing needs --backfilled.");
+  p("Read entries with `ledger show <id>`. Never read or edit the JSON under .ledger/.");
+  p("");
+  p("## Recording what you find");
+  p("");
+  p("```");
+  p("ledger change <id> --why-from commit <<'JSON'");
+  p('{ "what": "What changed, in a sentence.", "why": "Why, from the commit.", "description": "The whole current state, if it moved." }');
+  p("JSON");
+  p("```");
+  p("");
+  p("- A reason read off a commit message takes `--why-from commit`. Where the commit");
+  p("  says nothing usable, `--why-unknown`. Either leaves a question for the human.");
+  p("  Never write a plausible-sounding reason you found no evidence for.");
+  p("- A new capability: `ledger add <id>` with `paths`. A capability the code no longer");
+  p("  has: `ledger remove <id> --why \"…\"`; the client should learn it went.");
+  p("- Code that belongs to an entry: `ledger own <id> '<glob>'`. Code that isn't product");
+  p("  at all (tests, fixtures, tooling): `ledger own --ignore '<glob>'`.");
+  p("- Not every change is news. A refactor, a fix nobody would notice, a tidy: record");
+  p("  nothing, and claim the files if no entry owns them.");
   p("");
   if (previous) {
-    p(`  During v${version}          → record it as you normally would:`);
-    p("                        `ledger add` / `update` / `remove`.");
+    p(`## Before or after v${previous.version}?`);
     p("");
-    p("  Before the cutoff   → the same command, plus `--backfilled`.");
+    p(`Work that landed during the open release (v${version}) is recorded as usual. Work from`);
+    p(`before the last cut (v${previous.version}, ${longDate(previous.date)}) takes \`--backfilled\` on the same`);
+    p("command, so the edition draws it grey: already in the product, only now on the");
+    p("record. The commit dates answer the question; never guess which release it was.");
     p("");
-    p("`--backfilled` hides nothing and does not change which release the entry lands");
-    p("on — new in a client edition means new to the reader, and this is the first");
-    p("document to mention it. What it changes is how the edition draws it: green means");
-    p("built this cycle, blue means reworked this cycle, and grey means this was already");
-    p("in the product and is only now on the record. A capability that has been there");
-    p("for two years must not print as this release's news.");
-    p("");
-    p("Never guess which release something shipped in. The question is only");
-    p("before-or-after the last cutoff, and the commit dates answer it.");
+  } else {
+    p(`This ledger has no cut release yet, so everything belongs to v${version} as ordinary work.`);
     p("");
   }
-  p("## Reasons");
+  p("A capability that was added AND removed since the last audit was in no edition:");
+  p("write nothing for it.");
   p("");
-  p("`ledger update` refuses a change with no `changes` bullet, and that rule holds");
-  p("here. Take the reason from the commit message or pull-request title that made the");
-  p("change, and pass `--reason-inferred` with it, so the ledger knows the reason came");
-  p("from you reading a commit rather than from the person who decided it.");
-  p("");
-  p("Never write a plausible-sounding reason you found no evidence for. Where a commit");
-  p("message says nothing usable, still record the change, still pass");
-  p("`--reason-inferred`, and say in the bullet that the reason is not recorded. An");
-  p("honest gap is worth more than a confident invention.");
-  p("");
-  p("## Findings that are not entries");
-  p("");
-  p("A capability that was added AND removed since the last audit was in no edition");
-  p("and belongs in none: write nothing at all for it. A capability the ledger has but");
-  p("the code no longer does is a `ledger remove --reason \"…\"` — the client should");
-  p("learn that something is gone, even if it went a while ago (add `--backfilled`).");
-  p("");
-  p("## Batches");
-  p("");
-  p("Work these in order, one at a time, and do not stop between them.");
-  p("");
-  batches.forEach((b, i) => {
-    p(`${String(i + 1).padStart(3)}. ${b.name}  (${b.files.length} file${b.files.length === 1 ? "" : "s"})`);
-    for (const f of b.files.slice(0, 12)) p(`       ${f}`);
-    if (b.files.length > 12) p(`       … and ${b.files.length - 12} more`);
-  });
-  p("");
-  if (subjects.length) {
-    p("## Commit subjects in the range");
+
+  let budget = DIFF_TOTAL;
+  const withDiff = (files) => {
+    if (!since || budget <= 0) return [];
+    const text = git.diffText(root, since, files, { limit: Math.min(DIFF_PER_GROUP, budget) });
+    if (!text) return [];
+    budget -= text.split("\n").length;
+    return ["```diff", text, "```"];
+  };
+  const commitList = (commits) => [...new Map(commits.map((c) => [c.sha, c])).values()]
+    .map((c) => `  ${c.short}  ${c.date}  ${c.subject}`);
+
+  if (!sweep) {
+    if (r.entries.length) {
+      p("## Code that moved while its entry didn't");
+      p("");
+      p("Each of these entries owns files that changed in commits that didn't touch the");
+      p("entry. Read the diff: if someone using the product would notice the difference,");
+      p("record it with `ledger change`. If not, there is nothing to do.");
+      p("");
+      for (const e of r.entries) {
+        const s = e.feature.stateAt(version);
+        p(`### ${e.feature.id} — ${e.feature.currentName}`);
+        p("");
+        p(`Now: ${s && !s.removed ? s.description : "(removed)"}`);
+        p("");
+        for (const l of commitList(e.commits)) p(l);
+        for (const f of e.files) p(`  ${f}`);
+        for (const l of withDiff(e.files)) p(l);
+        p("");
+      }
+    }
+    if (r.unowned.length) {
+      p("## Changed files no entry owns");
+      p("");
+      p("For each group: claim it for the entry it belongs to (`ledger own`), record it as");
+      p("a capability the ledger is missing (`ledger add` with `paths`), or mark it as not");
+      p("product code (`ledger own --ignore`). Every file ends up one of the three.");
+      p("");
+      for (const b of git.cluster(r.unowned.map((u) => u.file))) {
+        const commits = r.unowned.filter((u) => b.files.includes(u.file)).flatMap((u) => u.commits);
+        p(`### ${b.name}  (${plural(b.files.length, "file")})`);
+        p("");
+        for (const l of commitList(commits)) p(l);
+        for (const f of b.files.slice(0, 20)) p(`  ${f}`);
+        if (b.files.length > 20) p(`  … and ${b.files.length - 20} more`);
+        for (const l of withDiff(b.files)) p(l);
+        p("");
+      }
+    }
+    if (r.dead.length) {
+      p("## Entries whose paths match no file");
+      p("");
+      p("The code went, or moved. If the capability is gone: `ledger remove <id> --why \"…\"`.");
+      p("If it moved: `ledger own <id> '<new glob>'`, then `ledger own <id> '<old glob>' --remove`.");
+      p("");
+      for (const d of r.dead) p(`  ${d.feature.id.padEnd(32)} ${d.globs.join(", ")}`);
+      p("");
+    }
+    if (renamed.length || deleted.length) {
+      p("## Renames and deletions in the range");
+      p("");
+      for (const c of renamed) p(`  renamed  ${c.from} → ${c.path}`);
+      for (const c of deleted) p(`  deleted  ${c.path}`);
+      p("");
+    }
+    if (budget <= 0) {
+      p(`(The diffs above stop at ${DIFF_TOTAL} lines; \`git diff ${git.shortSha(since)}..HEAD -- <file>\` reads the rest.)`);
+      p("");
+    }
+    if (!residueCount) {
+      p("## Nothing to look at");
+      p("");
+      p("Everything in the range was recorded, owned or ignored. Stamp the audit.");
+      p("");
+    }
+  } else {
+    p("## The sweep");
     p("");
-    p("Written by the people who made the changes: your best evidence both for whether");
-    p("something was a capability and for why it moved.");
+    p("Work these batches in order, one at a time, without stopping between them. For");
+    p("each, read the code, check every capability in it has an entry, and make sure each");
+    p("file is owned (`ledger own`) or ignored (`ledger own --ignore`). `ledger paths`");
+    p("shows who owns what.");
     p("");
-    for (const c of subjects) p(`  ${c.sha}  ${c.subject}`);
+    for (const [i, b] of git.cluster(sweepFiles).entries()) {
+      const owners = [...new Set(b.files.flatMap((f) => own.owners(f).map((o) => o.id)))];
+      const unownedHere = b.files.filter((f) => !own.owners(f).length).length;
+      p(`${String(i + 1).padStart(3)}. ${b.name}  (${plural(b.files.length, "file")}${unownedHere ? `, ${unownedHere} unowned` : ""})` +
+        (owners.length ? `  owned by ${owners.slice(0, 6).join(", ")}${owners.length > 6 ? ", …" : ""}` : ""));
+      for (const f of b.files.slice(0, 12)) p(`       ${f}`);
+      if (b.files.length > 12) p(`       … and ${b.files.length - 12} more`);
+    }
     p("");
   }
-  if (renamed.length || deleted.length) {
-    p("## Renames and deletions");
-    p("");
-    p("A capability that was renamed or withdrawn, not one that changed. A rename is");
-    p("`ledger update <id> --name \"New name\"` with a bullet saying what it was called and");
-    p("why; a withdrawal is `ledger remove <id> --reason \"…\"`.");
-    p("");
-    for (const c of renamed) p(`  renamed  ${c.from} → ${c.path}`);
-    for (const c of deleted) p(`  deleted  ${c.path}`);
-    p("");
-  }
-  p("## When every batch is done");
+  p("## When you're done");
   p("");
-  p("1. Run `ledger status` and check the release reads the way you expect.");
+  p("1. Run `ledger status` and fix what it reports.");
   p(`2. Run \`ledger audit complete${hasGit ? ` --commit ${head}` : ""}${sweep ? " --full" : ""}\``);
-  p("   — exactly that commit, not HEAD, and not a newer one. Do this before you ask");
-  p("   the human anything, so the audit is recorded even if nobody is at the terminal.");
-  p("3. Then print a numbered list of ONLY the findings whose reason you inferred, each");
-  p("   as: the feature name, the bullet you wrote, and the commit you took it from.");
-  p("   Leave out everything you did not have to infer — the list is for someone to");
-  p("   check quickly, so anything already certain is noise in it.");
-  p("4. Ask them to confirm or correct each one, and tell them that");
-  p("   `ledger audit confirm <id>` accepts a reason as it stands, and that rewriting");
-  p("   the bullet by hand in .ledger/features/<id>.json does the same thing — delete");
-  p("   the entry's \"reason_inferred\" line once the sentence is theirs. Until then");
-  p("   `ledger status` and `ledger cut` both keep reporting them as unconfirmed.");
+  p("   — exactly that commit, not HEAD, and not a newer one.");
+  p("3. Then say, in a few lines, what you recorded, and what you claimed or ignored.");
+  p("   The reasons you read off commits are already questions in `ledger questions`;");
+  p("   don't repeat them.");
 
   out(lines.join("\n"));
 }
