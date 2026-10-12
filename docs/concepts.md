@@ -39,6 +39,18 @@ something about it changed; absent versions mean "still whatever the last entry
 said". That's what makes "what did this look like at version N?" answerable, and
 why an old edition still reproduces exactly what was presented then.
 
+**Facts are recorded; text for the client is composed.** Alongside its states,
+a feature keeps **events**: what moved and why, as somebody recorded them while
+the work landed. The "What changed" notes and the summary an edition prints are
+composed once per release from the two states and the events between, so they
+describe only differences the client will see. See
+[checks.md](checks.md#recording-facts-composing-text).
+
+**A feature names its code.** Each entry's `paths` are globs over the
+repository. They let the ledger be checked against the code: the audit looks
+only at code the record doesn't account for, and the size readout says how
+much code moved under each entry.
+
 **Two audiences.** `user` features are what the client sees; `dev` features are
 what only the team cares about. `dev_notes` on a user feature is implementation
 detail attached to a client-facing capability.
@@ -63,17 +75,19 @@ job is reproducing what was in front of the client that day.
 config.json          product, the area list (= reading order), tone, wording overrides
 brand.json           logo, accent, fonts
 releases.json        the version timeline, each release with the commit it was cut at
-features/<id>.json   one feature, with its full history
+features/<id>.json   one feature: the code it lives in, its state at each version, and its events
 index.json           the deliberate corpus order (ties within a size band)
 subcategories.json   sub-section headings
 other-changes.json   changes belonging to no single feature
 audits.json          every audit so far, and the commit each was run against
-reviews.json         every review of a release, and a fingerprint of what it read
-summaries.json       per release, the lists its edition opens with, and what they were written from
+compositions.json    per release, the "What changed" notes and the summary its edition prints,
+                     and what they were composed from
+questions.json       reasons nobody vouched for, and what a check doubted
 redrafts.json        every redraft, and whether the new corpus was checked against the old
 archive/v1-v4/       a corpus a redraft set aside, read-only; its editions print from it
 STYLE.md             optional, the project's own tone as prose
 theme.css            optional, appended last to the PDF stylesheet
+.cache/              gitignored; what the last `ledger preview` saw
 ```
 
 Everything here is committed. Which parts are yours to edit is in

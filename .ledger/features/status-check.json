@@ -3,21 +3,34 @@
   "audience": "user",
   "category": "Reading the ledger",
   "size": "Medium",
+  "paths": [
+    "src/commands/status.mjs",
+    "src/commands/release.mjs"
+  ],
+  "dev_notes": "src/commands/status.mjs: cmdStatus, and cmdOverview for bare `ledger` (the help when there is no .ledger/). Both take the checklist from cutChecks() in src/commands/release.mjs, so neither can disagree with what a cut would do; `status --json` carries it as `checks`. It replaced three commands — status, check and doctor — because whichever of them you hadn't run was where the problem was; `ledger check` and `ledger doctor` now fail with a pointer to it.",
   "history": [
     {
       "version": 1,
       "name": "Checking the ledger is sound",
-      "description": "The command ledger status answers three questions at once: what the open release has collected so far, what the corpus holds, and how the setup resolves — the derived palette, the masthead, the fonts, the tone in force, and the browser that will print. Anything that is valid but would still print badly comes out as a warning at the end, such as an entry with no size or an area with nothing in it. It exits with an error when the corpus is broken and stays silent when there is nothing to say, so a commit hook can run it on every commit.",
-      "changes": null,
-      "dev_notes": "src/commands/status.mjs. It replaced three commands — status, check and doctor — because whichever of them you hadn't run was where the problem was; `ledger check` and `ledger doctor` now fail with a pointer to it."
+      "description": "The command ledger status answers three questions at once: what the open release has collected so far, what the corpus holds, and how the setup resolves — the derived palette, the masthead, the fonts, the tone in force, and the browser that will print. Anything that is valid but would still print badly comes out as a warning at the end, such as an entry with no size or an area with nothing in it. It exits with an error when the corpus is broken and stays silent when there is nothing to say, so a commit hook can run it on every commit."
     },
     {
       "version": 2,
-      "description": "The command ledger status answers four questions at once: what the open release has collected, whether it is ready to cut, what the corpus holds, and how the setup resolves, from the derived palette to the browser that will print. The readiness answer is the same checklist ledger cut runs, with the command that fixes each open check, and anything that is valid but would still print badly comes out as a warning at the end. Running ledger on its own prints a short version: what the open release holds, the checklist, and the one command to run next. ledger status exits with an error when the corpus is broken, and with --quiet it stays silent when there is nothing to say, so a commit hook can run it on every commit.",
-      "changes": [
-        "ledger status showed what the open release held and warned about what would print badly, but it did not say whether the release could be cut: you found out by trying, one refusal at a time. It now shows the checklist ledger cut runs (see “Cutting a release”), and ledger on its own says where things stand and what to run next, so nobody has to remember the order of audit, review and cut."
-      ],
-      "dev_notes": "src/commands/status.mjs: cmdStatus, and cmdOverview for bare `ledger` (the help when there is no .ledger/). Both take the checklist from cutChecks() in src/commands/release.mjs, so neither can disagree with what a cut would do; `status --json` carries it as `checks`. It replaced three commands — status, check and doctor — because whichever of them you hadn't run was where the problem was; `ledger check` and `ledger doctor` now fail with a pointer to it."
+      "description": "The command ledger status answers four questions at once: what the open release has collected, whether it is ready to cut, what the corpus holds, and how the setup resolves, from the derived palette to the browser that will print. The readiness answer is the same checklist ledger cut runs, with the command that fixes each open check, and anything that is valid but would still print badly comes out as a warning at the end. Running ledger on its own prints a short version: what the open release holds, the checklist, and the one command to run next. ledger status exits with an error when the corpus is broken, and with --quiet it stays silent when there is nothing to say, so a commit hook can run it on every commit."
+    },
+    {
+      "version": 3,
+      "description": "The command ledger status says at once what the open release holds, whether it is ready to cut, what the corpus holds and how much of the code belongs to an entry, and how the setup resolves. The readiness answer is the checklist ledger cut runs, and anything valid that would still print badly comes out as a warning. Bare ledger prints the short version and the next command. With --quiet it is silent when there is nothing to say, so a commit hook can run it."
+    }
+  ],
+  "events": [
+    {
+      "version": 3,
+      "kind": "change",
+      "what": "It reports the composition, the open questions and how much of the code belongs to an entry, and warns about a description that runs long for its size and a glob that matches no file.",
+      "why": "Those are the new ways a ledger drifts from its product, and a description past two or three sentences is where an edition stops being brief.",
+      "why_from": "person",
+      "date": "2026-10-12"
     }
   ]
 }

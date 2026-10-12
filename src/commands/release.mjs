@@ -3,9 +3,10 @@ import path from "node:path";
 import { openProject, pdfsAreCommitted } from "../store.mjs";
 import { fail, usage, nearest, isBlank, today, longDate, EXIT, UserError } from "../util.mjs";
 import { color, mark } from "../ui.mjs";
-import { unauditedReport, unauditedLine, unconfirmedReasons } from "./audit.mjs";
-import { unreviewedReport, unreviewedLine } from "./review.mjs";
-import { summaryReport, summaryLine } from "../summary.mjs";
+import { unauditedReport, unauditedLine } from "./audit.mjs";
+import { composeReport, composeLine, verifyReport } from "../compose.mjs";
+import { openQuestions } from "../questions.mjs";
+import { askInline } from "./questions.mjs";
 import { redraftReport, redraftSteps } from "./redraft.mjs";
 import { editionFile, printEdition } from "./build.mjs";
 import { runTask } from "../prompt.mjs";
@@ -150,11 +151,14 @@ function resolveCutCommit(project, flags) {
  * still be missing what the client was told. Unaudited work comes before the
  * empty-release check because when both fire they have one cause — work
  * landed and the ledger never heard about it — and the audit is what fixes
- * it. The summary comes next, because it is written from what was recorded.
- * The review comes after all of them, because each can send someone off to
- * record or write more, and whatever is written is what a review has to read.
+ * it. The composition comes next, because it is written from what was
+ * recorded; the opt-in verify after it, because it reads what was composed.
+ * Questions come last: every step before can open one.
  */
-export const CHECK_IDS = ["redraft", "audit", "content", "summary", "review", "moment"];
+export const CHECK_IDS = ["redraft", "audit", "content", "compose", "verify", "questions", "moment"];
+
+/** Checks that were renamed, so a `--skip` written against the old name still works. */
+const CHECK_ALIASES = { summary: "compose", review: "verify" };
 
 export function cutChecks(project, { date = today(), commit = undefined } = {}) {
   const current = project.releases.current;
@@ -165,8 +169,9 @@ export function cutChecks(project, { date = today(), commit = undefined } = {}) 
   const unaudited = unauditedReport(project);
   const touched = project.featureSet.features().filter((f) => f.touchedAt(version)).length;
   const other = project.featureSet.otherChanges({ version }).length;
-  const unreviewed = unreviewedReport(project);
-  const summary = summaryReport(project);
+  const composed = composeReport(project);
+  const verified = verifyReport(project);
+  const questions = openQuestions(project, { version });
   const previous = project.releases.predecessorOf(version);
   // Only once there is something to cut: straight after a cut, HEAD is the
   // commit it was cut at, and saying so as a second ✗ under "nothing recorded"
@@ -174,6 +179,7 @@ export function cutChecks(project, { date = today(), commit = undefined } = {}) 
   const recorded = touched > 0 || other > 0;
   const sameMoment = recorded && previous && previous.date === date && previous.commit && previous.commit === commit;
   const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+  const why = questions.filter((q) => q.kind === "why").length;
 
   return [
     {
@@ -185,7 +191,7 @@ export function cutChecks(project, { date = today(), commit = undefined } = {}) 
     {
       id: "audit",
       ok: unaudited.ok,
-      line: unaudited.ok ? unaudited.reason : `${unauditedLine(unaudited)}, so this edition may be missing capabilities the client already has`,
+      line: unaudited.ok ? unaudited.reason : `${unauditedLine(unaudited)}, so this edition may be missing what the client already has`,
       fix: "ledger audit        (or `ledger audit --run <agent>` to hand it to one)",
     },
     {
@@ -195,19 +201,28 @@ export function cutChecks(project, { date = today(), commit = undefined } = {}) 
         ? [touched ? plural(touched, "entry", "entries") : null, other ? plural(other, "product-wide note", "product-wide notes") : null]
           .filter(Boolean).join(" and ") + ` recorded against v${version}`
         : `nothing recorded against v${version}, so its edition would be ${version > 1 ? `identical to v${version - 1}` : "empty"}`,
-      fix: "record the release's work with `ledger add` / `ledger update` — or `ledger audit`, if it landed without the ledger",
+      fix: "record the release's work with `ledger add` / `ledger change` — or `ledger audit`, if it landed without the ledger",
     },
     {
-      id: "summary",
-      ok: summary.ok,
-      line: summaryLine(summary),
-      fix: "ledger summary      (or `ledger summary --run <agent>` to hand it to one)",
+      id: "compose",
+      ok: composed.ok,
+      line: composeLine(composed),
+      fix: "ledger compose      (or `ledger compose --run <agent>` to hand it to one)",
     },
     {
-      id: "review",
-      ok: unreviewed.ok,
-      line: unreviewed.ok ? (unreviewed.reason ?? `reviewed on ${longDate(unreviewed.last?.date)}`) : unreviewedLine(unreviewed),
-      fix: "ledger review       (or `ledger review complete`, if you have read them yourself)",
+      id: "verify",
+      ok: verified.ok,
+      line: verified.ok ? verified.reason : verified.line,
+      fix: "ledger verify       (or `ledger verify --run <agent>` to hand it to one)",
+    },
+    {
+      id: "questions",
+      ok: !questions.length,
+      line: questions.length
+        ? `${plural(questions.length, "question", "questions")} open on v${version}` +
+          (why ? ` (${plural(why, "reason nobody has vouched for", "reasons nobody has vouched for")})` : "")
+        : "nothing open",
+      fix: "ledger questions    (at a terminal, `ledger cut` asks them one at a time)",
     },
     {
       id: "moment",
@@ -227,10 +242,10 @@ export function renderChecks(checks, { indent = "  ", stream = process.stdout, s
   for (const ch of checks) {
     const skip = !ch.ok && skipped.includes(ch.id);
     const m = skip ? color(stream).yellow("–") : mark(ch.ok, stream);
-    lines.push(`${indent}${m} ${ch.id.padEnd(8)} ${ch.line}${skip ? "  (skipped)" : ""}`);
+    lines.push(`${indent}${m} ${ch.id.padEnd(9)} ${ch.line}${skip ? "  (skipped)" : ""}`);
     if (!ch.ok && !skip && ch.fix) {
       for (const [i, f] of ch.fix.split("\n").entries()) {
-        lines.push(`${indent}  ${" ".repeat(8)} ${color(stream).dim(i === 0 ? "→" : " ")} ${f}`);
+        lines.push(`${indent}  ${" ".repeat(9)} ${color(stream).dim(i === 0 ? "→" : " ")} ${f}`);
       }
     }
   }
@@ -244,7 +259,8 @@ function skippedChecks(flags) {
   const asked = [].concat(flags.skip ?? []).filter((v) => v !== true).flatMap((v) => String(v).split(","))
     .map((s) => s.trim()).filter(Boolean);
   if ([].concat(flags.skip ?? []).includes(true)) usage(`--skip needs the checks to skip: ${CHECK_IDS.join(", ")}`);
-  for (const id of asked) {
+  for (const [i, id] of asked.entries()) {
+    if (CHECK_ALIASES[id]) { asked[i] = CHECK_ALIASES[id]; continue; }
     if (!CHECK_IDS.includes(id)) {
       const near = nearest(id, CHECK_IDS);
       usage(`there is no check called "${id}"${near ? ` — did you mean ${near}?` : ""} (the checks: ${CHECK_IDS.join(", ")})`);
@@ -276,10 +292,11 @@ async function confirm(question) {
  * nothing was cut. `--no-pdf` cuts without printing, for a CI job or a
  * container, and `ledger build vN` prints it later.
  *
- * `--run <agent>` hands whatever of the audit, the summary and the review
- * is still open to that agent, one after the other, checks what each left
- * behind, and then asks before it cuts (`--yes` doesn't ask). Only with the
- * flag: nothing is ever handed to an agent unasked.
+ * `--run <agent>` hands whatever of the audit, the composition and (when it is
+ * on) the verify is still open to that agent, one after the other, checks
+ * what each left behind, and then asks before it cuts (`--yes` doesn't ask).
+ * Only with the flag: nothing is ever handed to an agent unasked. At a
+ * terminal, the open questions are asked one at a time on the way.
  */
 export async function cmdCut({ flags }) {
   let project = openProject(flags);
@@ -294,21 +311,38 @@ export async function cmdCut({ flags }) {
   const skipped = skippedChecks(flags);
 
   let handedOver = false;
-  if (flags.run !== undefined && flags.run !== false) {
-    for (const id of ["audit", "summary", "review"]) {
-      const check = cutChecks(project, { date }).find((ch) => ch.id === id);
-      if (check.ok || skipped.includes(id)) continue;
-      out(`${mark(false)} ${id}: ${check.line}`);
-      out("");
-      const code = await runTask(id, flags, { openProject });
-      out("");
-      if (code) {
-        throw new UserError(`${mark(false, process.stderr)} v${project.releases.current.version} was NOT cut: the ${id} didn't ` +
-          "finish (see above). Resume the agent's session to finish it, then cut again.", EXIT.refused, { raw: true });
-      }
-      project = openProject(flags);
-      handedOver = true;
+  const version = project.releases.current.version;
+  const run = flags.run !== undefined && flags.run !== false;
+  const interactive = process.stdin.isTTY && !flags["dry-run"];
+  const hand = async (id) => {
+    const check = cutChecks(project, { date }).find((ch) => ch.id === id);
+    if (check.ok || skipped.includes(id)) return;
+    out(`${mark(false)} ${id}: ${check.line}`);
+    out("");
+    const code = await runTask(id, flags, { openProject });
+    out("");
+    if (code) {
+      throw new UserError(`${mark(false, process.stderr)} v${version} was NOT cut: the ${id} didn't ` +
+        "finish (see above). Resume the agent's session to finish it, then cut again.", EXIT.refused, { raw: true });
     }
+    project = openProject(flags);
+    handedOver = true;
+  };
+  // A reason answered changes what the notes are composed from, so the open
+  // questions are asked before composing; a check against the code can open
+  // more, which are asked after it.
+  const ask = async () => {
+    if (!interactive || skipped.includes("questions") || !openQuestions(project, { version }).length) return;
+    await askInline(project, version);
+    out("");
+    project = openProject(flags);
+  };
+  if (run) await hand("audit");
+  await ask();
+  if (run) {
+    await hand("compose");
+    await hand("verify");
+    await ask();
   }
 
   const current = project.releases.current;
@@ -387,12 +421,6 @@ export async function cmdCut({ flags }) {
     ? `  wrote ${path.relative(process.cwd(), printed) || printed}`
     : `  no edition printed (--no-pdf) — \`ledger build v${current.version}\` prints it`);
   out(`  v${current.version + 1} is now open; new work records against it.`);
-  const pending = unconfirmedReasons(project);
-  if (pending.length) {
-    out(`! ${pending.length} reason${pending.length === 1 ? "" : "s"} in this edition came from an audit reading a ` +
-      "commit message and nobody has confirmed them yet: " +
-      `${pending.map((x) => x.id).join(", ")}. \`ledger audit confirm <id>\` vouches for one.`);
-  }
   const ledgerRel = path.relative(project.root, project.ledgerDir) || ".ledger";
   out(`Next: commit ${ledgerRel}/` +
     (pdfsAreCommitted(project.config) ? ` and ${String(project.config.output.client_dir).replace(/\/+$/, "")}/` : "") + ".");

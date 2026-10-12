@@ -1,16 +1,18 @@
 import fs from "node:fs";
 import path from "node:path";
 import { openProject } from "../store.mjs";
-import { Feature } from "../model/feature.mjs";
-import { fail, readStdin, asList, isBlank, exists } from "../util.mjs";
+import { Feature, WHY_FROM } from "../model/feature.mjs";
+import { fail, readStdin, asList, isBlank, exists, readJson, writeJson, today } from "../util.mjs";
+import { askWhy } from "../questions.mjs";
+import { globRegExp } from "../paths.mjs";
+import * as git from "../git.mjs";
 
 const out = (s) => process.stdout.write(`${s}\n`);
 
 /**
  * Every mutating command takes its content the same way: a JSON object on
  * stdin (or in --file), with individual flags filling in or overriding
- * fields. Prose belongs on stdin — a `changes` list of three multi-sentence
- * bullets is miserable as shell flags — while the short scalars are easier as
+ * fields. Prose belongs on stdin, while the short scalars are easier as
  * flags. Both work; use whichever suits the thing you're writing.
  */
 async function payload(flags, { allow }) {
@@ -41,6 +43,10 @@ async function payload(flags, { allow }) {
     name: flags.name,
     description: flags.description,
     dev_notes: flags["dev-notes"],
+    paths: flags.paths !== undefined && flags.paths !== true ? asList(flags.paths).flatMap((p) => String(p).split(",")).map((p) => p.trim()).filter(Boolean) : undefined,
+    what: flags.what,
+    why: flags.why,
+    why_from: flags["why-from"],
     reason: flags.reason,
     changes: flags.change ? asList(flags.change) : undefined,
     add_changes: flags["add-change"] ? asList(flags["add-change"]) : undefined,
@@ -58,10 +64,11 @@ function report(project, feature, { dryRun, verb }) {
   if (dryRun) {
     out(JSON.stringify(feature.toJSON(), null, 2));
     out(`(--dry-run: nothing written)`);
-    return;
+    return false;
   }
   project.saveFeature(feature);
   out(`${verb} ${feature.id} at v${project.workingVersion} → ${path.relative(process.cwd(), project.featurePath(feature.id))}`);
+  return true;
 }
 
 /**
@@ -96,17 +103,46 @@ function resolveCategory(project, dryRun) {
   return name;
 }
 
+function checkPaths(paths) {
+  for (const p of paths ?? []) {
+    if (typeof p !== "string" || isBlank(p)) fail("\"paths\" is a list of globs, like \"src/billing/**\"");
+    if (p.startsWith("/") || p.split("/").includes("..")) fail(`"${p}": paths are relative to the project root, inside it`);
+  }
+}
+
+/** Where a filed entry lives: the parts of a feature that describe it rather
+ *  than one moment in its history, and so record nothing against a release. */
+function applyFiling(project, feature, data) {
+  if (data.category) {
+    if (!project.config.categories.includes(data.category)) {
+      fail(
+        `unknown area ${JSON.stringify(data.category)} — the areas are:\n` +
+        project.config.categories.map((c) => `  ${c}`).join("\n") +
+        "\nIf this really is a new one, `ledger categories add` places it first.",
+      );
+    }
+    feature.category = data.category;
+  }
+  if ("subcategory" in data) feature.subcategory = data.subcategory || null;
+  if (data.size) feature.size = data.size;
+  if (data.dev_notes !== undefined) feature.dev_notes = isBlank(data.dev_notes) ? null : data.dev_notes;
+  if (data.paths !== undefined) {
+    checkPaths(data.paths);
+    feature.paths = [...new Set(data.paths)];
+  }
+}
+
 export async function cmdAdd({ flags, positional }) {
   const project = openProject(flags);
   const version = project.workingVersion;
   const data = await payload(flags, {
-    allow: ["id", "audience", "category", "subcategory", "size", "name", "description", "dev_notes", "backfilled"],
+    allow: ["id", "audience", "category", "subcategory", "size", "name", "description", "dev_notes", "paths", "backfilled"],
   });
 
   const id = positional[0] ?? data.id;
   if (!id) fail("usage: ledger add <id>  (with the rest as JSON on stdin)");
   if (project.featureSet.has(id)) {
-    fail(`feature "${id}" already exists — use \`ledger update ${id}\` to record a change to it`);
+    fail(`feature "${id}" already exists — use \`ledger change ${id}\` to record a change to it`);
   }
 
   // A category is only required once the product has more than one, so a
@@ -135,6 +171,7 @@ export async function cmdAdd({ flags, positional }) {
       fail(`sub-section ${sub.id} lives under ${JSON.stringify(sub.category)}, not ${JSON.stringify(data.category)}`);
     }
   }
+  checkPaths(data.paths);
 
   const feature = new Feature({
     id,
@@ -142,12 +179,12 @@ export async function cmdAdd({ flags, positional }) {
     category: data.category,
     subcategory: data.subcategory ?? null,
     size: data.size,
+    paths: [...new Set(data.paths ?? [])],
+    dev_notes: isBlank(data.dev_notes) ? null : data.dev_notes,
     history: [{
       version,
       name: data.name,
       description: data.description,
-      changes: null,
-      ...(data.dev_notes ? { dev_notes: data.dev_notes } : {}),
       // --backfilled: the capability was already in the product, and this is
       // simply the first edition to list it. It still lands on the open
       // release — "new" in a client edition means new to the reader — but it
@@ -156,132 +193,177 @@ export async function cmdAdd({ flags, positional }) {
     }],
   });
 
-  report(project, feature, { dryRun: flags["dry-run"], verb: "added" });
+  if (report(project, feature, { dryRun: flags["dry-run"], verb: "added" }) && !feature.paths.length && feature.audience === "user") {
+    out(`  no "paths" yet: \`ledger own ${id} <glob>\` says which code it lives in, so an audit and a preview can see it move`);
+  }
 }
 
-export async function cmdUpdate({ flags, positional }) {
+/**
+ * The reason a change carries, and where it came from, from the payload and
+ * the flags. Every change says why it happened, or says plainly that nobody
+ * knows: the ledger never invents one, and never forgets one is missing.
+ */
+function whyOf(flags, data, id) {
+  if (flags["why-unknown"]) {
+    if (!isBlank(data.why)) fail("--why-unknown says nobody knows why, so it can't come with a --why");
+    return { why: null, why_from: "unknown" };
+  }
+  if (isBlank(data.why)) {
+    fail(`${id} existed before this release, so the change needs "why": the reason it moved. The client can see ` +
+      "what it does now from the description; the reason is the part only the person who decided it knows. If you " +
+      "don't know, ask. If nobody can say, pass --why-unknown, which records the gap as a question rather than a " +
+      "plausible-sounding guess. A reason read off a commit message takes --why-from commit.");
+  }
+  const from = data.why_from ?? "person";
+  if (!WHY_FROM.includes(from) || from === "unknown") fail("--why-from is person (the default) or commit; for no reason at all, --why-unknown");
+  return { why: String(data.why).trim(), why_from: from };
+}
+
+/**
+ * `ledger change <id>`: something about a capability moved, and this is what
+ * and why. Appended to the feature's events; nothing here is phrased for the
+ * client. The "What changed" note the edition prints is composed for the
+ * whole release at once (`ledger compose`), from the state the last edition
+ * showed, the state now and these events, so a second change in one cycle is
+ * just a second event: there is nothing earlier to revise.
+ *
+ * What moves the product: `what` (with its `why`), a new `description` of
+ * the whole current state, a `name` the product now uses. What doesn't: the
+ * area, the size, the paths and the team's notes, which say where an entry
+ * lives and are filed without recording anything.
+ */
+export async function cmdChange({ flags, positional }, { legacy = false } = {}) {
   const project = openProject(flags);
   const version = project.workingVersion;
   const id = positional[0];
-  if (!id) fail("usage: ledger update <id>  (with the change as JSON on stdin)");
+  if (!id) fail(`usage: ledger ${legacy ? "update" : "change"} <id>  (what and why as JSON on stdin, or --what/--why)`);
   const feature = project.featureSet.find(id);
 
-  const data = await payload(flags, {
-    allow: ["description", "changes", "add_changes", "name", "size", "category", "subcategory", "dev_notes", "backfilled", "reason_inferred"],
-  });
+  const base = ["what", "why", "why_from", "description", "name", "size", "category", "subcategory", "dev_notes", "paths", "backfilled"];
+  const data = await payload(flags, { allow: legacy ? [...base, "changes", "add_changes", "reason_inferred"] : base });
 
   if (feature.entryAt(version)?.removed) {
     fail(`${id} is marked removed at v${version} — delete that entry by hand if it was a mistake`);
   }
+  applyFiling(project, feature, data);
 
-  // Field moves (a re-filing, a resize) apply to the feature itself, not to
-  // one moment in its history: they describe where the entry lives, not what
-  // the product did.
-  if (data.category) {
-    if (!project.config.categories.includes(data.category)) {
-      fail(
-        `unknown area ${JSON.stringify(data.category)} — the areas are:\n` +
-        project.config.categories.map((c) => `  ${c}`).join("\n") +
-        "\nIf this really is a new one, `ledger categories add` places it first.",
-      );
-    }
-    feature.category = data.category;
+  // `ledger update` wrote client-facing bullets, each carrying both what and
+  // why. Kept working: each bullet becomes one event that says both.
+  const legacyBullets = legacy ? [...asList(data.changes), ...asList(data.add_changes)].filter((b) => !isBlank(b)) : [];
+
+  const moves = !isBlank(data.what) || !isBlank(data.description) || !isBlank(data.name) || data.backfilled || legacyBullets.length;
+  const filing = ["category", "subcategory", "size", "dev_notes", "paths"].some((k) => data[k] !== undefined);
+  if (!moves) {
+    if (!filing) fail(`nothing to record — \`ledger change ${id}\` takes "what" and "why", and "description" for the new state`);
+    const rebuilt = new Feature(feature.toJSON());
+    if (flags["dry-run"]) { out(JSON.stringify(rebuilt.toJSON(), null, 2)); out("(--dry-run: nothing written)"); return; }
+    project.saveFeature(rebuilt);
+    out(`filed ${id} — where an entry lives isn't news, so nothing is recorded against v${version}`);
+    return;
   }
-  if ("subcategory" in data) feature.subcategory = data.subcategory || null;
-  if (data.size) feature.size = data.size;
 
   const existedBefore = feature.firstVersion < version;
   const prev = feature.history.filter((h) => h.version < version).pop();
+  const recorded = feature.events.length;
   let entry = feature.entryAt(version);
-  const againThisCycle = existedBefore && Boolean(entry) && !entry.removed;
+  const notes = [];
 
-  // A feature the client has never seen has no "before" to report, however
-  // many times it moved while it was being built: every intermediate state
-  // is a draft. A change bullet on it would print as a fix to something the
-  // reader never had, so the new state goes in the description instead.
-  if (!existedBefore && (data.changes?.length || data.add_changes?.length)) {
-    fail(
-      `${id} is new in v${version} — the client has never seen an earlier version of it, so there is nothing to ` +
-      "tell them changed. Pass the full updated \"description\" and no \"changes\".",
-    );
-  }
-
-  if (!entry) {
-    if (isBlank(data.description)) {
-      fail(
-        `recording a change needs the full updated "description" — the current-state text, not a diff ` +
-        `(\`ledger show ${id}\` prints what's there now)`,
-      );
+  // A feature the client has never seen has no "before": however often it
+  // moved while it was being built, the new state is its description, and
+  // the edition prints no "What changed" note for it.
+  if (!existedBefore) {
+    if (!isBlank(data.description)) entry.description = data.description;
+    if (!isBlank(data.name)) entry.name = data.name;
+    if (!isBlank(data.what) || legacyBullets.length) {
+      if (legacy) {
+        fail(`${id} is new in v${version} — the client has never seen an earlier version of it, so there is nothing to ` +
+          "tell them changed. Pass the full updated \"description\" and no \"changes\".");
+      }
+      notes.push(`${id} is new in v${version}, so its description is the whole story: no change was recorded, ` +
+        "and the edition prints no \"What changed\" note for it.");
     }
-    entry = { version, description: data.description, changes: null };
-    // dev_notes belong to the feature, not to one release: an entry that
-    // doesn't restate them would silently drop the notes from every doc.
-    if (prev?.dev_notes) entry.dev_notes = prev.dev_notes;
-    feature.history.push(entry);
-    feature.history.sort((a, b) => a.version - b.version);
-  } else if (!isBlank(data.description)) {
-    entry.description = data.description;
-  }
+  } else {
+    const events = [];
+    if (legacyBullets.length) {
+      for (const b of legacyBullets) {
+        events.push({ version, kind: "change", what: b, why: null, why_from: data.reason_inferred ? "commit" : "person", combined: true });
+      }
+    } else if (!isBlank(data.what)) {
+      events.push({ version, kind: "change", what: String(data.what).trim(), ...whyOf(flags, data, id) });
+    } else {
+      // Refining the current-state text of an entry that already changed
+      // this cycle is wording of that change, not another one. Anything
+      // else — a new name, a description on an entry that hasn't moved —
+      // is news, and news says what and why.
+      const refining = entry && !entry.removed && !isBlank(data.description) && isBlank(data.name) && !data.backfilled;
+      if (!refining) {
+        fail(legacy
+          ? `${id} existed before v${version}, so this needs "changes": a list of standalone bullets, each saying what ` +
+            "it was before AND why it moved. If you don't know why it changed, ask — don't write a plausible-sounding one."
+          : `${id} existed before v${version}, so this needs "what" (what changed) and "why" (the reason). ` +
+            "The description alone would change what the client reads without telling them anything moved.");
+      }
+    }
 
-  // A rename the client is told about: `name` on this release's entry, with a
-  // `changes` bullet like any other change. The generators footnote the
-  // previous name on their own, from the named entries in the history.
-  //
-  // A name that was simply *chosen badly* is not this. That is wording, and
-  // wording is a hand-edit: change `name` on the entry where it was set, in
-  // .ledger/features/<id>.json, and nothing lands on the release. There used
-  // to be a `ledger rename` covering both, which is why it kept getting used
-  // for the first when the second was meant.
-  if (data.name) entry.name = data.name;
-  if (data.dev_notes !== undefined) {
-    if (isBlank(data.dev_notes)) delete entry.dev_notes;
-    else entry.dev_notes = data.dev_notes;
-  }
+    if (!entry) {
+      // The state at this release. A change the description doesn't need to
+      // mention still marks the entry as moved, with the words it had.
+      entry = { version, description: isBlank(data.description) ? prev.description : data.description };
+      feature.history.push(entry);
+      feature.history.sort((a, b) => a.version - b.version);
+    } else if (!isBlank(data.description)) {
+      entry.description = data.description;
+    }
+    // A rename the client is told about: `name` on this release's entry. The
+    // generators footnote the previous name on their own. A name that was
+    // simply chosen badly is wording, and a hand-edit.
+    if (!isBlank(data.name)) entry.name = data.name;
+    if (data.backfilled) entry.backfilled = true;
 
-  if (data.changes !== undefined) entry.changes = data.changes;
-  if (data.add_changes !== undefined) entry.changes = [...(entry.changes ?? []), ...asList(data.add_changes)];
-  // A change an audit found late still has to say what moved and why — the
-  // rule below is not relaxed for it. All --backfilled changes is the
-  // register it prints in: the product moved before the last cutoff, so the
-  // client should not read this as work from the cycle just shipped.
-  if (data.backfilled) entry.backfilled = true;
-  // Set when an audit took the reason from a commit message rather than from
-  // whoever made the decision. It stays on the entry until someone vouches for
-  // the sentence, so the question outlives the terminal the audit ran in.
-  if (data.reason_inferred) entry.reason_inferred = true;
-
-  // The rule that makes the ledger worth reading rather than a diff: a
-  // feature that already existed can't quietly acquire a new description.
-  // Something has to say what moved and why.
-  if (existedBefore && !entry.changes?.length) {
-    fail(
-      `${id} existed before v${version}, so this needs "changes": a list of standalone bullets, each saying what it ` +
-      "was before AND why it moved. The client can see what it is now from the description; the reason is the part " +
-      "only you know. If you don't know why it changed, ask — don't write a plausible-sounding one.",
-    );
+    for (const e of events) {
+      if (data.backfilled) e.backfilled = true;
+      e.date = today();
+      feature.events.push(e);
+    }
   }
 
   const rebuilt = new Feature(feature.toJSON());
-  report(project, rebuilt, { dryRun: flags["dry-run"], verb: "updated" });
+  if (!report(project, rebuilt, { dryRun: flags["dry-run"], verb: legacy ? "updated" : "changed" })) return;
+  for (const n of notes) out(`note: ${n}`);
 
-  // The second change to one feature in a cycle is where a misleading bullet
-  // starts: it naturally says what the feature was a moment ago, and the
-  // client never saw that. Said here, while the agent still has the context.
-  if (againThisCycle && !flags["dry-run"]) {
-    out(
-      `note: ${id} had already changed in v${version}. The client compares this release with v${prev.version}, ` +
-      `not with the state your last update left it in, so every bullet's "before" has to be true of v${prev.version} ` +
-      `(\`ledger show ${id} --history\`). Revise or merge the earlier bullets rather than stacking a new one on them.`,
-    );
+  // A reason nobody vouched for stays a question until someone does.
+  const asked = [];
+  for (let i = recorded; i < rebuilt.events.length; i++) {
+    const q = askWhy(project, rebuilt, i);
+    if (q) asked.push(q);
   }
+  if (asked.length) {
+    project.saveQuestions();
+    for (const q of asked) out(`  question #${q.id} opened: ${q.text}`);
+    out("  `ledger questions` lists what's open; `ledger cut` asks them before printing.");
+  }
+}
+
+/** The old name. Kept so stanzas and scripts written against it still work. */
+export async function cmdUpdate(args) {
+  process.stderr.write("note: `ledger update` is now `ledger change`, which takes \"what\" and \"why\" as separate fields — " +
+    "the old \"changes\" bullets still work.\n");
+  return cmdChange(args, { legacy: true });
 }
 
 export async function cmdRemove({ flags, positional }) {
   const project = openProject(flags);
   const version = project.workingVersion;
   const id = positional[0];
-  if (!id) fail('usage: ledger remove <id> --reason "…"');
-  if (isBlank(flags.reason)) fail("a removal needs --reason \"…\" — the ledger says what went away and why");
+  if (!id) fail('usage: ledger remove <id> --why "…"');
+  const data = await payload(flags, { allow: ["why", "why_from", "reason", "backfilled", "reason_inferred"] });
+  const why = !isBlank(data.why) ? data.why : data.reason;
+  if (isBlank(why) || why === true) {
+    fail("a removal needs --why \"…\": the edition says what went away and why, so this is the one reason that can't be " +
+      "left unknown. If it was read off a commit message, add --why-from commit.");
+  }
+  const from = data.reason_inferred ? "commit" : (data.why_from ?? "person");
+  if (!["person", "commit"].includes(from)) fail("--why-from is person (the default) or commit");
 
   const feature = project.featureSet.find(id);
   if (feature.firstVersion === version) {
@@ -293,16 +375,67 @@ export async function cmdRemove({ flags, positional }) {
 
   feature.history = feature.history.filter((h) => h.version !== version);
   feature.history.push({
-    version, removed: true, reason: flags.reason,
+    version, removed: true, reason: String(why).trim(),
     // A withdrawal an audit found late. It is still reported to the client —
     // a capability that is gone and was never mentioned is exactly what a
     // reader needs to know — but not as something taken away this cycle.
-    ...(flags.backfilled ? { backfilled: true } : {}),
-    ...(flags["reason-inferred"] ? { reason_inferred: true } : {}),
+    ...(data.backfilled ? { backfilled: true } : {}),
   });
   feature.history.sort((a, b) => a.version - b.version);
+  feature.events.push({ version, kind: "remove", what: `${feature.currentName} is no longer part of the product.`,
+    why: String(why).trim(), why_from: from, ...(data.backfilled ? { backfilled: true } : {}), date: today() });
 
-  report(project, new Feature(feature.toJSON()), { dryRun: flags["dry-run"], verb: "removed" });
+  const rebuilt = new Feature(feature.toJSON());
+  if (!report(project, rebuilt, { dryRun: flags["dry-run"], verb: "removed" })) return;
+  const q = askWhy(project, rebuilt, rebuilt.events.length - 1);
+  if (q) {
+    project.saveQuestions();
+    out(`  question #${q.id} opened: ${q.text}`);
+  }
+}
+
+/**
+ * `ledger own <id> <glob…>`: which code a capability lives in. Adds to the
+ * entry's `paths`, or with --remove takes globs off it. `ledger own --ignore
+ * <glob…>` marks files as not product code at all — tests, fixtures, CI — so
+ * they never read as code that no entry owns.
+ *
+ * Nothing is recorded against the release: where the code lives is about the
+ * entry, not news about the product.
+ */
+export async function cmdOwn({ flags, positional }) {
+  const project = openProject(flags);
+  project.assertWritable();
+  const ignore = Boolean(flags.ignore);
+  const [id, ...globs] = ignore ? [null, ...positional] : positional;
+  if (!ignore && !id) fail("usage: ledger own <id> <glob…> [--remove]  |  ledger own --ignore <glob…>");
+  if (!globs.length && !flags.clear) fail("name the globs: `ledger own <id> 'src/billing/**'` — quote them, so the shell leaves the stars alone");
+  checkPaths(globs);
+
+  const tracked = git.available(project.root) ? git.files(project.root) : [];
+  const count = (g) => tracked.filter((f) => globRegExp(g).test(f)).length;
+  const describe = (g) => (tracked.length ? `${g}  (${count(g)} file${count(g) === 1 ? "" : "s"})` : g);
+
+  if (ignore) {
+    const raw = readJson(project.configPath);
+    const list = raw.ignore ?? [];
+    const next = flags.remove ? list.filter((g) => !globs.includes(g)) : [...new Set([...list, ...globs])];
+    if (flags["dry-run"]) { out(JSON.stringify(next, null, 2)); out("(--dry-run: nothing written)"); return; }
+    raw.ignore = next;
+    writeJson(project.configPath, raw);
+    for (const g of globs) out(`${flags.remove ? "no longer ignoring" : "ignoring"} ${describe(g)}`);
+    return;
+  }
+
+  const feature = project.featureSet.find(id);
+  const before = feature.paths;
+  feature.paths = flags.clear ? [] : flags.remove ? before.filter((g) => !globs.includes(g)) : [...new Set([...before, ...globs])];
+  const rebuilt = new Feature(feature.toJSON());
+  if (flags["dry-run"]) { out(JSON.stringify(rebuilt.toJSON(), null, 2)); out("(--dry-run: nothing written)"); return; }
+  project.saveFeature(rebuilt);
+  out(`${id} lives in:`);
+  for (const g of rebuilt.paths) out(`  ${describe(g)}${tracked.length && !count(g) ? "   ! matches no tracked file" : ""}`);
+  if (!rebuilt.paths.length) out("  (nothing — `ledger own <id> <glob>` adds a path)");
 }
 
 /**
@@ -418,7 +551,7 @@ function removeCategory(project, flags, args) {
   if (held.length) {
     fail(
       `${JSON.stringify(name)} still holds ${held.length} feature(s): ${held.map((f) => f.id).join(", ")}. ` +
-      "Re-file them first (`ledger update <id> --category \"…\"`) — dropping the area would leave them pointing at nothing.",
+      "Re-file them first (`ledger change <id> --category \"…\"`) — dropping the area would leave them pointing at nothing.",
     );
   }
   if (flags["dry-run"]) {
@@ -478,5 +611,5 @@ export async function cmdSubcategory({ flags, positional }) {
   }
   project.subcategories.push(entry);
   project.saveSubcategories();
-  out(`added sub-section ${data.id} under ${data.category} — assign features to it with \`ledger update <id> --subcategory ${data.id}\``);
+  out(`added sub-section ${data.id} under ${data.category} — assign features to it with \`ledger change <id> --subcategory ${data.id}\``);
 }

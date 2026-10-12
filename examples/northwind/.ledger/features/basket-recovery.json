@@ -3,17 +3,26 @@
   "audience": "user",
   "category": "Ordering",
   "size": "Small",
+  "paths": [],
   "history": [
     {
       "version": 1,
       "name": "Basket survives a lost connection",
-      "description": "A basket is held for seven days against the browser it was built in, so a customer who closes the tab or loses signal comes back to what they had.",
-      "changes": null
+      "description": "A basket is held for seven days against the browser it was built in, so a customer who closes the tab or loses signal comes back to what they had."
     },
     {
       "version": 2,
       "removed": true,
       "reason": "Folded into the account itself: a basket now belongs to the customer rather than to one browser, so the seven-day browser-local hold has nothing left to do."
+    }
+  ],
+  "events": [
+    {
+      "version": 2,
+      "kind": "remove",
+      "what": "Basket survives a lost connection is no longer part of the product.",
+      "why": "Folded into the account itself: a basket now belongs to the customer rather than to one browser, so the seven-day browser-local hold has nothing left to do.",
+      "why_from": "person"
     }
   ]
 }

@@ -5,9 +5,10 @@ import { resolveBrand, accentCollides } from "../render/brand.mjs";
 import { fontFaceCss } from "../render/fonts.mjs";
 import { probeBrowser } from "../render/pdf.mjs";
 import { resolveStyle, styleTitle } from "../style.mjs";
-import { unauditedReport, unauditedSince, unconfirmedReasons } from "./audit.mjs";
-import { unreviewedReport, unreviewedLine } from "./review.mjs";
-import { summaryReport, summaryLine, textProblems } from "../summary.mjs";
+import { unauditedReport, unauditedSince } from "./audit.mjs";
+import { composeReport, composeLine, textProblems } from "../compose.mjs";
+import { openQuestions } from "../questions.mjs";
+import { coverage } from "./paths.mjs";
 import { shortSha } from "../git.mjs";
 import { redraftReport, redraftSteps, rangeLabel } from "./redraft.mjs";
 import { cutChecks, renderChecks } from "./release.mjs";
@@ -16,6 +17,9 @@ import { UserError } from "../util.mjs";
 import { color } from "../ui.mjs";
 
 const out = (s) => process.stdout.write(`${s}\n`);
+
+/** About how many words a description has before it stops being two or three sentences. */
+const DESCRIPTION_WORDS = { Big: 120, Medium: 90, Small: 60 };
 const field = (k, v) => out(`  ${k.padEnd(11)} ${v}`);
 
 /**
@@ -42,15 +46,18 @@ export async function cmdStatus({ flags }) {
   const release = releaseReport(project);
   const corpus = corpusReport(project);
   const audit = auditReport(project);
-  const review = unreviewedReport(project);
+  const compose = composeReport(project);
   const redraft = redraftReport(project);
+  const questions = openQuestions(project);
+  const cov = coverage(project);
   const checks = project.releases.current.future ? cutChecks(project) : [];
 
   if (flags.json) {
     const setup = setupReport(project);
     setup.browser = await browserLine();
     const ready = checks.map(({ id, ok, line, fix }) => ({ id, ok, line, fix }));
-    out(JSON.stringify({ ...release, corpus, audit, review, redraft, checks: ready, setup, warnings }, null, 2));
+    const owned = cov ? { product_files: cov.product.length, unowned: cov.unowned.length, ignored: cov.ignored } : null;
+    out(JSON.stringify({ ...release, corpus, audit, compose, questions, ownership: owned, redraft, checks: ready, setup, warnings }, null, 2));
     return;
   }
 
@@ -75,7 +82,7 @@ export async function cmdStatus({ flags }) {
     if (release.other_changes) {
       out(`  other (${release.other_changes}) — change${release.other_changes === 1 ? "" : "s"} belonging to no single feature`);
     }
-    out(`  reviewed    ${reviewLine(review)}`);
+    out(`  composed    ${composedLine(compose)}`);
   }
 
   if (checks.length) {
@@ -92,6 +99,11 @@ export async function cmdStatus({ flags }) {
     : `${corpus.areas}${corpus.largest ? `, largest is “${corpus.largest.category}” with ${corpus.largest.count}` : ""}`);
   field("releases", `${corpus.releases} (\`ledger releases\` lists them)`);
   field("audited", audit.line);
+  if (cov) {
+    field("owned", `${cov.product.length - cov.unowned.length} of ${cov.product.length} product files belong to an entry` +
+      (cov.unowned.length ? ` — \`ledger paths\` lists the ${cov.unowned.length} that don't` : ""));
+  }
+  if (questions.length) field("questions", `${questions.length} open — \`ledger questions\``);
   if (audit.full_line) field("full sweep", audit.full_line);
   const lastRedraft = project.redrafts[project.redrafts.length - 1];
   if (lastRedraft) {
@@ -117,10 +129,11 @@ export async function cmdStatus({ flags }) {
   if (!warnings.length) out("Nothing to fix.");
 }
 
-function reviewLine(review) {
-  if (review.ok) return review.last ? `${review.last.date}, nothing changed since` : `not needed — ${review.reason}`;
-  if (!review.last) return "not yet — `ledger review` prints the brief";
-  return `${review.last.date}, then ${review.pending.length} entr${review.pending.length === 1 ? "y" : "ies"} changed`;
+function composedLine(report) {
+  if (report.ok) return report.reason ? `not needed — ${report.reason}` : `${report.composition.date}, nothing moved since`;
+  if (report.missing) return "not yet — `ledger compose` prints the brief";
+  if (report.incomplete) return "a draft, never marked complete — `ledger compose` finishes it";
+  return `${report.composition.date ?? "never stamped"}, then ${report.stale.length} entr${report.stale.length === 1 ? "y" : "ies"} moved`;
 }
 
 function listing(project, label, ids) {
@@ -168,8 +181,6 @@ function auditReport(project) {
   const last = project.lastAudit;
   const full = project.lastFullAudit;
   const unaudited = unauditedReport(project);
-  const pending = unconfirmedReasons(project);
-
   let line;
   if (!last) line = "never — `ledger audit` prints the brief";
   else {
@@ -188,7 +199,6 @@ function auditReport(project) {
     last,
     last_full: full,
     unaudited,
-    unconfirmed_reasons: pending,
     line,
     full_line: fullLine,
   };
@@ -296,52 +306,42 @@ function collectWarnings(project) {
   // so that is the normal state between sweeps. The "audited" line above says
   // how much has landed, and `ledger cut` is where it gates.
 
-  // Only once the edition has something to be compared with; a first edition
-  // prints nothing as new or changed.
-  const unreviewed = unreviewedReport(project);
-  if (!unreviewed.ok) {
-    warnings.push(`${unreviewedLine(unreviewed)}. \`ledger review\` prints the brief; \`ledger cut\` refuses until then.`);
-  }
-
-  const summary = summaryReport(project);
-  if (!summary.ok) {
-    warnings.push(`${summaryLine(summary)}. \`ledger summary\` prints the brief; \`ledger cut\` refuses until then.`);
+  const composed = composeReport(project);
+  if (!composed.ok) {
+    warnings.push(`${composeLine(composed)}. \`ledger compose\` prints the brief; \`ledger cut\` refuses until then.`);
   }
   // An edition's opening page prints these exactly as written, and nothing
-  // about them puts the summary out of date, so they are only ever said here.
-  if (summary.summary) {
-    const faulty = textProblems(summary.summary);
+  // about them puts the composition out of date, so they are only ever said here.
+  if (composed.composition) {
+    const faulty = textProblems(composed.composition);
     if (faulty.length) {
       warnings.push(
-        `${faulty.length} item${faulty.length === 1 ? "" : "s"} in the summary of v${summary.version} won't read as a sentence ` +
+        `${faulty.length} item${faulty.length === 1 ? "" : "s"} in the summary of v${composed.version} won't read as a sentence ` +
         `of ${faulty.length === 1 ? "its" : "their"} own: ${faulty.map(([text, problems]) => `“${text.slice(0, 50)}${text.length > 50 ? "…" : ""}” ` +
-        `(${problems.join(", ")})`).join("; ")}. Reword one that opens on a command or a file name, in .ledger/summaries.json.`,
+        `(${problems.join(", ")})`).join("; ")}. Reword one that opens on a command or a file name, in .ledger/compositions.json.`,
       );
     }
   }
 
-  // A "What changed" note on something the client has never seen describes a
-  // state inside the release — a draft of the feature, not a change to it.
-  for (const f of set.features({ audience: "user" })) {
-    const h = f.entryAt(f.firstVersion);
-    if (f.firstVersion === project.releases.current.version && project.releases.current.future && h.changes?.length) {
-      warnings.push(
-        `${f.id} is new in v${f.firstVersion} but carries "changes". The client has never seen an earlier version of it, ` +
-        "so there is nothing to say changed: fold anything worth keeping into the description and set \"changes\" to null.",
-      );
-    }
-  }
-
-  const pending = unconfirmedReasons(project);
-  if (pending.length) {
+  // Two or three sentences is what a description has to work with; past this
+  // it is usually describing how, or carrying detail that belongs in dev notes.
+  const long = set.features({ audience: "user" }).map((f) => {
+    const st = f.stateAt(project.releases.latestVersion);
+    return st && !st.removed ? [f, st.description.split(/\s+/).length] : null;
+  }).filter((x) => x && x[1] > (DESCRIPTION_WORDS[x[0].size] ?? DESCRIPTION_WORDS.Medium));
+  if (long.length) {
     warnings.push(
-      `${pending.length} change reason${pending.length === 1 ? "" : "s"} came from an audit reading a commit ` +
-      `message rather than from whoever decided it, and nobody has confirmed ${pending.length === 1 ? "it" : "them"} ` +
-      `yet: ${pending.map((x) => `${x.id} v${x.version}`).join(", ")}. ` +
-      "`ledger audit confirm <id>` vouches for one as it stands. To rewrite the bullet instead, edit it in " +
-      ".ledger/features/<id>.json and delete the \"reason_inferred\" line on that entry — writing the sentence " +
-      "yourself is the stronger form of vouching for it.",
+      `${long.length} description${long.length === 1 ? " runs" : "s run"} long for ${long.length === 1 ? "its" : "their"} size ` +
+      `(${long.map(([f, n]) => `${f.id} ${n} words`).join(", ")}). A description says what the product does in two or three ` +
+      `sentences — about ${DESCRIPTION_WORDS.Big} words for a Big entry, ${DESCRIPTION_WORDS.Medium} for a Medium, ${DESCRIPTION_WORDS.Small} for a Small; ` +
+      "the mechanics go in dev_notes. Shortening one is wording: edit it in .ledger/features/<id>.json.",
     );
+  }
+
+  const cov = coverage(project);
+  for (const d of cov?.dead ?? []) {
+    warnings.push(`${d.feature.id}'s paths ${d.globs.join(", ")} match no tracked file: its code moved or went. ` +
+      `\`ledger own ${d.feature.id} '<glob>'\` points it at the code again, or \`ledger remove\` if the capability is gone.`);
   }
 
   const indexed = new Set(project.index);
@@ -396,8 +396,9 @@ export async function cmdOverview({ flags, help }) {
   const open = checks.find((ch) => !ch.ok);
   let next;
   if (!open) next = 'ledger cut --name "…"      (prints the edition; `ledger preview` shows the draft first)';
+  else if (open.id === "questions") next = "ledger questions    (or `ledger cut`, which asks them one at a time)";
   else if (open.id === "redraft") next = redraftReport(project).steps[0];
-  else if (open.id === "content") next = "record work as it lands: `ledger add` / `ledger update` (an agent that read the stanza does this itself)";
+  else if (open.id === "content") next = "record work as it lands: `ledger add` / `ledger change` (an agent that read the stanza does this itself)";
   else next = open.fix;
   out(`Next: ${next}`);
   out(c.dim("`ledger status` has the full picture · `ledger help` lists every command"));

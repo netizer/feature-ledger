@@ -1,0 +1,55 @@
+{
+  "compositions": [
+    {
+      "version": 2,
+      "changes": {
+        "delivery-window-picker": [
+          "The booking horizon went from fourteen days to twenty-eight. Fourteen covered the weekly shop but not the customers who plan a month ahead around a delivery. Those are the orders least likely to be cancelled, so the longer horizon costs nothing to offer and holds the more valuable bookings.",
+          "A day with no free van used to show no slots at all, which read as a fault in the site. It now says the fleet is fully committed, and offers the next day that is not."
+        ],
+        "saved-addresses": [
+          "Was \"Saved addresses\", which read as a settings screen; customers were looking for it under the order, not under their account. The name now matches the label it sits behind."
+        ]
+      },
+      "new": [
+        {
+          "text": "Customers choose, line by line, whether a substitute is acceptable and which one.",
+          "covers": [
+            "substitutions"
+          ]
+        },
+        {
+          "text": "Pickers scan each item at the shelf, can hand a part-finished run to a colleague, and see the time left before the van leaves.",
+          "covers": [
+            "pick-scan",
+            "pick-reassign",
+            "pick-timer",
+            "pick-print"
+          ]
+        }
+      ],
+      "changed": [
+        {
+          "text": "Delivery windows can be booked up to 28 days ahead instead of 14.",
+          "covers": [
+            "delivery-window-picker"
+          ]
+        }
+      ],
+      "quiet": [
+        "saved-addresses"
+      ],
+      "date": "2026-10-12",
+      "commit": "847e774421c3c0ae8e7776fa9f3718faf1b06e48",
+      "inputs": {
+        "delivery-window-picker": "6571a05005b5f1b2",
+        "substitutions": "2161abb021e3043a",
+        "saved-addresses": "715f6ec32fc1f90b",
+        "pick-scan": "bfb8201faf3fb1b1",
+        "pick-reassign": "b364acea63970982",
+        "pick-timer": "bbe23e937a160eb2",
+        "pick-print": "cde78790d3a4b758"
+      }
+    }
+  ]
+}

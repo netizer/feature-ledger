@@ -3,13 +3,30 @@
   "audience": "user",
   "category": "Setting up a ledger",
   "size": "Small",
+  "paths": [
+    "assets/RULES.md",
+    "src/commands/read.mjs"
+  ],
+  "dev_notes": "assets/RULES.md with a {style} placeholder; a project copy at .ledger/RULES.md wins. src/commands/read.mjs cmdRules.",
   "history": [
     {
       "version": 1,
       "name": "The authoring rules",
-      "description": "The command ledger rules prints the full rules for writing the ledger: what each field means, where the bar for an entry sits, how to record a change or a removal, and which parts of the corpus you edit by hand instead. The project's tone is printed inside it, and a RULES.md in the ledger directory replaces the packaged text with your own house conventions.",
-      "changes": null,
-      "dev_notes": "assets/RULES.md with a {style} placeholder; a project copy at .ledger/RULES.md wins. src/commands/read.mjs cmdRules."
+      "description": "The command ledger rules prints the full rules for writing the ledger: what each field means, where the bar for an entry sits, how to record a change or a removal, and which parts of the corpus you edit by hand instead. The project's tone is printed inside it, and a RULES.md in the ledger directory replaces the packaged text with your own house conventions."
+    },
+    {
+      "version": 3,
+      "description": "The command ledger rules prints the rules for writing the ledger: what each field means, where the bar for an entry sits, how to record a change, and what you edit by hand instead. The project's tone is printed inside it, and a RULES.md in the ledger directory replaces it with your own house conventions."
+    }
+  ],
+  "events": [
+    {
+      "version": 3,
+      "kind": "change",
+      "what": "The rules describe a change as what moved and why, the code each entry lives in, and editing the composed notes, and no longer teach how to write a client-facing note mid-release.",
+      "why": "Those rules existed to keep mid-release notes honest, and the notes are composed now. An agent reads the rules before its first edit, so every line it doesn't need is paid for on every edit.",
+      "why_from": "person",
+      "date": "2026-10-12"
     }
   ]
 }

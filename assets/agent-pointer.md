@@ -11,18 +11,23 @@ through the CLI:
 ```
 ledger list                  # the corpus, one line per feature
 ledger show <id>             # the one entry you are about to touch
-ledger add <id>              # a new feature    (JSON payload on stdin)
-ledger update <id>           # a change to one  (JSON payload on stdin)
+ledger add <id>              # a new feature    (JSON payload on stdin, with "paths")
+ledger change <id>           # a change to one  ({ "what", "why", "description" } on stdin)
+ledger own <id> '<glob>'     # code a feature lives in, when you add some
 ledger status                # release, corpus and setup, checked
 ledger rules                 # the full authoring rules; read before your first edit
 ```
 
+A change records **what** moved and **why**, as facts; you don't write it for
+the client. The edition's "What changed" note is composed later, for the whole
+release at once. Never invent a reason: ask. If nobody can say, pass
+`--why-unknown`, and a reason you read off a commit message takes
+`--why-from commit`. Either is kept as a question for a person.
+
 Wording is different: there is no command for it. To improve how an existing
-entry is *said* — its name, its description, its dev notes, the text of a
-change bullet — edit `.ledger/features/<id>.json` in place and run
-`ledger status`. Nothing is recorded against the release, because nothing
-about the product moved. Use `ledger update` only when the product actually
-changed and the client should be told.
+entry is *said* — its name, its description, its dev notes — edit
+`.ledger/features/<id>.json` in place and run `ledger status`. Nothing is
+recorded against the release, because nothing about the product moved.
 
 Write every entry in {style_line}
 
@@ -31,12 +36,9 @@ they could ask for, or would miss if it went away. Guardrails, defaults,
 plumbing and polish are described inside the capability they belong to, or go
 in as `dev`, or as `ledger note`. They never get an entry of their own.
 
-Descriptions are present-tense statements of what the product does, never of
-who did what to it. Client-facing prose, not release notes. Every sentence
-states something a reader could confirm by using the product.
-
-A `changes` bullet says what the feature was before, and why it moved. Never
-invent a reason: ask.
+Descriptions are present-tense statements of what the product does, in two or
+three sentences, never of who did what to it. Every sentence states something a
+reader could confirm by using the product.
 
 {build_line}
 <!-- /feature-ledger -->

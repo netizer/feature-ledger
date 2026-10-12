@@ -3,12 +3,12 @@
   "audience": "user",
   "category": "Warehouse Console",
   "size": "Medium",
+  "paths": [],
   "history": [
     {
       "version": 1,
       "name": "Exception queue",
-      "description": "Anything that cannot be picked as ordered lands in one queue, with the customer's contact details beside it. That covers short stock, a damaged item, and an address the van cannot reach.",
-      "changes": null
+      "description": "Anything that cannot be picked as ordered lands in one queue, with the customer's contact details beside it. That covers short stock, a damaged item, and an address the van cannot reach."
     }
   ]
 }

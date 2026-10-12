@@ -3,21 +3,34 @@
   "audience": "user",
   "category": "Setting up a ledger",
   "size": "Medium",
+  "paths": [
+    "assets/BOOTSTRAP.md",
+    "src/commands/init.mjs"
+  ],
+  "dev_notes": "src/commands/init.mjs cmdBootstrap prints assets/BOOTSTRAP.md with {product}, {style_line} and {audit_block} filled in. The stamp carries HEAD as of the moment the prompt was printed, not whatever HEAD has become when a long survey finishes, and is placed before `ledger cut` so the audit logs against the release the entries went into rather than the empty one the cut opens.",
   "history": [
     {
       "version": 1,
       "name": "Baseline survey of an existing codebase",
-      "description": "The command ledger bootstrap prints a brief you paste into a coding agent, which then reads the codebase and records what it already does as version 1. The brief carries the entry bar, the project's tone, and five steps: list the capabilities, decide the areas, write the entries, cut the baseline from the date of the first commit, and hand back the entries it was least sure of. The agent runs it start to finish without stopping to ask you anything.",
-      "changes": null,
-      "dev_notes": "src/commands/init.mjs cmdBootstrap prints assets/BOOTSTRAP.md with {product} and {style_line} filled in."
+      "description": "The command ledger bootstrap prints a brief you paste into a coding agent, which then reads the codebase and records what it already does as version 1. The brief carries the entry bar, the project's tone, and five steps: list the capabilities, decide the areas, write the entries, cut the baseline from the date of the first commit, and hand back the entries it was least sure of. The agent runs it start to finish without stopping to ask you anything."
     },
     {
       "version": 2,
-      "description": "The command ledger bootstrap prints a brief you paste into a coding agent, which then reads the codebase and records what it already does as version 1. The brief carries the entry bar, the project's tone, and five steps: list the capabilities, decide the areas, write the entries, cut the baseline from the date of the first commit, and hand back the entries it was least sure of. The brief also records the survey as the first full sweep of the ledger audit, so the audit counts unrecorded work from the baseline onward. The agent runs it start to finish without stopping to ask you anything.",
-      "changes": [
-        "The survey counts as the first full sweep of the ledger audit; see “The ledger audit”. The brief records it just before the baseline is cut, the one moment when what the ledger holds and what the codebase does are known to agree. Pass --no-audit for a survey that is deliberately partial."
-      ],
-      "dev_notes": "src/commands/init.mjs cmdBootstrap prints assets/BOOTSTRAP.md with {product}, {style_line} and {audit_block} filled in. The stamp carries HEAD as of the moment the prompt was printed, not whatever HEAD has become when a long survey finishes, and is placed before `ledger cut` so the audit logs against the release the entries went into rather than the empty one the cut opens."
+      "description": "The command ledger bootstrap prints a brief you paste into a coding agent, which then reads the codebase and records what it already does as version 1. The brief carries the entry bar, the project's tone, and five steps: list the capabilities, decide the areas, write the entries, cut the baseline from the date of the first commit, and hand back the entries it was least sure of. The brief also records the survey as the first full sweep of the ledger audit, so the audit counts unrecorded work from the baseline onward. The agent runs it start to finish without stopping to ask you anything."
+    },
+    {
+      "version": 3,
+      "description": "The command ledger bootstrap prints a brief you paste into a coding agent, which reads the codebase and records what it already does as version 1, with the code each capability lives in. It lists the capabilities, decides the areas, writes the entries, cuts the baseline from the date of the first commit, and hands back the entries it was least sure of. The survey counts as the first full audit, and the agent runs it to the end without stopping to ask you anything."
+    }
+  ],
+  "events": [
+    {
+      "version": 3,
+      "kind": "change",
+      "what": "The survey gives every entry the code it lives in, and ends with every product file owned by an entry or marked as not product code.",
+      "why": "The audit and the size readout read the code through those paths, so the baseline is where they start out complete.",
+      "why_from": "person",
+      "date": "2026-10-12"
     }
   ]
 }

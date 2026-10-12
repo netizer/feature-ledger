@@ -5,7 +5,7 @@ and every operation is a CLI command. Two things connect it to an agent:
 
 1. **A stanza** in the agent's instruction file, so it records features as it
    builds them.
-2. **Agent tasks** — `bootstrap`, `audit`, `summary`, `review`,
+2. **Agent tasks** — `bootstrap`, `audit`, `compose`, `verify`, `paths brief`,
    `redraft check` and `style rewrite` — which prepare a prompt for an agent
    to work through.
 
@@ -17,17 +17,17 @@ Every agent task delivers its prompt the same four ways:
 | --- | --- |
 | *(default)* | An explanation for you, then the prompt under a rule, to paste into a fresh agent session in the project root. |
 | `--copy` | The prompt, straight onto the clipboard (`pbcopy`, `wl-copy`, `xclip` or `xsel`). |
-| `--print` | The prompt alone, ready to pipe: `ledger review --print \| pbcopy`. Warnings still reach your screen, on stderr. |
+| `--print` | The prompt alone, ready to pipe: `ledger compose --print \| pbcopy`. Warnings still reach your screen, on stderr. |
 | `--run AGENT` | The prompt handed to an agent, in the project root. The CLI waits for it, then reports. |
 
 An agent that can run commands doesn't need any of this: tell it to run
-`ledger review --print` and follow what it prints.
+`ledger compose --print` and follow what it prints.
 
 ## `--run`
 
 ```bash
 ledger audit --run claude
-ledger review --run codex
+ledger compose --run codex
 ledger bootstrap --run gemini
 ledger audit --run "my-agent --headless"      # any command that reads the prompt on stdin
 ```
@@ -52,7 +52,8 @@ Resume the session:  claude --resume 7744d0d3-482a-4ac2-9fd1-0e1580121146
 - **The last message** is held back from the progress and shown here, because
   that's where an agent puts its questions and next steps.
 - **The check** is the stamp the task is supposed to leave: an audit recorded, a
-  review recorded, a redraft marked complete, a baseline cut. An agent that
+  composition up to date, a verify recorded, every product file owned, a
+  redraft marked complete, a baseline cut. An agent that
   exits cleanly without it is reported with ✗, and the command exits with 3.
 - **Refused tool calls** are listed, one line each, when the agent tried
   something it wasn't allowed to do.
@@ -60,11 +61,12 @@ Resume the session:  claude --resume 7744d0d3-482a-4ac2-9fd1-0e1580121146
   questions or finish what it couldn't. Ctrl-C stops the agent, and you still
   get the resume command.
 
-`ledger cut --name "…" --run claude` hands whichever of the audit, the summary
-and the review is still open to the agent, one after the other, then shows you
+`ledger cut --name "…" --run claude` hands whichever of the audit, the
+composition and (when it's on) the verify is still open to the agent, one after
+the other, asks you the open questions, then shows you
 the agent's notes and asks before it cuts. `--yes` cuts without asking.
-`ledger preview --run claude` hands over only the summary, and only when it's
-out of date: the summary is written from the ledger alone, so it's cheap
+`ledger preview --run claude` hands over only the composition, and only when
+it's out of date: it is composed from the ledger alone, so it's cheap
 enough for a daily draft.
 
 ### The agents it knows
@@ -147,7 +149,7 @@ Because the corpus grows past what's cheap to **read**. A mature ledger is 100+
 features and 150–200 KB, around 45,000 tokens. With the CLI, the same lookup is
 `ledger list` (about 2k tokens) plus `ledger show <id>` (about 250).
 
-And because some writes are expensive to get wrong. `ledger add`, `update` and
+And because some writes are expensive to get wrong. `ledger add`, `change` and
 `remove` resolve which release an edit belongs to — the fact every New/Changed
 tag is computed from — and refuse the mistakes you'd find much later: a change
 with no explanation, an audit stamp with no sweep behind it.

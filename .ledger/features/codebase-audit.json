@@ -3,13 +3,30 @@
   "audience": "user",
   "category": "Recording what the product does",
   "size": "Big",
+  "paths": [
+    "src/commands/audit.mjs",
+    "src/git.mjs"
+  ],
+  "dev_notes": "src/commands/audit.mjs and src/git.mjs, the only place the package shells out to git. residue() walks the commits since the last audit (git.commitFiles) and keeps a product file only when none of its owners was recorded in the same commit or moved in the open release, plus files no entry owns that still exist, plus globs that match nothing (deadGlobs). The brief carries per-group diffs (80 lines each, 1,200 in all). The stamp goes through `ledger audit complete`, never a hand-edit: it verifies the commit is an ancestor of HEAD, and the brief always carries an explicit --commit. Every audit is kept in .ledger/audits.json with its mode. `audit confirm <id>` still works, accepting that entry's open why questions. No git, or a shallow clone, degrades to a full sweep with no gate.",
   "history": [
     {
       "version": 2,
       "name": "The ledger audit",
-      "description": "The command ledger audit finds capabilities that shipped without the ledger recording them, such as work done without a coding agent that read the project's instructions. It prints a brief for a coding agent: the range since the last audit, the changed paths grouped into batches, and the commit subjects behind them. An audit covers everything since the last one, or the whole codebase with --full, which is the only way to find a capability the baseline survey missed. The agent records what it finds and then stamps the commit it audited, so the tool knows how much of the repository has not been examined yet. A release with unaudited work behind it cannot be cut, and the refusal says how many commits and files are outstanding. A project that started with ledger bootstrap is already stamped, because the baseline survey counts as a full sweep.",
-      "changes": null,
-      "dev_notes": "src/commands/audit.mjs and src/git.mjs, the only place the package shells out to git. The stamp goes through `ledger audit complete`, never a hand-edit, because it is the one field that makes a gap permanently invisible if it is set without the work being done: it verifies the commit is an ancestor of HEAD, and the brief always carries an explicit --commit so commits landing under a long audit are not silently marked as examined. Every audit is kept in .ledger/audits.json with its mode, so \"when did we last sweep the whole thing\" stays answerable. The counts recorded there cover backfilled entries only — an audit's current-cycle findings are indistinguishable from ordinary work on the same release, so counting them would mean trusting a number the agent asserts. A reason taken from a commit message rather than from whoever made the decision is marked --reason-inferred and reported by `ledger status` until `ledger audit confirm` clears it, or until someone rewrites the bullet by hand and drops the flag with it. No git, or a shallow clone, degrades to a full sweep with no gate."
+      "description": "The command ledger audit finds capabilities that shipped without the ledger recording them, such as work done without a coding agent that read the project's instructions. It prints a brief for a coding agent: the range since the last audit, the changed paths grouped into batches, and the commit subjects behind them. An audit covers everything since the last one, or the whole codebase with --full, which is the only way to find a capability the baseline survey missed. The agent records what it finds and then stamps the commit it audited, so the tool knows how much of the repository has not been examined yet. A release with unaudited work behind it cannot be cut, and the refusal says how many commits and files are outstanding. A project that started with ledger bootstrap is already stamped, because the baseline survey counts as a full sweep."
+    },
+    {
+      "version": 3,
+      "description": "The command ledger audit finds work that shipped without the ledger hearing about it: code that moved under an entry that didn't, and changed code no entry owns. It prints a brief for a coding agent with the diffs of just those changes, and the agent records what it finds and stamps the commit it audited. --full sweeps the whole codebase, the only way to find a capability the baseline survey missed. A release can't be cut while something is left unexamined, and work that was recorded, owned or ignored never asks for an audit."
+    }
+  ],
+  "events": [
+    {
+      "version": 3,
+      "kind": "change",
+      "what": "It looks only at code the ledger hasn't accounted for, and hands the agent the diffs, instead of every changed path and the commit subjects.",
+      "why": "Every commit counted, so the gate fired after work that had been recorded properly, and an agent handed only file names had to work out again which entry each file belonged to.",
+      "why_from": "person",
+      "date": "2026-10-12"
     }
   ]
 }

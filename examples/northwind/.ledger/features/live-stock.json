@@ -3,12 +3,12 @@
   "audience": "user",
   "category": "Ordering",
   "size": "Big",
+  "paths": [],
   "history": [
     {
       "version": 1,
       "name": "Live stock levels",
-      "description": "Quantities shown on a product are the ones the warehouse can actually pick right now. A line that goes out of stock mid-basket is flagged before payment, not after it.",
-      "changes": null
+      "description": "Quantities shown on a product are the ones the warehouse can actually pick right now. A line that goes out of stock mid-basket is flagged before payment, not after it."
     }
   ]
 }

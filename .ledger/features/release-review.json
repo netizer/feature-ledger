@@ -2,22 +2,39 @@
   "id": "release-review",
   "audience": "user",
   "category": "Recording what the product does",
-  "size": "Big",
+  "size": "Medium",
+  "paths": [
+    "src/commands/verify.mjs"
+  ],
+  "dev_notes": "src/commands/verify.mjs: the brief lists every client-facing entry in the release with its paths, the files that moved under it since the last edition, its description and its composed note, then the summary items. The agent files findings with `ledger questions add`; `verify complete` stores `verified: { date, commit, fingerprint }` on the composition, the fingerprint covering the composed text and the entries' descriptions (verifyFingerprint in src/compose.mjs). The cut checks it only when config.json has \"checks\": { \"verify\": true }. `ledger review` is retired in src/cli.mjs with a pointer to compose and verify; `--skip review` maps to verify.",
   "history": [
     {
       "version": 2,
       "name": "Reviewing a release before it goes out",
-      "description": "The command ledger review prints a brief for a coding agent to read the open release the way the client will: as one document, against the edition they already have. The brief lists what arrived in the release, every client-facing entry in it by area, and the places the drafts probably show, such as change bullets that name something the previous edition never mentioned. The agent tests every bullet against the previous edition, drops or merges the ones whose \"before\" never shipped, removes change notes from new entries, and makes names, numbers and cross-references agree. It edits wording only and never invents a reason, and it ends with a list of questions for you. ledger review complete records what was reviewed, and ledger status reports any client-facing entry that changed after that.",
-      "changes": null,
-      "dev_notes": "src/commands/review.mjs. The stamp in .ledger/reviews.json is a per-entry sha256 of the words the client reads (name, description, changes, removal reason, backfilled) plus the user-audience other-changes, so dev_notes edits and `audit confirm` don't invalidate it and the cut gate can name what moved. `review complete` refuses a new entry carrying changes and an updated one with none. The \"never mentioned\" hint is quoted labels and non-sentence-initial capitalised words absent from the previous edition's text."
+      "description": "The command ledger review prints a brief for a coding agent to read the open release the way the client will: as one document, against the edition they already have. The brief lists what arrived in the release, every client-facing entry in it by area, and the places the drafts probably show, such as change bullets that name something the previous edition never mentioned. The agent tests every bullet against the previous edition, drops or merges the ones whose \"before\" never shipped, removes change notes from new entries, and makes names, numbers and cross-references agree. It edits wording only and never invents a reason, and it ends with a list of questions for you. ledger review complete records what was reviewed, and ledger status reports any client-facing entry that changed after that."
     },
     {
       "version": 3,
-      "description": "The command ledger review prints a brief for a coding agent to read the open release the way the client will: as one document, against the edition they already have. The brief lists what arrived in the release, every client-facing entry in it by area, and the places the drafts probably show, such as change bullets that name something the previous edition never mentioned. The agent tests every bullet against the previous edition, drops or merges the ones whose \"before\" never shipped, removes change notes from new entries, and makes names, numbers and cross-references agree. Last, it reads the summary the edition opens with against the entries as it left them, and fixes any item that no longer agrees. It edits wording only and never invents a reason, and it ends with a list of questions for you. ledger review complete refuses while the summary leaves an entry out of both its items and its quiet list. It records what was reviewed, the summary included, and records the entries as what the summary was written from, so rewording an entry in the review doesn't put the summary out of date. ledger status reports any client-facing entry, or the summary, that changed after that.",
-      "changes": [
-        "The review read each entry's description and change bullets, and nothing shorter. Each edition now opens with a summary written from the entries, so an item written for a bullet the review drops would describe a change the entry no longer does. The review reads the summary last, a reworded summary asks for another review, and recording a review brings the summary's record up to date, so neither keeps putting the other out of date. See “Summary of changes”."
-      ],
-      "dev_notes": "src/commands/review.mjs. The stamp in .ledger/reviews.json is a per-entry sha256 of the words the client reads (name, description, changes, removal reason, backfilled) plus the user-audience other-changes and the summary's items and quiet list, so dev_notes edits and `audit confirm` don't invalidate it and the cut gate can name what moved. `review complete` refuses a new entry carrying changes and an updated one with none. The \"never mentioned\" hint is quoted labels and non-sentence-initial capitalised words absent from the previous edition's text. `review complete` also refuses a summary that doesn't account for the release (accountingProblems in src/summary.mjs), and re-stamps the summary's `entries` once the review is recorded."
+      "name": "Checking an edition against the code",
+      "description": "The command ledger verify has a coding agent read every sentence an edition will print about the release, its descriptions, notes and summary, against the code each entry lives in. It edits nothing: whatever it can't confirm becomes a question, and ledger cut asks it before printing. The cut asks for a verify only once a project turns it on."
+    }
+  ],
+  "events": [
+    {
+      "version": 3,
+      "kind": "change",
+      "what": "The review read each entry's description and change bullets, and nothing shorter. Each edition now opens with a summary written from the entries, so an item written for a bullet the review drops would describe a change the entry no longer does. The review reads the summary last, a reworded summary asks for another review, and recording a review brings the summary's record up to date, so neither keeps putting the other out of date. See “Summary of changes”.",
+      "why": null,
+      "why_from": "person",
+      "combined": true
+    },
+    {
+      "version": 3,
+      "kind": "change",
+      "what": "It checks what the edition says against the code and reports what it doubts, instead of rewording the release in place, and the cut only asks for it once a project turns it on.",
+      "why": "Composing the notes from the two editions removed the drafts the review existed to repair. What is left worth a second read is whether the text is true, and a check that edits nothing leaves every doubt with a person.",
+      "why_from": "person",
+      "date": "2026-10-12"
     }
   ]
 }

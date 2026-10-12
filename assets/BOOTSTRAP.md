@@ -11,7 +11,7 @@ the finished document, then open `.ledger/features/<id>.json` and rewrite
 anything that isn't how you'd say it to this client — the wrong word, a
 sentence it invented, a detail they shouldn't be reading, or the sentence it
 had no way of knowing. That records nothing and marks nothing as changed.
-`ledger update <id>` and `ledger remove <id> --reason "…"` are for anything
+`ledger change <id>` and `ledger remove <id> --why "…"` are for anything
 where the product itself has moved since. The agent finishes by listing the
 entries it was least sure about, so you know where to look first.
 
@@ -35,8 +35,8 @@ the most defensible call, write down that you made it, and keep going.
 Read the sample before you write the first entry, and keep matching it as you
 go. The sample is the brief; the name of the guide is only where it came from.
 
-Each description is a present-tense statement of what the product does: "A
-guest can book without an account." Every sentence states something a reader
+Each description is a present-tense statement of what the product does, in two
+or three sentences: "A guest can book without an account." Every sentence states something a reader
 could confirm by using the product. Never authorship, never history: no
 "added", "we now support", "improved", "new". Someone reading the finished
 document must not be able to tell whether a feature shipped last week or three
@@ -155,16 +155,26 @@ yourself.
    `category` out entirely when the ledger has no areas. Hold every `name` to
    **The names** above before you move on: it is the part of the entry most
    readers will ever actually read.
-3. Size each entry — **Big** for a capability the product is chosen for,
+3. Give it `paths`: the globs its code lives in, as you just read it
+   (`"paths": ["src/billing/**"]`). Prefer a directory or a pattern to a list
+   of files; a module several capabilities share belongs to each of them.
+   Later audits and previews read the code through these.
+4. Size each entry — **Big** for a capability the product is chosen for,
    **Medium** for a capability in its own right inside a bigger one, **Small**
    for one narrow enough to describe in a line. The scale ranks entries within
    this product; it is not permission to record something smaller than a
    capability.
-4. Set `audience` to `dev` for a capability only the team would ever
+5. Set `audience` to `dev` for a capability only the team would ever
    encounter, and put implementation detail in `dev_notes` rather than in the
    description.
-5. Run `ledger status` at the end of each batch, fix anything it reports, and
+6. Run `ledger status` at the end of each batch, fix anything it reports, and
    move straight on to the next batch.
+
+When every batch is done, run `ledger paths`. Every product file should belong
+to an entry. A file that doesn't is either part of a capability (claim it:
+`ledger own <id> '<glob>'`), a capability you missed (record it), or not
+product code at all — tests, fixtures, tooling — which you mark with
+`ledger own --ignore '<glob>'`.
 
 Where you can't tell from the code what something is *for* — as opposed to
 what it does — write the reading the code best supports, and keep the entry's
@@ -196,6 +206,6 @@ Finish with a short note for me, and nothing else to do:
   have expected it in the document.
 
 Then stop. What you hand me is a draft: I'll rewrite the wording myself in
-`.ledger/features/<id>.json`, and `ledger update <id>` and
-`ledger remove <id> --reason "…"` cover anything that has actually moved.
+`.ledger/features/<id>.json`, and `ledger change <id>` and
+`ledger remove <id> --why "…"` cover anything that has actually moved.
 `ledger preview` prints a draft of whatever is open.

@@ -181,7 +181,7 @@ function start(flags) {
   // a corpus, never a corpus of corpora.
   fs.mkdirSync(archiveAbs, { recursive: true });
   for (const entry of fs.readdirSync(project.ledgerDir)) {
-    if (entry === ARCHIVE_DIRNAME) continue;
+    if (entry === ARCHIVE_DIRNAME || entry === ".cache") continue;
     fs.cpSync(path.join(project.ledgerDir, entry), path.join(archiveAbs, entry), { recursive: true });
   }
   writeJson(path.join(archiveAbs, ARCHIVED_MARKER), {
@@ -208,7 +208,10 @@ function start(flags) {
   // audit recorded — and are kept, whole, in the archive. The survey records
   // the new corpus's first full sweep on its own.
   writeJson(project.auditsPath, { audits: [] });
-  if (exists(project.reviewsPath)) fs.unlinkSync(project.reviewsPath);
+  // What was composed, and what was asked, is about the old corpus's
+  // editions; both stay in the archive, with the editions they belong to.
+  if (exists(project.compositionsPath)) writeJson(project.compositionsPath, { compositions: [] });
+  if (exists(project.questionsPath)) writeJson(project.questionsPath, { questions: [] });
 
   const timeline = releases.releases
     .filter((r) => !r.future)
@@ -254,17 +257,6 @@ function complete(flags) {
   }
   if (!project.featureSet.features().length) {
     fail("the new corpus is empty, so there is nothing to have checked. Run `ledger bootstrap` first.");
-  }
-
-  // The first edition after a redraft is an inventory: it prints no "What
-  // changed" note, so a bullet left on an entry is text nobody will read.
-  const problems = project.featureSet.features({ audience: "user" })
-    .filter((f) => f.entryAt(redraft.opens)?.changes?.length)
-    .map((f) => `${f.id} carries "changes", which the v${redraft.opens} edition never prints — fold anything worth ` +
-      "keeping into the description, and set it to null");
-  if (problems.length) {
-    fail(`the redraft isn't ready to be marked complete:\n${problems.map((p) => `  ${p}`).join("\n")}\n` +
-      "Fix these in .ledger/features/<id>.json, run `ledger status`, then `ledger redraft complete` again.");
   }
 
   if (flags.note !== undefined && flags.note !== true) redraft.note = String(flags.note).trim() || null;
@@ -481,7 +473,7 @@ function brief(flags) {
   p("5. Keep the old wording where it was better: the client's own word for a thing,");
   p("   a name the client already knows the capability by, a sentence that says what");
   p("   a feature is *for*. Where the new name is clearer, keep the new one.");
-  p("6. Old \"What changed\" bullets are not carried over. The first edition after a");
+  p("6. Old \"What changed\" notes are not carried over. The first edition after a");
   p("   redraft prints none. A reason in one that explains what a feature is for can");
   p("   go into the description, as how the feature works.");
   p("7. Old \"dev_notes\" carry over to the entry that now owns the capability.");
@@ -497,8 +489,9 @@ function brief(flags) {
   p("  the other and delete its file.");
   p("- Change what the ledger says only to make it true and complete. Every sentence you");
   p("  leave must be something a reader could confirm by using the product.");
-  p(`- Every entry stays at ${N}, with "changes" set to null. Don't run \`ledger update\``);
-  p("  or `ledger remove`, and don't touch releases.json, redrafts.json or the archive.");
+  p(`- Every entry stays at ${N}. Don't run \`ledger change\` or \`ledger remove\`, and`);
+  p("  don't touch releases.json, redrafts.json or the archive. `ledger own` is fine:");
+  p("  an entry that takes over an old one's capability takes over its paths.");
   p("- Don't run `ledger build` or `ledger cut`.");
   p("");
   p("## The note for the client");
@@ -516,8 +509,7 @@ function brief(flags) {
   p("## When you're done");
   p("");
   p("1. Run `ledger status`. It validates every file you touched. Fix what it reports.");
-  p("2. Run `ledger redraft complete --note \"…\"` with the note. It refuses while an");
-  p("   entry still carries a change note, and names it.");
+  p("2. Run `ledger redraft complete --note \"…\"` with the note.");
   p("3. Then print a short report for the human:");
   p("   - per old entry, one line for each statement you put back, and where;");
   p("   - the entries you added;");

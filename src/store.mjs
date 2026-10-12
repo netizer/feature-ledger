@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { fail, readJson, writeJson, exists } from "./util.mjs";
+import { fail, readJson, writeJson, exists, isBlank } from "./util.mjs";
 import { Feature } from "./model/feature.mjs";
 import { FeatureSet } from "./model/feature-set.mjs";
 import { ReleaseSet } from "./model/release-set.mjs";
@@ -18,9 +18,10 @@ export const LEDGER_DIRNAME = ".ledger";
  *     subcategories.json   optional sub-section headings
  *     other-changes.json   changes belonging to no single feature
  *     audits.json          every audit so far, and the commit each was run against
- *     reviews.json         every review of a release before it was cut, and what it read
- *     summaries.json       per release, the short lists its edition opens with, and the
- *                          entries they were written from
+ *     compositions.json    per release, the "What changed" notes and the summary its
+ *                          edition prints, and what they were composed from
+ *     questions.json       what only a person can answer: reasons nobody recorded or
+ *                          that came from a commit message, and what a check found
  *     redrafts.json        every time the corpus was rewritten from scratch, and whether
  *                          the new one has been checked against the old
  *     archive/<label>/     the corpus a redraft set aside, read-only
@@ -28,6 +29,7 @@ export const LEDGER_DIRNAME = ".ledger";
  *     features/<id>.json   one file per feature
  *     STYLE.md             optional prose tone, when style is "custom"
  *     theme.css            optional CSS appended last to the PDF
+ *     .cache/              gitignored; what the last `ledger preview` saw
  */
 export function findLedgerDir(startDir = process.cwd(), explicit = null) {
   if (explicit) {
@@ -48,7 +50,16 @@ export function findLedgerDir(startDir = process.cwd(), explicit = null) {
   fail(`no ${LEDGER_DIRNAME}/ found in this directory or any parent — run \`ledger init\` first`);
 }
 
+/**
+ * The shape of the corpus on disk. 2 keeps a feature's changes as events and
+ * the client's "What changed" notes in compositions.json; 1 kept the notes on
+ * the feature, written as each change landed. `ledger migrate` moves a ledger
+ * from 1 to 2, and nothing else reads 1.
+ */
+export const SCHEMA = 2;
+
 export const DEFAULT_CONFIG = {
+  schema: SCHEMA,
   product: "The product",
   // The one-line "what is this thing" that opens the generated docs and the
   // PDF's front page. Left empty means the generators fall back to a
@@ -62,6 +73,12 @@ export const DEFAULT_CONFIG = {
   // taxonomy onto a product with four capabilities, invents a structure the
   // reader then has to hold in their head for nothing.
   default_category: "Features",
+  // Files that say nothing about what the product does — tests, lockfiles,
+  // CI — so they never read as code no entry owns. See src/paths.mjs.
+  ignore: [],
+  // Opt-in checks. `verify` has an agent check the composed text against the
+  // code before every cut.
+  checks: { verify: false },
   // The tone every entry is written in: one style-guide id, or "custom" for
   // a tone written as prose in .ledger/STYLE.md. See src/style.mjs.
   style: "google",
@@ -139,8 +156,9 @@ export class Project {
     this.otherChangesPath = path.join(ledgerDir, "other-changes.json");
     this.indexPath = path.join(ledgerDir, "index.json");
     this.auditsPath = path.join(ledgerDir, "audits.json");
-    this.reviewsPath = path.join(ledgerDir, "reviews.json");
-    this.summariesPath = path.join(ledgerDir, "summaries.json");
+    this.compositionsPath = path.join(ledgerDir, "compositions.json");
+    this.questionsPath = path.join(ledgerDir, "questions.json");
+    this.cacheDir = path.join(ledgerDir, ".cache");
     this.redraftsPath = path.join(ledgerDir, "redrafts.json");
     this.archiveDir = path.join(ledgerDir, ARCHIVE_DIRNAME);
     this.featuresDir = path.join(ledgerDir, "features");
@@ -149,7 +167,13 @@ export class Project {
   }
 
   load() {
-    this.config = deepMerge(DEFAULT_CONFIG, readJson(this.configPath));
+    const raw = readJson(this.configPath);
+    if ((raw.schema ?? 1) < SCHEMA) {
+      fail(`${path.relative(process.cwd(), this.ledgerDir) || this.ledgerDir} was written by an earlier version of ` +
+        "feature-ledger. Run `ledger migrate` to bring it over (`ledger migrate --run claude` also has an agent " +
+        "say which code each entry lives in). Nothing printed so far changes.");
+    }
+    this.config = deepMerge(DEFAULT_CONFIG, raw);
     this.brand = deepMerge(DEFAULT_BRAND, readOptional(this.brandPath, {}));
     if (!this.brand.name) this.brand.name = this.config.product;
 
@@ -158,8 +182,8 @@ export class Project {
     this.otherChangesList = readOptional(this.otherChangesPath, []);
     this.index = readOptional(this.indexPath, { order: [] }).order ?? [];
     this.audits = readOptional(this.auditsPath, { audits: [] }).audits ?? [];
-    this.reviews = readOptional(this.reviewsPath, { reviews: [] }).reviews ?? [];
-    this.summaries = readOptional(this.summariesPath, { summaries: [] }).summaries ?? [];
+    this.compositions = readOptional(this.compositionsPath, { compositions: [] }).compositions ?? [];
+    this.questions = readOptional(this.questionsPath, { questions: [] }).questions ?? [];
     this.redrafts = readOptional(this.redraftsPath, { redrafts: [] }).redrafts ?? [];
 
     const files = exists(this.featuresDir)
@@ -171,7 +195,7 @@ export class Project {
       if (data.id && file !== expected) {
         fail(`features/${file} declares id "${data.id}" — a feature file must be named <id>.json (${expected})`);
       }
-      return new Feature(data, { file: `features/${file}` });
+      return new Feature(data, { file: `features/${file}`, ...this.bulletsFor(data) });
     });
 
     this.featureSet = new FeatureSet({
@@ -182,6 +206,27 @@ export class Project {
       config: this.config,
       releaseSet: this.releases,
     });
+  }
+
+  /**
+   * A feature's "What changed" notes by version, from compositions.json, and
+   * for the open release, until anything is composed for it, its events as a
+   * draft. Only an updated entry gets either: a new one has no "before".
+   */
+  bulletsFor(data) {
+    const bullets = {};
+    for (const c of this.compositions) {
+      const list = c.changes?.[data.id];
+      if (Array.isArray(list) && list.length) bullets[c.version] = list;
+    }
+    const drafts = {};
+    const open = this.releases.current.future ? this.releases.current.version : null;
+    const first = Math.min(...(data.history ?? []).map((h) => h.version));
+    if (open !== null && !bullets[open] && first < open) {
+      const events = (data.events ?? []).filter((e) => e.version === open && (e.kind ?? "change") === "change");
+      if (events.length) drafts[open] = events.map((e) => (isBlank(e.why) ? e.what : `${e.what.replace(/\s*$/, "")} ${e.why}`));
+    }
+    return { bullets, drafts };
   }
 
   /** The version everything an agent writes lands on. */
@@ -314,31 +359,25 @@ export class Project {
     writeJson(this.auditsPath, { audits: this.audits });
   }
 
-  /** The latest review recorded against one release, or null. */
-  lastReviewOf(version) {
-    return [...this.reviews].reverse().find((r) => r.version === version) ?? null;
-  }
-
-  recordReview(entry) {
-    this.assertWritable();
-    this.reviews.push(entry);
-    writeJson(this.reviewsPath, { reviews: this.reviews });
-  }
-
   /**
-   * The summary written for one release, or null. One per release, not a log
-   * like the reviews: an edition prints the lists it was cut with, and nothing
-   * asks what an earlier draft of them said.
+   * What was composed for one release: its "What changed" notes, the summary
+   * lists its edition opens with, and the stamp of what they were composed
+   * from. One per release; an edition prints the one it was cut with.
    */
-  summaryOf(version) {
-    return this.summaries.find((s) => s.version === version) ?? null;
+  compositionOf(version) {
+    return this.compositions.find((c) => c.version === version) ?? null;
   }
 
-  saveSummary(summary) {
+  saveComposition(composition) {
     this.assertWritable();
-    this.summaries = [...this.summaries.filter((s) => s.version !== summary.version), summary]
+    this.compositions = [...this.compositions.filter((c) => c.version !== composition.version), composition]
       .sort((a, b) => a.version - b.version);
-    writeJson(this.summariesPath, { summaries: this.summaries });
+    writeJson(this.compositionsPath, { compositions: this.compositions });
+  }
+
+  saveQuestions() {
+    this.assertWritable();
+    writeJson(this.questionsPath, { questions: this.questions });
   }
 
   saveIndex() {

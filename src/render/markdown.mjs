@@ -153,7 +153,7 @@ export class MarkdownRenderer {
     // document is meant to read as though written to one.
     let line = `- **[${tags.join(", ")}]** ${name}: ${state.description}`;
     if (touched && f.firstVersion !== this.target && state.changes?.length) {
-      line += "\n\n  **What changed:**\n";
+      line += state.changes_draft ? "\n\n  **What changed** *(as recorded, not yet composed)*:\n" : "\n\n  **What changed:**\n";
       line += state.changes.map((c) => `  - ${c}`).join("\n");
     }
     if (extended && state.dev_notes) line += `\n\n  *Dev notes:* ${state.dev_notes}`;

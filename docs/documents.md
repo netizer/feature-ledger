@@ -18,8 +18,12 @@ there:
 docs/client/Acme-Portal-Feature-Ledger_6.pdf
 ```
 
-A **draft** is the open release as it stands. `ledger preview` prints it, and so
-does `ledger build` once the open release has something in it. It goes in the
+A **draft** is the open release as it stands. `ledger preview` prints it, after
+a short readout of how big the release is (`--size` stops there), and so does
+`ledger build` once the open release has something in it. `--run claude` on
+either composes what changed first, when anything has moved since it was last
+composed. Until then, an updated entry's "What changed" note prints the changes
+as they were recorded, labelled as such. It goes in the
 gitignored docs directory, with `-draft` in its name, so it can never be
 mistaken for, or committed as, an edition:
 
@@ -38,15 +42,17 @@ every edition with the current wording, and `--html` writes HTML instead of PDF
 From the second edition on, the page after the cover lists what differs from
 the last edition as short numbered lists, each under a plain heading in the
 colour its entries wear: *What's new*, *What changed*, *Already in place*, *No
-longer available*, and the product-wide notes. The first three are the
-release's summary, written with `ledger summary`: each item is a sentence that
+longer available*, and the product-wide notes. The first three are composed
+with the release's "What changed" notes, by `ledger compose`: each item is a sentence that
 reads on its own, followed by numbered links, `[1] [2] [3]`, to the entries it
 sums up. A removal is listed by its name, and a product-wide note by its first
 sentence. The first edition, and the first after a redraft, have nothing to
 compare with and print no summary.
 
-A draft whose summary is missing or out of date says so in a note at the top
-of the page, and lists the entries by name where there is no summary at all.
+A draft whose composition is missing or out of date says so in a note at the
+top of the page, and lists the entries by name where nothing is composed yet.
+An edition cut before summaries existed lists its entries by name, as it
+always did.
 
 The heading, the sentence under it and the first two list headings are
 `summary_title`, `summary_intro`, `summary_new` and `summary_updated` in the

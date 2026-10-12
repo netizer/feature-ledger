@@ -3,12 +3,12 @@
   "audience": "user",
   "category": "Platform & Reliability",
   "size": "Medium",
+  "paths": [],
   "history": [
     {
       "version": 1,
       "name": "Full audit trail on every order",
-      "description": "Every change to an order records who made it and when, and the history is readable from the order itself rather than from the database.",
-      "changes": null
+      "description": "Every change to an order records who made it and when, and the history is readable from the order itself rather than from the database."
     }
   ]
 }

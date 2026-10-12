@@ -4,12 +4,12 @@
   "category": "Warehouse Console",
   "subcategory": "picking-day",
   "size": "Small",
+  "paths": [],
   "history": [
     {
       "version": 2,
       "name": "Paper fallback",
-      "description": "A run prints as a single sheet in aisle order, so a flat handset or a dead network doesn't stop the day.",
-      "changes": null
+      "description": "A run prints as a single sheet in aisle order, so a flat handset or a dead network doesn't stop the day."
     }
   ]
 }
