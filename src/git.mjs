@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -99,13 +100,38 @@ export function churn(root, from) {
  * file, biggest first, with untracked files marked. An overview for an agent
  * to read the code from, not the code itself, which it reads as it needs.
  */
-export function diffStat(project, from, { limit = 120 } = {}) {
+export function diffStat(project, from, { limit = 120, skip = () => false } = {}) {
   const rows = [...churn(project.root, from)]
-    .filter(([file]) => !isLedgerPath(project.config, file))
+    .filter(([file]) => !isLedgerPath(project.config, file) && !skip(file))
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   const untracked = new Set((git(project.root, ["ls-files", "--others", "--exclude-standard"]) ?? "").split("\n").filter(Boolean));
   const width = Math.min(60, Math.max(0, ...rows.map(([f]) => f.length)));
   const shown = rows.slice(0, limit).map(([file, n]) => `  ${file.padEnd(width)}  ${String(n).padStart(5)}${untracked.has(file) ? "  (new, uncommitted)" : ""}`);
   if (rows.length > limit) shown.push(`  … and ${rows.length - limit} more files`);
   return { files: rows.length, lines: rows.reduce((n, [, k]) => n + k, 0), text: shown.join("\n") };
+}
+
+/**
+ * The uncommitted work outside the ledger, file by file: each changed or
+ * untracked path, with a hash of what is on disk now ("deleted" when it is
+ * gone). Recorded when the code is read for unrecorded work, so a file that
+ * still holds exactly what was read is known to be nothing new, however
+ * often it is looked at again, and a file edited since is.
+ */
+export function worktreeFiles(project) {
+  const files = {};
+  for (const line of uncommitted(project.root)) {
+    const file = line.split(" -> ").pop().replace(/^"(.*)"$/, "$1");
+    if (isLedgerPath(project.config, file)) continue;
+    files[file] = contentHash(project.root, file);
+  }
+  return files;
+}
+
+export function contentHash(root, file) {
+  try {
+    return crypto.createHash("sha1").update(fs.readFileSync(path.join(root, file))).digest("hex");
+  } catch {
+    return "deleted";
+  }
 }

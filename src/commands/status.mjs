@@ -387,6 +387,9 @@ export async function cmdOverview({ flags, help }) {
   out(readiness(report));
   if (report.refusals.length || report.warnings.length) out(renderReport(report));
   out("");
-  out(`Next: ${nextStep(project, report)}`);
+  // Agent work that is due comes first: the edition is written from it.
+  const { agentPlan } = await import("./agent.mjs");
+  const due = agentPlan(project).queue[0];
+  out(`Next: ${due && due.task !== "prepare" ? `ledger agent          (${due.task}; spends tokens)` : nextStep(project, report)}`);
   out(c.dim("`ledger preview` shows the edition as it would print, for free · `ledger status` has the full picture"));
 }

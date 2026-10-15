@@ -220,11 +220,17 @@ export function longNotes(composition) {
 
 /* ---- what has moved since the last prepare ---------------------------- */
 
-/** What `prepare` stamps: per client-facing entry in the release, how many events it had. */
+/**
+ * What `prepare` stamps: per client-facing entry in the release, how many
+ * events it had, and the reasons still open then, as `id#index`. A note
+ * written without its reason is out of date once someone gives it.
+ */
 export function preparedSnapshot(project, version) {
+  const unvouched = unknownReasons(project, version).map(({ feature, index }) => `${feature.id}#${index}`);
   return {
     entries: Object.fromEntries(releaseEntries(project, version).map((f) => [f.id, f.eventsAt(version).length])),
     notes: project.featureSet.otherChanges({ version, audience: "user" }).length,
+    ...(unvouched.length ? { unvouched } : {}),
   };
 }
 
@@ -243,9 +249,9 @@ export function prepareReport(project, version = project.releases.current.versio
   const composition = project.compositionOf(version);
   const prepared = composition?.prepared?.entries ? composition.prepared : null;
   const base = { version, composition, prepared, recorded, applies: composes(project, version) };
-  if (!recorded) return { ...base, ok: true, since: 0, arrived: [], moved: [], notesSince: 0, nothing: true };
+  if (!recorded) return { ...base, ok: true, since: 0, arrived: [], moved: [], answered: [], notesSince: 0, nothing: true };
   if (!prepared) {
-    return { ...base, ok: false, never: true, since: recorded, arrived: entries.map((f) => f.id), moved: [], notesSince: notes };
+    return { ...base, ok: false, never: true, since: recorded, arrived: entries.map((f) => f.id), moved: [], answered: [], notesSince: notes };
   }
   const arrived = entries.filter((f) => !(f.id in prepared.entries)).map((f) => f.id);
   const moved = entries.filter((f) => f.id in prepared.entries && f.eventsAt(version).length > prepared.entries[f.id]).map((f) => f.id);
@@ -253,7 +259,13 @@ export function prepareReport(project, version = project.releases.current.versio
   const since = entries.reduce((n, f) => n + (f.id in prepared.entries
     ? Math.max(0, f.eventsAt(version).length - prepared.entries[f.id])
     : changesOf(f)), 0) + notesSince;
-  return { ...base, ok: since === 0, since, arrived, moved, notesSince };
+  // Entries whose note was written while a reason was missing, and that a
+  // person has given since.
+  const answered = [...new Set((prepared.unvouched ?? []).filter((key) => {
+    const [id, index] = [key.slice(0, key.lastIndexOf("#")), Number(key.slice(key.lastIndexOf("#") + 1))];
+    return entries.some((f) => f.id === id && f.events[index]?.why_from === "person");
+  }).map((key) => key.slice(0, key.lastIndexOf("#"))))].filter((id) => !arrived.includes(id) && !moved.includes(id));
+  return { ...base, ok: since === 0 && !answered.length, since, arrived, moved, answered, notesSince };
 }
 
 const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -268,7 +280,10 @@ export function prepareLine(report) {
   const where = [...report.arrived, ...report.moved];
   const what = [where.length ? list(where) : null, report.notesSince ? plural(report.notesSince, "product-wide note") : null]
     .filter(Boolean).join(", and ");
-  return `${plural(report.since, "change")} recorded since the last prepare${when}${what ? `, on ${what}` : ""}`;
+  const answered = report.answered?.length ? `a reason given for ${list(report.answered)} since the last prepare${when}` : null;
+  if (!report.since) return answered;
+  return `${plural(report.since, "change")} recorded since the last prepare${when}${what ? `, on ${what}` : ""}` +
+    (answered ? `, and ${answered.replace(/ since the last prepare.*$/, "")}` : "");
 }
 
 /** Updated entries whose edition would print the changes as recorded, for want of a prepared note. */

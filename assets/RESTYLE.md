@@ -16,8 +16,8 @@ that you need.
 {copy_rule}
 
 You are rewriting the wording of an existing feature ledger for {product}, so
-that it reads as though it had always been written in one tone. There are
-{count} entries. Nothing about the product is changing. Only the words are.
+that it reads as though it had always been written in one tone.
+{count_line} Nothing about the product is changing. Only the words are.
 
 {style}
 
@@ -86,23 +86,22 @@ and it is not part of a retone — tell me instead.
 **Work in this order.**
 
 1. Run `ledger style` and read it properly. It is the whole brief.
-2. Take one area at a time, in this order:
+2. Take one area at a time, in this order, and only the entries listed:
 {categories}
-3. For each area, run `ledger list --category "<area>"`, then `ledger show
-   <id>` for each entry in it. Read the entries through the commands rather
+3. For each area, run `ledger show <id>` for each entry listed for it. Read the entries through the commands rather
    than by opening the corpus: the whole of `.ledger/` is far more than you
    need in context at once.
 4. Rewrite each entry's name, description, and any dev notes and change
    notes, editing `.ledger/features/<id>.json` and `.ledger/compositions.json` in place. Do the names first
    and hold them to the test above — they are the part of the area a reader is
    most likely to be left with.
-5. Run `ledger status` — it revalidates every file you touched — then stop and
-   show me the area you just did before moving on.
+5. Run `ledger status` — it revalidates every file you touched — and then
+   `ledger style rewrite complete --category "<area>"`, which records the area
+   as rewritten, so a later run doesn't send it through again. Then stop and
+   show me the area you just did before moving on. If nobody is there to
+   answer, carry on with the next area.
 
-**Then the parts that are not features.** Sub-section headings and overviews
-(`ledger subcategories list`, edited in `.ledger/subcategories.json`), any
-product-wide notes in `.ledger/other-changes.json`, and the product's one-line
-description in `.ledger/config.json`, if it has one.
+{rest}
 
 **Then check your own work.** `ledger status` should be clean, and its release
 section should show the same contents it showed before you started. If a

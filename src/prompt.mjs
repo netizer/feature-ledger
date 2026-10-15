@@ -36,9 +36,14 @@ export const TASKS = {
     label: "baseline survey",
     brief: async (flags) => (await import("./commands/init.mjs")).cmdBootstrap({ flags, positional: [] }),
     snapshot: () => ({}),
-    verify(p) {
+    async verify(p) {
       const n = p.featureSet.features().length;
       if (!n) return [{ ok: false, line: "nothing was recorded — the ledger is still empty" }];
+      const { bootstrapState } = await import("./state.mjs");
+      if (!bootstrapState(p).done) {
+        return [{ ok: false, line: `${n} entr${n === 1 ? "y" : "ies"} recorded, but the agent stopped before \`ledger bootstrap complete\` — ` +
+          "`ledger agent` carries the survey on from here" }];
+      }
       return [{ ok: true, line: `${n} entr${n === 1 ? "y" : "ies"} recorded — read it with \`ledger preview\`, edit it, commit it, ` +
         (p.pendingRedraft ? "then run `ledger redraft check`" : "then `ledger cut --name \"Baseline\"`") }];
     },
@@ -57,26 +62,47 @@ export const TASKS = {
     label: "tone rewrite",
     brief: async (flags) => (await import("./commands/style.mjs")).cmdStyle({ flags, positional: ["rewrite"] }),
     snapshot: () => ({}),
-    verify(p) {
-      return [{ ok: true, line: `the corpus still loads (${p.featureSet.features().length} entries) — read the diff before you commit it` }];
+    async verify(p) {
+      const { restyleDue } = await import("./state.mjs");
+      const left = restyleDue(p);
+      if (left.due) {
+        return [{ ok: false, line: `${left.entries.length} entr${left.entries.length === 1 ? "y is" : "ies are"} still in an earlier tone` +
+          `${left.other ? ", and the text that belongs to no entry" : ""} — \`ledger agent\` carries the rewrite on from here` }];
+      }
+      return [{ ok: true, line: `the whole ledger is in the new tone (${p.featureSet.features().length} entries) — read the diff before you commit it` }];
+    },
+  },
+  sweep: {
+    label: "sweep for unrecorded work",
+    brief: async (flags) => (await import("./commands/sweep.mjs")).cmdSweep({ flags, positional: [] }),
+    snapshot: (p) => ({ sweep: p?.state.sweep ?? null }),
+    async verify(p, before) {
+      const swept = p.state.sweep && JSON.stringify(p.state.sweep) !== JSON.stringify(before.sweep);
+      return [swept
+        ? { ok: true, line: "the code is marked as read — `ledger` says what was recorded" }
+        : { ok: false, line: "the code isn't marked as read — the agent stopped before `ledger sweep complete`" }];
     },
   },
 };
 
 /** The task a command line names, or null when it doesn't print a prompt. */
 export function taskFor(command, sub) {
-  if (["bootstrap", "prepare"].includes(command) && (sub === undefined || sub === "brief")) return command;
+  if (["bootstrap", "prepare", "sweep"].includes(command) && (sub === undefined || sub === "brief")) return command;
   const key = `${command} ${sub}`;
   return TASKS[key] ? key : null;
 }
 
 /** Every command line that prints a prompt, for messages that list them. */
-export const PROMPT_COMMANDS = ["ledger prepare", "ledger bootstrap", "ledger redraft check", "ledger style rewrite"];
+export const PROMPT_COMMANDS = ["ledger agent", "ledger prepare", "ledger bootstrap", "ledger sweep", "ledger redraft check",
+  "ledger style rewrite"];
 
 /**
  * Runs a brief with stdout held back, and splits what it printed at the rule.
  * Lines in the explanation that start with "!" are warnings that matter to
  * the person whatever happens to the prompt.
+ *
+ * A brief that prints no rule found nothing for an agent to do: `prompt` is
+ * null, and `text` says why.
  */
 export async function capturePrompt(run) {
   const chunks = [];
@@ -94,7 +120,7 @@ export async function capturePrompt(run) {
   }
   const text = chunks.join("");
   const at = text.indexOf(COPY_RULE);
-  if (at === -1) fail("this command printed no prompt, so there is nothing to deliver");
+  if (at === -1) return { warnings: [], prompt: null, text };
 
   const warnings = [];
   let warning = false;
@@ -122,7 +148,11 @@ export function deliveryMode(flags) {
  */
 export async function deliver(mode, taskKey, flags, { openProject }) {
   const task = TASKS[taskKey];
-  const { warnings, prompt } = await capturePrompt(() => task.brief(flags));
+  const { warnings, prompt, text } = await capturePrompt(() => task.brief(flags));
+  if (prompt === null) {
+    process.stdout.write(text);
+    return 0;
+  }
 
   if (mode === "print") {
     for (const w of warnings) process.stderr.write(`${w}\n`);
@@ -149,7 +179,11 @@ export async function runTask(taskKey, flags, { openProject, prompt = null, warn
   const task = TASKS[taskKey];
   const project = tryOpen(openProject, flags);
   const agent = resolveAgent(flags.run, project?.config);
-  if (prompt === null) ({ prompt, warnings } = await capturePrompt(() => task.brief(flags)));
+  if (prompt === null) {
+    let text;
+    ({ prompt, warnings, text } = await capturePrompt(() => task.brief(flags)));
+    if (prompt === null) { process.stdout.write(text); return 0; }
+  }
   const cwd = project?.root ?? process.cwd();
   const c = color();
   const say = (s = "") => process.stdout.write(`${s}\n`);

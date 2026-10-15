@@ -30,6 +30,8 @@
     "edition-summary",
     "open-questions",
     "release-size",
-    "migrate-ledger"
+    "migrate-ledger",
+    "agent-command",
+    "unrecorded-work-sweep"
   ]
 }

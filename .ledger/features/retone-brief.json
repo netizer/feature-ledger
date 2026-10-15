@@ -9,6 +9,20 @@
       "version": 1,
       "name": "Moving an existing ledger to a new tone",
       "description": "The command ledger style rewrite prints a brief for rewriting a ledger that is already written into the tone the project has moved to. The agent works one area at a time and replaces the words in place, so nothing lands on the release and no entry is marked as changed."
+    },
+    {
+      "version": 3,
+      "description": "The command ledger style rewrite prints a brief for rewriting the entries still in an earlier tone, one area at a time. Each finished area is marked done, so an interrupted rewrite carries on from the areas left."
+    }
+  ],
+  "events": [
+    {
+      "version": 3,
+      "kind": "change",
+      "what": "A rewrite into a new tone covers only the entries still in the old one, and carries on from the areas left when a rewrite stops partway.",
+      "why": "The tone each entry was written in is recorded rather than guessed from its text, so the same entries are never rewritten into the tone they already have.",
+      "why_from": "person",
+      "date": "2026-10-15"
     }
   ]
 }

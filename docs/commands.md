@@ -7,15 +7,22 @@ cuts, and `ledger add x --help` never waits for a payload.
 ```
 ledger — a client-facing record of what your product does, kept in the repo
 
-  Preview is free, prepare costs tokens, cut prints.
+  Preview is free, the agent costs tokens, cut prints.
 
     ledger                              where things stand, and the one thing to run next
     ledger preview [--html] [--open] [--full]
                                         the edition as it would print now, after a short readout.
                                         Free: no agent
-    ledger prepare                      one interactive agent session that writes the client's text:
+    ledger agent [--plan] [--force]     whatever agent work is due, worked out from .ledger/ and git
+                                        for free: the survey, a rewrite into a new tone, prepare, or
+                                        a sweep of the code for work nobody recorded — only the part
+                                        not done yet. Asks the missing reasons first, at a terminal.
+                                        Nothing due, no agent. --plan shows it; --force sweeps even
+                                        a small change. Spends tokens
+    ledger prepare [--full]             one interactive agent session that writes the client's text:
                                         the "What changed" notes, the summary, how to see each entry
-                                        and the message, and checks it against the code. Spends tokens
+                                        and the message, and checks it against the code. After the
+                                        first, only what moved since the last; --full for all of it
     ledger prepare complete             check what it wrote, and record what it was written from
     ledger cut --name "..." [--date YYYY-MM-DD] [--commit SHA] [--full] [--yes] [--no-pdf] [--html]
                                         print the edition and the message to send with it, and open
@@ -48,7 +55,12 @@ ledger — a client-facing record of what your product does, kept in the repo
   Once, or rarely
     ledger init [--product "Name"] [--accent "#hex"] [--logo path] [--agents auto|none|claude,agents,...]
                 [--style google|govuk|plain-language|ste] [--commit-pdfs]
-    ledger bootstrap                    agent task: survey the codebase and write the baseline
+    ledger bootstrap                    agent task: survey the codebase and write the baseline, or carry
+                                        on a survey that stopped partway
+    ledger bootstrap complete           record that the survey finished
+    ledger sweep                        agent task: read the code since it was last read, and record
+                                        the work nobody recorded
+    ledger sweep complete               record the code as read
     ledger migrate [--dry-run]          bring a ledger written by an earlier version over
     ledger build [v3 | all | draft] [--md] [--pdf] [--full] [--out DIR] [--html]
                                         reprint an edition, or write the Markdown docs
@@ -56,7 +68,11 @@ ledger — a client-facing record of what your product does, kept in the repo
     ledger releases amend <version> --commit SHA
     ledger redraft [start | check | complete --note "..."]
                                         write the corpus again from scratch, keeping the client's record
-    ledger style rewrite                agent task: bring every entry into the project's tone
+    ledger style rewrite [--category "Area"]
+                                        agent task: bring the entries still in an earlier tone into
+                                        the project's tone
+    ledger style rewrite complete [--category "Area" | <id>...]
+                                        record those entries as rewritten (no area or id: all of it)
     ledger completion zsh|bash|fish     shell completion; the script says how to load it
 
   Editing the words (no command — the corpus is yours to edit; run `ledger status` after)
@@ -66,14 +82,14 @@ ledger — a client-facing record of what your product does, kept in the repo
     .ledger/config.json                 product name, tagline, document titles, area overviews
     .ledger/other-changes.json          the product-wide notes
 
-  Delivering a prompt (prepare, bootstrap, redraft check, style rewrite)
+  Delivering a prompt (agent, prepare, bootstrap, sweep, redraft check, style rewrite)
     (default)        an explanation for you, then the prompt to paste into your agent session
     --print          the prompt alone, ready to pipe: `ledger prepare --print | pbcopy`
     --copy           the prompt, straight onto the clipboard
     --run AGENT      hand it to claude, codex, gemini — or to "any command" that reads the prompt on
                      stdin — wait, check what it left behind, and print how to resume its session.
                      Only ever when you type it. A bare --run uses $LEDGER_AGENT, or "agent"
-                     in .ledger/config.json
+                     in .ledger/config.json — and so does `ledger agent` with no option at all
 
   Global: --dir PATH (point at a .ledger directory), --json where offered, --help after any
           command. An option a command doesn't take is an error, and nothing is run.

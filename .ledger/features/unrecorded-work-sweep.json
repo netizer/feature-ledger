@@ -1,0 +1,15 @@
+{
+  "id": "unrecorded-work-sweep",
+  "audience": "user",
+  "category": "Recording what the product does",
+  "size": "Small",
+  "dev_notes": "src/commands/sweep.mjs; `sweep complete` stamps state.sweep with HEAD and a content hash per uncommitted file (git.worktreeFiles). codeSince() in src/state.mjs reads from the latest of the sweep, the prepare stamp, the bootstrap stamp and the last edition's commit, and skips files whose content still matches the stamp. Tests, docs, lockfiles and CI paths don't count towards the 20-line threshold. `prepare complete` stamps the sweep too, and the prepare brief shares recordingRules() with it.",
+  "history": [
+    {
+      "version": 3,
+      "name": "Finding work nobody recorded",
+      "description": "The command ledger sweep reads the code that changed since it was last read, and records any change someone using the product would notice that nobody recorded. It writes none of the client's text.",
+      "how_to_see": "Change some code without recording it, then run ledger sweep: the prompt lists the files that changed since the code was last read."
+    }
+  ]
+}

@@ -203,7 +203,7 @@ export function nextStep(project, report) {
     const redraft = redraftReport(project);
     return redraft.ok ? report.refusals[0].fix : redraft.steps[0];
   }
-  if (report.warnings.some((w) => w.id === "prepare")) return "ledger prepare        (paste it into your agent session; it spends tokens)";
+  if (report.warnings.some((w) => w.id === "prepare")) return "ledger agent          (it prepares the edition; spends tokens)";
   return 'ledger cut --name "…"   (prints the edition; `ledger preview` shows it first, for free)';
 }
 

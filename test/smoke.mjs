@@ -259,7 +259,7 @@ assert("…and records no event", !("events" in readJson(path.join(dir, ".ledger
 // nobody gave.
 const overviewBefore = run([]);
 assert("bare `ledger` says nothing is prepared yet, and that prepare is next",
-  overviewBefore.includes("hasn't run for v2") && overviewBefore.includes("Next: ledger prepare"));
+  overviewBefore.includes("hasn't run for v2") && overviewBefore.includes("Next: ledger agent") && overviewBefore.includes("prepares the edition"));
 assert("…and lists the reasons nobody vouched for",
   overviewBefore.includes("Reasons nobody has vouched for") && overviewBefore.includes("alpha: It also remembers the last choice.  — why: not recorded"));
 const brief = run(["prepare"]);
@@ -674,7 +674,7 @@ assert("`ledger add --help` prints help without reading a payload",
   run(["add", "never", "--help"], { cwd: dir }).includes("ledger add <id>")
   && !fs.existsSync(path.join(dir, ".ledger/features/never.json")));
 assert("-h works the same", run(["redraft", "-h"], { cwd: dir }).includes("ledger redraft"));
-assert("the help leads with the mental model", run(["--help"], { cwd: dir }).includes("Preview is free, prepare costs tokens, cut prints."));
+assert("the help leads with the mental model", run(["--help"], { cwd: dir }).includes("Preview is free, the agent costs tokens, cut prints."));
 
 // ---- Finding your way ----
 // Bare `ledger` says where things stand and what to run next; outside a
@@ -854,6 +854,128 @@ assert("a release cut before commits were recorded can be filled in", cutJson()[
 run(["releases", "amend", "4", "--commit", head], { cwd: repo, expect: "fail" });
 run(["release", "amend", "1", "--commit", "0".repeat(40)], { cwd: repo, expect: "fail" });   // the old name, still refusing
 fs.rmSync(repo, { recursive: true, force: true });
+
+// ---- One command for agent work ----
+// `ledger agent` works out which task is due from what the CLI recorded when
+// each one finished, and how much of it, so a task already done is never
+// sent round again and nothing due starts nothing.
+{
+  const ag = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-agent-"));
+  const agit = (...args) => spawnSync("git", ["-C", ag, ...args], { encoding: "utf8" });
+  const commit = (msg) => { agit("add", "-A"); agit("commit", "-qm", msg); };
+  const state = () => (fs.existsSync(path.join(ag, ".ledger/state.json")) ? readJson(path.join(ag, ".ledger/state.json")) : {});
+  const on = (args, o = {}) => run(args, { cwd: ag, ...o });
+  agit("init", "-q", ".");
+  agit("config", "user.email", "smoke@example.com");
+  agit("config", "user.name", "Smoke");
+  fs.mkdirSync(path.join(ag, "src"));
+  fs.writeFileSync(path.join(ag, "src/app.js"), "one\n");
+  commit("Initial import");
+
+  assert("outside a ledger, `ledger agent` says to init, and starts nothing",
+    on(["agent"], { expect: "fail" }).includes("`ledger init`") && lastStatus === 3);
+  on(["init", "--product", "Routed", "--agents", "none"]);
+  assert("an empty corpus is a survey", on(["agent", "--plan"]).includes("bootstrap: survey the codebase"));
+  assert("…delivered like any task", on(["agent", "--print"]).includes("You are cataloguing what Routed already does"));
+
+  on(["add", "one"], { stdin: feature({ audience: "user", size: "Medium", name: "One", description: "Does the one thing." }) });
+  const unsure = on(["agent"], { expect: "fail" });
+  assert("entries with no finished survey and no edition stop for a person, not an agent",
+    unsure.includes("Only you can say which it is") && unsure.includes("ledger bootstrap complete") && lastStatus === 3);
+  assert("…and the survey carries on from the entries already there",
+    on(["bootstrap"]).includes("This survey has already started.** 1 entry is recorded"));
+  on(["bootstrap", "complete"]);
+  assert("`bootstrap complete` stamps the survey", state().bootstrap?.version === 1);
+  commit("Baseline");
+  assert("a finished survey with nothing else due starts no agent", on(["agent"]).includes("Nothing for an agent to do."));
+
+  // The tone each entry was written in is recorded, never read off the text.
+  on(["style", "set", "govuk"]);
+  assert("`style set` records the tone every entry was in until now",
+    state().styles?.entries?.one === "google" && state().styles?.other === "google");
+  on(["add", "two"], { stdin: feature({ audience: "user", size: "Small", name: "Two", description: "Does the two thing." }) });
+  assert("…and an entry written after it is in the new tone", !("two" in (state().styles?.entries ?? {})));
+  assert("a rewrite is due for the entries in the old tone only",
+    on(["agent", "--plan"]).includes("style rewrite: 1 entry and the text that belongs to no entry"));
+  const restyle = on(["style", "rewrite"]);
+  assert("…and its brief lists only those", restyle.includes("1 of the 2 entries are still in an earlier tone") &&
+    restyle.includes("  - Features: one") && restyle.includes("ledger style rewrite complete --category"));
+  on(["style", "rewrite", "complete", "--category", "Features"]);
+  assert("an area marked done leaves only the rest of the text", on(["agent", "--plan"]).includes("style rewrite: 0 entries and the text"));
+  on(["style", "rewrite", "complete"]);
+  assert("…and once it's all done, no rewrite is due again", !("styles" in state()) && on(["agent"]).includes("Nothing for an agent to do."));
+  assert("asked for anyway, the rewrite is a second pass", on(["style", "rewrite"]).includes("this is a second pass"));
+
+  on(["cut", "--name", "Baseline", "--no-pdf", "--yes"]);
+  commit("Cut v1");
+
+  // A sweep is for code nobody has read, and enough of it.
+  fs.writeFileSync(path.join(ag, "src/app.js"), "one\ntwo\n");
+  const small = on(["agent", "--plan"]);
+  assert("a small change is under the sweep threshold, and says how to sweep it anyway",
+    small.includes("Nothing for an agent to do.") && small.includes("under the 20-line threshold") && small.includes("--force"));
+  assert("…which --force does", on(["agent", "--plan", "--force"]).includes("sweep: read the code nobody has read yet"));
+  fs.writeFileSync(path.join(ag, "src/app.js"), Array.from({ length: 30 }, (_, i) => `line ${i}`).join("\n"));
+  fs.mkdirSync(path.join(ag, "test"));
+  fs.writeFileSync(path.join(ag, "test/app.test.js"), Array.from({ length: 200 }, (_, i) => `t ${i}`).join("\n"));
+  const sweepPlan = on(["agent", "--plan"]);
+  assert("enough code since the last edition is a sweep", sweepPlan.includes("sweep:") && sweepPlan.includes("since v1's commit"));
+  const sweepBrief = on(["agent", "--print"]);
+  assert("…whose brief is the diff and the release's record, and no client text",
+    sweepBrief.includes("src/app.js") && sweepBrief.includes("ledger sweep complete") && sweepBrief.includes("Don't") &&
+    !sweepBrief.includes("## 4. What to write"));
+  on(["sweep", "complete"]);
+  assert("swept, the same uncommitted work is nothing new", on(["agent", "--plan"]).includes("Nothing for an agent to do."));
+  assert("`ledger sweep` with nothing to read prints no prompt",
+    !on(["sweep"]).includes("COPY EVERYTHING") && on(["sweep", "--print"]).includes("Nothing to sweep"));
+  fs.writeFileSync(path.join(ag, "test/app.test.js"), "changed\n");
+  assert("…and a change to tests alone starts no agent", on(["agent", "--plan"]).includes("Nothing for an agent to do."));
+  assert("…though `ledger sweep`, asked for, still shows it", on(["sweep"]).includes("test/app.test.js"));
+  commit("More of it");
+
+  // Prepare: the whole release the first time, then only what moved.
+  on(["change", "one", "--what", "It does the one thing twice.", "--why-unknown"]);
+  assert("recorded changes nobody prepared are a prepare", on(["agent", "--plan"]).includes("prepare: write the client's text for v2"));
+  writeComposition(2, { changes: { one: ["It does the one thing twice."] }, changed: [{ text: "One does its thing twice.", covers: ["one"] }],
+    quiet: [] }, { cwd: ag });
+  assert("prepare complete records the code as read", state().sweep?.commit === agit("rev-parse", "HEAD").stdout.trim());
+  assert("…and the reasons still open", readJson(path.join(ag, ".ledger/compositions.json")).compositions
+    .find((x) => x.version === 2).prepared.unvouched?.join() === "one#0");
+  assert("prepared, nothing is due", on(["agent", "--plan"]).includes("Nothing for an agent to do."));
+  on(["change", "two", "--what", "It does the two thing faster.", "--why", "It was slow."]);
+  assert("a change since is a prepare of what moved", on(["agent", "--plan"]).includes("prepare: only what moved since the last prepare"));
+  const delta = on(["prepare"]);
+  assert("…whose brief gives the moved entries in full and the rest one line each",
+    delta.includes("Only what moved since the last prepare: two") && delta.includes("one  —  One  (prepared, unchanged)") &&
+    /now: +Does the two thing\./.test(delta));
+  assert("…and --full prepares the whole release", !on(["prepare", "--full"]).includes("(prepared, unchanged)"));
+  writeComposition(2, { changes: { one: ["It does the one thing twice."], two: ["It does the two thing faster, because it was slow."] },
+    changed: [{ text: "One and Two both do more.", covers: ["one", "two"] }], quiet: [] }, { cwd: ag });
+  // A reason given after the note was written makes that note out of date.
+  const onePath = path.join(ag, ".ledger/features/one.json");
+  const one = readJson(onePath);
+  one.events[0].why = "Customers asked for it.";
+  one.events[0].why_from = "person";
+  fs.writeFileSync(onePath, JSON.stringify(one, null, 2));
+  const answered = on(["agent", "--plan"]);
+  assert("a reason given since the last prepare sends that entry back to it",
+    answered.includes("prepare: only what moved") && answered.includes("a reason given for one"));
+  assert("…and bare `ledger` says so", on([]).includes("a reason given for one since the last prepare"));
+
+  // With an agent configured, `ledger agent` hands the task to it, and checks it.
+  const fake = path.join(ag, "fake-agent.cjs");
+  fs.writeFileSync(fake, `const { spawnSync } = require("node:child_process");
+process.stdin.resume(); process.stdin.on("end", () => {
+  spawnSync(process.execPath, [${JSON.stringify(BIN)}, "prepare", "complete"], { stdio: "inherit" });
+});`);
+  const handed = on(["agent", "--run", `node ${JSON.stringify(fake)}`]);
+  assert("`ledger agent --run` hands the due task over and checks what it left", /✓ prepared \(/.test(handed));
+  fs.rmSync(fake);
+  const viaConfig = on(["agent"], { env: { ...process.env, LEDGER_AGENT: `node -e "process.exit(0)"` } });
+  assert("…and with nothing due, an agent configured or not, nothing starts",
+    viaConfig.includes("Nothing for an agent to do.") && !viaConfig.includes("Handing"));
+  fs.rmSync(ag, { recursive: true, force: true });
+}
 
 // ---- The redraft: a corpus written again, a record that carries on ----
 const rd = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-redraft-"));

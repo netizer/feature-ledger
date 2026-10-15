@@ -16,7 +16,7 @@
     },
     {
       "version": 3,
-      "description": "The command ledger bootstrap prints a brief you paste into a coding agent, which reads the codebase and records what it already does as version 1, with how to see each capability. It lists the capabilities, decides the areas, writes the entries, and hands back the entries it was least sure of with the ledger cut command for the baseline, dated from the first commit. The agent runs it to the end without stopping to ask you anything, and doesn't commit or cut."
+      "description": "The command ledger bootstrap prints a brief you paste into a coding agent, which reads the codebase and records what it already does as version 1, with how to see each capability. The agent runs to the end without asking you anything, and doesn't commit or cut. A survey that stops partway carries on from the entries it wrote."
     }
   ],
   "events": [
@@ -35,6 +35,14 @@
       "why": "The developer reads, commits and cuts the baseline, since coding agents never commit for them, and the ledger no longer maps code to entries or keeps audits.",
       "why_from": "person",
       "date": "2026-10-12"
+    },
+    {
+      "version": 3,
+      "kind": "change",
+      "what": "A survey that stops partway carries on from the entries it already wrote, instead of starting again.",
+      "why": "So the batches already written are not paid for twice.",
+      "why_from": "person",
+      "date": "2026-10-15"
     }
   ]
 }

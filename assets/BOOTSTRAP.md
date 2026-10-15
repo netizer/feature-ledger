@@ -22,7 +22,7 @@ that you need.
 
 {copy_rule}
 
-You are cataloguing what {product} already does, into a feature ledger. This
+{resume_intro}You are cataloguing what {product} already does, into a feature ledger. This
 is an inventory of an existing codebase, not a record of anything you or I
 built. Read `ledger rules` first — it defines every field and the house style.
 
@@ -198,6 +198,9 @@ read of this document. Anything you can't tell apart from its neighbours, or
 that you'd have to open the description to understand, gets one more pass:
 edit `name` in `.ledger/features/<id>.json`, which changes the words and
 nothing about the release, and re-run `ledger status`.
+
+Then run `ledger bootstrap complete`. It records that the survey finished, so
+the next run knows not to carry it on.
 
 Finish with a short note for me, and nothing else to do:
 

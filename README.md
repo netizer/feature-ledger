@@ -25,18 +25,25 @@ CLI command).
 
 ## The whole API
 
-> **Preview is free, prepare costs tokens, cut prints.**
+> **Preview is free, the agent costs tokens, cut prints.**
 
 ```bash
 ledger                    # where things stand, and the one thing to run next
 ledger preview            # the edition as it would print now — free, no agent
-ledger prepare            # one agent session that writes the client's text — spends tokens
+ledger agent              # whatever agent work is due, and only the part not done yet — spends tokens
 ledger cut --name "…"     # print the edition and the message to send with it
 ```
 
 While you build, your coding agent records facts with `ledger add`,
 `ledger change` and `ledger remove`. It never commits for you, and no agent
 runs unless you ask for one.
+
+`ledger agent` is the one command for agent work. It reads `.ledger/` and git,
+for free, to work out what is due: the survey, a rewrite into a new tone, the
+client's text for the release, or a look at code nobody has read for work
+nobody recorded. It covers only what changed since that task last ran, and
+with nothing due it starts nothing. `ledger agent --plan` shows what it would
+do.
 
 ## Install
 
@@ -51,15 +58,17 @@ Needs Node 18.17+, and Chrome or Chromium for the PDF.
 ```bash
 cd my-app
 ledger init --product "Acme Portal"
-ledger bootstrap          # paste the prompt into your agent session
+ledger agent              # paste the prompt into your agent session
 ```
 
 `init` creates `.ledger/` and tells your agent about it, in `CLAUDE.md` or
-`AGENTS.md`. `bootstrap` prints a prompt for your agent to survey the codebase
-and write an entry per capability, with how to see each one. Add `--copy` to
+`AGENTS.md`. On an empty ledger, `ledger agent` prints the survey
+(`ledger bootstrap`): a prompt for your agent to read the codebase and write an
+entry per capability, with how to see each one. Add `--copy` to
 put the prompt on the clipboard, or `--run claude` to hand it to an agent
 directly (`codex`, `gemini`, or any command that reads a prompt on stdin work
-too).
+too). Set `"agent": "claude"` in `.ledger/config.json` and `ledger agent` hands
+it over on its own.
 
 Then read it with `ledger preview`, and fix whatever doesn't sound like you:
 the words live in `.ledger/features/<id>.json` and are yours to edit. Commit,
@@ -96,17 +105,20 @@ nothing.
 ## Showing it to the client
 
 ```bash
-ledger prepare            # in your agent session, with you there
+ledger agent              # prepares the edition: in your agent session, with you there
 ledger cut --name "Sprint 6 demo"
 ```
 
-`prepare` is one interactive session that writes everything the client reads:
+When changes are recorded that nobody has prepared, `ledger agent` runs
+`ledger prepare`, and before it, at a terminal, asks you for the reasons nobody
+gave, for free. `prepare` is one interactive session that writes everything the client reads:
 an overview of the release, a one-sentence note on each change, the summary
 list, how to see each new or updated capability, and the message to send, all
 in plain language for someone who has never seen the code. In the same session it reads the
 code since the last edition for work nobody recorded, asks you the reasons
 nobody gave, and checks what it wrote against the code, which is a good moment
-to fix either. It doesn't commit: it ends with a list of what it changed.
+to fix either. It doesn't commit: it ends with a list of what it changed. Run
+again later in the release, it covers only what moved since.
 
 `cut` refuses only an edition that would be wrong: nothing recorded, or a
 redraft not yet checked. Everything else it says before it asks to go ahead:

@@ -50,8 +50,8 @@ product. The client has never seen the code: no file names, paths, flags or
 code terms in anything they read; those go in `dev_notes`.
 
 **Don't commit.** What you record lands in the working tree, and the developer
-commits it with everything else. Don't run `ledger prepare` or `ledger cut`
-unless you are asked to.
+commits it with everything else. Don't run `ledger agent`, `ledger prepare` or
+`ledger cut` unless you are asked to.
 
 Do not run `ledger build` as part of an ordinary change. The Markdown docs are
 gitignored build output; the client PDFs in `docs/client/` are committed, and

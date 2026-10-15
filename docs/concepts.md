@@ -100,6 +100,9 @@ other-changes.json   changes belonging to no single feature
 compositions.json    per release, the "What changed" notes, the summary and the message its
                      edition goes out with, and what `ledger prepare` had read
 redrafts.json        every redraft, and whether the new corpus was checked against the old
+state.json           how far the agent tasks have got: the tone each entry was last written
+                     in, the code last read for unrecorded work, whether the survey finished.
+                     Absent until there is something in it
 archive/v1-v4/       a corpus a redraft set aside, read-only; its editions print from it
 STYLE.md             optional, the project's own tone as prose
 theme.css            optional, appended last to the PDF stylesheet

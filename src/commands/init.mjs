@@ -174,7 +174,7 @@ export async function cmdInit({ flags }) {
   out(`      .ledger/features/<id>.json and change anything that isn't how you'd say it to this client`);
   out(`  4. commit, then \`ledger cut --name "Baseline"\` prints the first edition`);
   out("");
-  out("From then on the agent records each change as it works. Preview is free, prepare costs tokens, cut prints.");
+  out("From then on the agent records each change as it works. Preview is free, the agent costs tokens, cut prints.");
   out("Run `ledger` on its own at any point: it says where things stand and what to run next.");
 }
 
@@ -226,11 +226,14 @@ function addGitignore(root, dir) {
  * read the codebase can say what it does. So this prints the procedure, and
  * whichever agent you use runs it.
  */
-export async function cmdBootstrap({ flags }) {
+export async function cmdBootstrap({ flags, positional = [] }) {
+  if (positional[0] === "complete") return bootstrapComplete(flags);
+  if (positional[0] && positional[0] !== "brief") fail("usage: ledger bootstrap | bootstrap complete");
   let product = "the product";
   let config = DEFAULT_CONFIG;
   let ledgerDir = null;
   let redraft = null;
+  let started = 0;
   try {
     const { openProject } = await import("../store.mjs");
     const project = openProject(flags);
@@ -238,6 +241,7 @@ export async function cmdBootstrap({ flags }) {
     config = project.config;
     ledgerDir = project.ledgerDir;
     redraft = project.pendingRedraft;
+    started = project.featureSet.features().length;
   } catch {
     // Printing the prompt before `ledger init` is still useful.
   }
@@ -245,11 +249,51 @@ export async function cmdBootstrap({ flags }) {
   process.stdout.write(
     asset("BOOTSTRAP.md")
       .replaceAll("{redraft_intro}", redraft ? redraftIntro(redraft) : "")
+      .replaceAll("{resume_intro}", started ? resumeIntro(started) : "")
       .replaceAll("{baseline_step}", redraft ? redraftStep(redraft) : BASELINE_STEP)
       .replaceAll("{product}", product)
       .replaceAll("{style_line}", styleLine(style))
       .replaceAll("{copy_rule}", COPY_BLOCK),
   );
+}
+
+/**
+ * A survey that stopped partway — out of context, interrupted — left entries
+ * behind. The next one carries on from them rather than starting again, so
+ * the batches already written are neither paid for twice nor duplicated.
+ */
+function resumeIntro(n) {
+  return `**This survey has already started.** ${n} entr${n === 1 ? "y is" : "ies are"} recorded, by an
+earlier run that stopped before it finished. Carry on from there: run
+\`ledger list\` first, and treat what it shows as batches already written. Do
+Step 1 against the whole codebase as usual, then write only the capabilities
+that have no entry yet. Leave the existing entries as they are, unless one
+breaks the bar below; then fix it by editing its file. If every capability
+already has an entry, go straight to Step 5.
+
+`;
+}
+
+/**
+ * `ledger bootstrap complete`: records that the survey finished, so
+ * `ledger agent` knows the corpus is a whole baseline and not one that
+ * stopped halfway, and that the code as it stands has been read.
+ */
+async function bootstrapComplete(flags) {
+  const { openProject } = await import("../store.mjs");
+  const { stampBootstrap } = await import("../state.mjs");
+  const project = openProject(flags);
+  project.assertWritable();
+  const n = project.featureSet.features().length;
+  if (!n) fail("the ledger is still empty, so there is no survey to mark finished. `ledger bootstrap` prints it.");
+  stampBootstrap(project);
+  if (flags["dry-run"]) {
+    out(JSON.stringify(project.state.bootstrap, null, 2));
+    out("(--dry-run: nothing written)");
+    return;
+  }
+  project.saveState();
+  out(`recorded the survey as finished: ${n} entr${n === 1 ? "y" : "ies"} at v${project.state.bootstrap.version}`);
 }
 
 /** Step 4 of an ordinary survey: stop short of the cut, and say how to make it. */

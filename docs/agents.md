@@ -6,16 +6,92 @@ an agent:
 
 1. **A stanza** in the agent's instruction file, so it records facts as it
    builds, and never commits for you.
-2. **Agent tasks** — `prepare`, `bootstrap`, `redraft check` and
-   `style rewrite` — which print a prompt for an agent to work through.
+2. **Agent tasks** — `bootstrap`, `redraft check`, `style rewrite`, `prepare`
+   and `sweep` — which print a prompt for an agent to work through, and
+   `ledger agent`, which works out which of them is due.
 
 **Agents never run unless you ask.** No command starts one on its own:
-`preview`, `cut` and `build` never do, and an agent task only hands its prompt
-to an agent when `--run` is on the command line.
+`preview`, `cut` and `build` never do. An agent task hands its prompt to an
+agent only when `--run` is on the command line, and `ledger agent` only when
+you type it with an agent configured.
+
+## `ledger agent` — the one command for agent work
+
+You don't need to remember which task is due. `ledger agent` reads `.ledger/`
+and git, with no agent and no tokens, and picks the first that applies:
+
+| What it finds | What it runs |
+| --- | --- |
+| an empty corpus | `bootstrap`, the survey |
+| entries, but no finished survey and no edition yet | nothing: it **stops** and asks you (below) |
+| a redraft not yet checked | `redraft check` |
+| entries in a tone the project has since left | `style rewrite`, of those entries only |
+| changes `prepare` hasn't read | `prepare`, of only what moved since the last one |
+| enough code nobody has read since | `sweep`, of only that code |
+| none of these | **nothing**: no agent starts, exit 0 |
+
+```
+ledger agent — prepare: only what moved since the last prepare (October 12, 2026)
+  moved: delivery-windows, saved-baskets, pick-scan
+  412 lines in 9 files since a1b2c3d (the last prepare)
+```
+
+**How it knows.** Every decision comes from a record the CLI wrote when a task
+finished, never from the text, so a task that is done is never sent round
+again. Prepare's record is the stamp `ledger prepare complete` writes. The
+rest is in `.ledger/state.json`, which only exists once there is something in
+it:
+
+- **The tone each entry was written in.** `ledger style set` records the old
+  tone against every entry before it switches. An entry added, or given a new
+  description, afterwards is in the new tone. `ledger style rewrite complete
+  --category "<area>"` marks an area done as the rewrite finishes it. A
+  rewrite that stops halfway carries on from the areas that are left. A
+  hand-edit records nothing: rewording a sentence doesn't change its tone.
+  Change the tone with `ledger style set`, not by editing `config.json`, or
+  nothing records that the old entries are in the old one.
+- **The code last read.** `ledger sweep complete` and `ledger prepare complete`
+  record HEAD, and each uncommitted file as it was read. The next sweep starts
+  from the latest of that, the last prepare, the survey and the last edition's
+  commit, and leaves out any file that still holds exactly what was read.
+- **The survey.** `ledger bootstrap complete` records that it finished. A survey
+  that stopped partway leaves entries but no record, and the next
+  `ledger bootstrap` carries on from those entries instead of starting again.
+
+**How much.** Each task covers only what isn't done: the entries still in the
+old tone, the entries that moved since the last prepare, the code since it was
+last read. A sweep starts only for 20 lines or more outside tests, docs,
+lockfiles and CI configuration; below that it says how much there is, and
+`ledger agent --force` sweeps it anyway. When `prepare` is due, it reads the
+code too, so no separate sweep is offered.
+
+**What it asks you instead.** At a terminal, before anything spends tokens, it
+asks each reason nobody has given, one at a time, and records your answer as
+yours. Enter skips one, `q` skips the rest. A reason given after a release was
+prepared sends that entry back to `prepare`, since its note was written without
+it. And where the records can't settle what is due, it stops and says so
+instead of paying an agent to guess. A corpus with entries, no finished survey
+and no edition is either a survey that stopped partway (`ledger bootstrap`
+carries it on) or a baseline you wrote yourself (`ledger bootstrap complete`
+says so). Only you know which.
+
+**One task per run.** Each task has its own check afterwards (below), and the
+next `ledger agent` picks up the next one. `--plan` shows what it would run,
+how much of it, and what comes after, and runs nothing.
+
+**How it delivers.** Like any task: `--print`, `--copy` or `--run AGENT`. With
+none of them, it hands the task to `$LEDGER_AGENT` or `"agent"` in
+`.ledger/config.json` when one is set, because typing `ledger agent` is asking
+for agent work, and otherwise prints the prompt to paste. `prepare` asks you
+things, so it is best pasted into your own session even when an agent is
+configured: `ledger agent --copy`.
+
+It never runs `init`, `migrate`, `redraft start`, `style set` or `cut`: each
+of those is a decision, not agent work. It names them when they're next.
 
 ## Delivering an agent task
 
-Every agent task delivers its prompt the same four ways:
+Every agent task, `ledger agent` included, delivers its prompt the same four ways:
 
 | | |
 | --- | --- |
@@ -61,7 +137,8 @@ Resume the session:  claude --resume 7744d0d3-482a-4ac2-9fd1-0e1580121146
 - **The last message** is held back from the progress and shown here, because
   that's where an agent puts its questions and next steps.
 - **The check** is what the task is supposed to leave behind: a release
-  prepared, a redraft marked complete, entries recorded. An agent that exits
+  prepared, a redraft marked complete, a survey or a tone rewrite marked
+  finished, the code marked as read. An agent that exits
   cleanly without it is reported with ✗, and the command exits with 3.
 - **Refused tool calls** are listed, one line each, when the agent tried
   something it wasn't allowed to do.

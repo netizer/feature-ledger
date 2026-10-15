@@ -1,0 +1,15 @@
+{
+  "id": "agent-command",
+  "audience": "user",
+  "category": "Recording what the product does",
+  "size": "Medium",
+  "dev_notes": "src/commands/agent.mjs: agentPlan() decides, in order, bootstrap (empty corpus), a stop (entries, no bootstrap stamp, nothing cut), redraft check, style rewrite (restyleDue), prepare (prepareReport not ok; skipped for an inventory edition), sweep (codeSince().significant >= SWEEP_MIN_LINES, or --force). cmdAgent asks unknown reasons at a TTY first (askReasons), then delivers the first task through prompt.mjs: --print/--copy/--run, else $LEDGER_AGENT or config.agent, else the pasteable brief. Exit 3 on a stop or outside a ledger. Bare `ledger` points its Next line at it. The records it reads are in .ledger/state.json (src/state.mjs) and the prepare stamp.",
+  "history": [
+    {
+      "version": 3,
+      "name": "One command for agent work",
+      "description": "The command ledger agent works out which agent task is due, and how much of it is left, from what earlier tasks recorded. It then runs that one task. When nothing is due, it starts no agent and spends nothing.",
+      "how_to_see": "Record a change, then run ledger agent: it starts the preparation of the edition. Prepare it, run ledger agent again, and it says there is nothing for an agent to do."
+    }
+  ]
+}

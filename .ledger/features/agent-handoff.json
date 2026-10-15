@@ -12,7 +12,7 @@
     },
     {
       "version": 3,
-      "description": "The commands that prepare work for a coding agent, prepare, bootstrap, redraft check and style rewrite, print a prompt for you to paste into your agent session. Add --copy to put it on the clipboard, or --run claude, codex or gemini to hand it to that agent and wait. When the agent stops, you see its last message, whether it left what its task asks for, and the command that resumes its session. Nothing is handed to an agent unless you pass --run."
+      "description": "The agent tasks, bootstrap, redraft check, style rewrite, prepare and sweep, print a prompt for you to paste into your agent session, or hand it to Claude, Codex or Gemini and wait. When the agent stops, you see its last message, whether it left what its task asks for, and the command that resumes its session."
     }
   ],
   "events": [
@@ -39,6 +39,14 @@
       "why": "Audit, compose and verify are the steps of one prepare session now, and the paths brief went with the code map.",
       "why_from": "person",
       "date": "2026-10-12"
+    },
+    {
+      "version": 3,
+      "kind": "change",
+      "what": "The sweep for unrecorded work is a task you can hand to an agent too, and ledger agent hands over whichever task is due.",
+      "why": "So you only need to remember one command for agent work.",
+      "why_from": "person",
+      "date": "2026-10-15"
     }
   ]
 }

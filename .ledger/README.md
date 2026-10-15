@@ -16,6 +16,7 @@ document handed over stays in the repo.
 | `subcategories.json` | Sub-section headings, for an area that grew too big to read as one list. |
 | `other-changes.json` | Changes belonging to no single feature. |
 | `redrafts.json` | Every time the corpus was written again from scratch, and when the new one was checked against the old. Written by `ledger redraft`. |
+| `state.json` | How far the agent tasks have got: the tone each entry was last written in, the code last read for unrecorded work, and whether the survey finished. `ledger agent` reads it to decide what's due. Written by the CLI as each task completes; absent until there is something in it. |
 | `archive/<label>/` | A corpus a redraft set aside, read-only. The editions it produced are printed from it. |
 | `theme.css` | Optional. Appended last to the PDF's stylesheet, for a one-off nudge. |
 
@@ -36,8 +37,8 @@ which release the entry lands on, which is what every New/Changed tag is
 computed from, and `ledger change` refuses a change that never says why it
 happened, or that it isn't known.
 
-**Leave `releases.json`, `redrafts.json`, the `events` in a feature, the
-`prepared` stamp in `compositions.json` and `archive/` alone.** The timeline has
+**Leave `releases.json`, `redrafts.json`, `state.json`, the `events` in a
+feature, the `prepared` stamp in `compositions.json` and `archive/` alone.** The timeline has
 to keep matching the editions already handed over, and an edition already cut
 reprints from what is recorded for it. One exception: when someone gives the
 reason for a change that had none, it goes into that event's `why`, with

@@ -3,6 +3,7 @@ import path from "node:path";
 import { openProject } from "../store.mjs";
 import { Feature, WHY_FROM } from "../model/feature.mjs";
 import { fail, readStdin, asList, isBlank, exists, today } from "../util.mjs";
+import { markStyled } from "../state.mjs";
 
 const out = (s) => process.stdout.write(`${s}\n`);
 
@@ -187,7 +188,8 @@ export async function cmdAdd({ flags, positional }) {
     }],
   });
 
-  report(project, feature, { dryRun: flags["dry-run"], verb: "added" });
+  // Written now, so written in the project's tone: nothing for a rewrite to do.
+  if (report(project, feature, { dryRun: flags["dry-run"], verb: "added" }) && markStyled(project, [id])) project.saveState();
 }
 
 /**
@@ -337,6 +339,7 @@ export async function cmdChange({ flags, positional }, { legacy = false } = {}) 
 
   const rebuilt = new Feature(feature.toJSON());
   if (!report(project, rebuilt, { dryRun: flags["dry-run"], verb: legacy ? "updated" : "changed" })) return;
+  if (!isBlank(data.description) && markStyled(project, [id])) project.saveState();
   for (const n of notes) out(`note: ${n}`);
   unvouched(rebuilt.events.slice(recorded));
 }

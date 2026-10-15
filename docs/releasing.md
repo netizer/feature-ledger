@@ -1,6 +1,6 @@
 # Preview, prepare, cut
 
-> **Preview is free, prepare costs tokens, cut prints.**
+> **Preview is free, the agent costs tokens, cut prints.**
 
 Three commands take a release from open to handed over. Only one of them
 spends tokens, and only when you run it.
@@ -78,6 +78,17 @@ Run it mid-release to see the near-final text, and again before the cut. A
 change recorded afterwards shows as news since the last prepare, everywhere;
 editing the words by hand never does.
 
+### Only what moved
+
+Once a release is prepared, the next brief covers only what moved since: the
+entries with new events, new entries, new product-wide notes, and entries
+whose missing reason someone has given since. Those are given in full, the rest
+one line each, so the summary can still account for them, and section 2 reads
+only the code since it was last read (by a prepare or a sweep), not since the
+last edition. `ledger prepare --full` prepares the whole release again. With
+nothing moved, `ledger prepare` prepares the whole release, since you asked for
+it; `ledger agent` doesn't start it at all.
+
 ### The overview
 
 Two or three sentences under the version number on the first page: what this
@@ -124,8 +135,9 @@ summary items as a short list, and a line on anything removed. Plain text. When
 
 The ledger never invents a reason. A change recorded with `--why-unknown`, or
 with a reason read off a commit (`--why-from commit`), keeps that on its event.
-Bare `ledger` lists them; `ledger prepare` asks you about them; the cut says
-how many are left. When you give one, it goes into the event with
+Bare `ledger` lists them; `ledger agent`, run at a terminal, asks you each one
+before it starts anything, for free; `ledger prepare` asks the rest; the cut
+says how many are left. When you give one, it goes into the event with
 `"why_from": "person"`: the one change ever made to an event. When nobody knows,
 the note says what changed, and stops.
 

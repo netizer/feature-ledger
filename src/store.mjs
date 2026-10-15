@@ -22,6 +22,9 @@ export const LEDGER_DIRNAME = ".ledger";
  *                          had seen when it wrote them
  *     redrafts.json        every time the corpus was rewritten from scratch, and whether
  *                          the new one has been checked against the old
+ *     state.json           how far the agent tasks have got: the style each entry was
+ *                          last written in, the code last read for unrecorded work,
+ *                          whether the survey finished (see src/state.mjs)
  *     archive/<label>/     the corpus a redraft set aside, read-only
  *     index.json           the deliberate corpus order
  *     features/<id>.json   one file per feature
@@ -156,6 +159,7 @@ export class Project {
     this.indexPath = path.join(ledgerDir, "index.json");
     this.compositionsPath = path.join(ledgerDir, "compositions.json");
     this.redraftsPath = path.join(ledgerDir, "redrafts.json");
+    this.statePath = path.join(ledgerDir, "state.json");
     this.archiveDir = path.join(ledgerDir, ARCHIVE_DIRNAME);
     this.featuresDir = path.join(ledgerDir, "features");
     this.themeCssPath = path.join(ledgerDir, "theme.css");
@@ -184,6 +188,7 @@ export class Project {
     this.index = readOptional(this.indexPath, { order: [] }).order ?? [];
     this.compositions = readOptional(this.compositionsPath, { compositions: [] }).compositions ?? [];
     this.redrafts = readOptional(this.redraftsPath, { redrafts: [] }).redrafts ?? [];
+    this.state = readOptional(this.statePath, {});
 
     const files = exists(this.featuresDir)
       ? fs.readdirSync(this.featuresDir).filter((f) => f.endsWith(".json")).sort()
@@ -348,6 +353,14 @@ export class Project {
     this.compositions = [...this.compositions.filter((c) => c.version !== composition.version), composition]
       .sort((a, b) => a.version - b.version);
     writeJson(this.compositionsPath, { compositions: this.compositions });
+  }
+
+  /** The work record. Left out of the tree while there is nothing in it, so a
+   *  project that never runs an agent task never grows the file. */
+  saveState() {
+    this.assertWritable();
+    if (Object.keys(this.state).length) writeJson(this.statePath, this.state);
+    else if (exists(this.statePath)) fs.unlinkSync(this.statePath);
   }
 
   saveIndex() {

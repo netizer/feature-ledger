@@ -228,6 +228,13 @@ function start(flags) {
   });
   project.saveRedrafts();
 
+  // The survey and the tones belonged to the corpus just set aside: the new
+  // one is surveyed afresh, in the project's tone.
+  delete project.state.bootstrap;
+  if (project.state.styles) delete project.state.styles.entries;
+  if (project.state.styles && !Object.keys(project.state.styles).length) delete project.state.styles;
+  project.saveState();
+
   out(`archived ${rangeLabel(versions)} (${featureCount} feature${featureCount === 1 ? "" : "s"}) to ${ledgerRel}/${archiveRel}/`);
   out(`the corpus now opens at v${opens}, empty. ${rangeLabel(versions)} ${versions.length === 1 ? "stays in the timeline as an archived release" : "stay in the timeline as archived releases"}, ` +
     "so the numbering carries on and every edition already printed keeps its number and its file.");

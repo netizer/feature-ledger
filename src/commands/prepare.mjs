@@ -6,6 +6,7 @@ import {
   shapeProblems, textProblems, prepareReport, prepareLine, unknownReasons, stamped, messageFor,
 } from "../compose.mjs";
 import { eventLine } from "../diff.mjs";
+import { codeSince, stampSweep } from "../state.mjs";
 
 const out = (s) => process.stdout.write(`${s}\n`);
 const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -23,6 +24,10 @@ const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
  * showed it and as it stands now, the events between, the reasons nobody
  * vouched for, and the code since the last edition as a diffstat. The agent
  * reads the code it needs from there.
+ *
+ * Once a release has been prepared, the next brief covers only what moved
+ * since: those entries in full, the rest one line each, and the code since
+ * it was last read. `--full` prepares the whole release again.
  *
  * Nothing runs unless someone asks: printed for pasting by default, and
  * handed to an agent only with `--run`.
@@ -70,6 +75,9 @@ function complete(flags) {
     return;
   }
   project.saveComposition(next);
+  // Section 2 of the brief read the code as it stands, so it counts as read.
+  stampSweep(project);
+  project.saveState();
   const fresh = openProject(flags);
 
   const notes = Object.keys(next.changes).length;
@@ -125,7 +133,7 @@ function brief(flags) {
   const notes = project.featureSet.otherChanges({ version, audience: "user" });
   const composition = project.compositionOf(version);
   const report = prepareReport(project, version);
-  const moved = new Set(report.never ? [] : [...report.arrived, ...report.moved]);
+  const moved = new Set(report.never ? [] : [...report.arrived, ...report.moved, ...report.answered]);
   const unknown = unknownReasons(project, version);
   const hasGit = git.available(root);
   const since = previous?.commit && hasGit ? previous.commit : null;
@@ -133,6 +141,10 @@ function brief(flags) {
   const commits = since ? git.subjects(root, since) : [];
   const dirty = hasGit ? git.uncommitted(root).filter((p) => !git.isLedgerPath(project.config, p)) : [];
   const inventory = !previous;
+  // Only what moved since the last prepare, when there is one to build on.
+  const delta = !flags.full && !inventory && Boolean(report.prepared) && !report.ok;
+  const fresh = new Set(delta ? [...report.arrived, ...report.moved, ...report.answered] : []);
+  const code = delta ? codeSince(project) : null;
 
   /* ---- the part for the human ---- */
   out(`ledger prepare — ${N}${P ? `, read against the ${P} edition (${longDate(previous.date)})` : ", a first edition"}`);
@@ -143,7 +155,16 @@ function brief(flags) {
   out(`${plural(entries.length, "client-facing entry", "client-facing entries")} in ${N}${kinds ? ` (${kinds})` : ""}. ` +
     `${prepareLine(report).replace(/^./, (c) => c.toUpperCase())}.` +
     (unknown.length ? ` ${plural(unknown.length, "reason")} nobody vouched for, which it will ask you about.` : ""));
-  if (stat) out(`${plural(stat.lines, "line")} in ${plural(stat.files, "file")} since ${P}'s commit, which it reads for work nobody recorded.`);
+  if (delta) {
+    out(`Only what moved since the last prepare: ${[...fresh].join(", ") || "product-wide notes"}. Every other note stays as it is;`);
+    out("`ledger prepare --full` prepares the whole release again.");
+    if (code && !code.nothing) {
+      out(`${plural(code.lines, "line")} in ${plural(code.files, "file")} since ${code.from.label} (${git.shortSha(code.from.commit)}), which it reads for work nobody recorded.`);
+    }
+  } else {
+    if (report.prepared && report.ok && !inventory) out("Nothing has moved since the last prepare, so this prepares the whole release again.");
+    if (stat) out(`${plural(stat.lines, "line")} in ${plural(stat.files, "file")} since ${P}'s commit, which it reads for work nobody recorded.`);
+  }
   out("");
   out("Paste the prompt into your agent session, in the project root, and stay with it:");
   out("it asks you what only you know, and where what it wrote and the code disagree");
@@ -187,9 +208,18 @@ function brief(flags) {
     p(`Nothing client-facing is recorded against ${N} yet. Start with section 2.`);
     p("");
   }
+  if (delta) {
+    p("Only the entries given in full below moved since the release was last prepared.");
+    p("The others are listed one line each, for the summary: keep their notes as they are.");
+    p("");
+  }
   for (const f of entries) {
     const kind = kindAt(f, version);
     const s = f.stateAt(version);
+    if (delta && !fresh.has(f.id)) {
+      p(`  ${kind.padEnd(9)} ${f.id}  —  ${s.removed ? f.currentName : s.name}  (prepared, unchanged)`);
+      continue;
+    }
     const before = P ? f.stateAt(previous.version) : null;
     const shownBefore = needsNote(f, version) && before && !before.removed;
     const mark = moved.has(f.id) ? "*" : " ";
@@ -215,6 +245,7 @@ function brief(flags) {
     p(`  note      product-wide: ${c.description}`);
     p("");
   }
+  if (lines[lines.length - 1] !== "") p("");
   if (composition && !report.never && !inventory) {
     p(`What is written for ${N} so far is below. Entries marked \`*\` above moved since it was`);
     p("written; keep every other entry's note exactly as it is, including any hand-edits,");
@@ -229,7 +260,28 @@ function brief(flags) {
   /* 2 */
   p("## 2. Work nobody recorded");
   p("");
-  if (stat) {
+  if (code?.nothing) {
+    p(`No code has changed since ${code.from.label} (${git.shortSha(code.from.commit)}), when it was last read. Skip`);
+    p("this section unless the developer points you at something.");
+    p("");
+  } else if (code) {
+    p(`The code since ${code.from.label} (${git.shortSha(code.from.commit)}), when it was last read, working tree included,`);
+    p("biggest first. Read what you need of it with `git diff` and the files themselves:");
+    p("");
+    p("```");
+    p(code.stat.text || "  (no changes)");
+    p("```");
+    p("");
+    if (code.commits.length) {
+      p("The commits in that range:");
+      p("");
+      p("```");
+      for (const c of code.commits.slice(-60)) p(`  ${c}`);
+      if (code.commits.length > 60) p(`  … and ${code.commits.length - 60} earlier`);
+      p("```");
+      p("");
+    }
+  } else if (stat) {
     p(`The code since ${P}'s commit (${git.shortSha(since)}), working tree included, biggest first. Read what you`);
     p("need of it with `git diff` and the files themselves:");
     p("");
@@ -263,28 +315,7 @@ function brief(flags) {
   p("Compare it with section 1. A change someone using the product would notice that");
   p("section 1 doesn't account for is unrecorded. Record it:");
   p("");
-  p("```");
-  p("ledger change <id> <<'JSON'");
-  p('{ "what": "What changed, in a sentence.", "why": "Why.", "description": "The whole current state, if it moved." }');
-  p("JSON");
-  p("ledger add <id>       # a new capability: { audience, size, name, description, how_to_see?, category? }");
-  p("ledger remove <id> --why \"…\"");
-  p("```");
-  p("");
-  p("- One entry is one capability someone using the product would name: something they");
-  p("  could ask for, or would miss if it went away. A guardrail, a default, plumbing or");
-  p("  polish is part of the capability it belongs to, never an entry of its own. A name");
-  p("  is a short noun phrase in the users' words: not a caption, not the mechanism.");
-  p("- A refactor, a fix nobody would notice, a tidy: record nothing.");
-  p("- The reason: ask the developer. One read off a commit message takes");
-  p("  `--why-from commit`; one nobody knows takes `--why-unknown`. Never invent one.");
-  if (previous) {
-    p(`- A capability that was already in the product before ${P} and is only now being`);
-    p("  recorded takes `--backfilled`, and prints grey: the product didn't move, the");
-    p("  record did. Everything in the range above is this release's work.");
-  }
-  p("");
-
+  recordingRules(p, P);
   /* 3 */
   p("## 3. Reasons nobody recorded");
   p("");
@@ -412,7 +443,7 @@ function brief(flags) {
   /* 5 */
   p("## 5. Check it against the code");
   p("");
-  p("Read every sentence you wrote, and every description you touched, against what");
+  p(`Read every sentence you wrote${delta ? " this time" : ""}, and every description you touched, against what`);
   p("the code does. Each has to be something a reader could confirm by using the product.");
   p("Where the text and the code disagree, tell the developer: what the text says, what");
   p("the code does, at path:line. This is a good moment to fix the code or the text,");
@@ -429,6 +460,35 @@ function brief(flags) {
   p("   found in section 5 that is still open. Don't commit.");
 
   out(lines.join("\n"));
+}
+
+/**
+ * How to record work nobody recorded: the commands, the entry bar, and where
+ * a reason comes from. Shared by the prepare brief and the sweep, so the two
+ * hold an agent to the same bar.
+ */
+export function recordingRules(p, P) {
+  p("```");
+  p("ledger change <id> <<'JSON'");
+  p('{ "what": "What changed, in a sentence.", "why": "Why.", "description": "The whole current state, if it moved." }');
+  p("JSON");
+  p("ledger add <id>       # a new capability: { audience, size, name, description, how_to_see?, category? }");
+  p("ledger remove <id> --why \"…\"");
+  p("```");
+  p("");
+  p("- One entry is one capability someone using the product would name: something they");
+  p("  could ask for, or would miss if it went away. A guardrail, a default, plumbing or");
+  p("  polish is part of the capability it belongs to, never an entry of its own. A name");
+  p("  is a short noun phrase in the users' words: not a caption, not the mechanism.");
+  p("- A refactor, a fix nobody would notice, a tidy: record nothing.");
+  p("- The reason: ask the developer. One read off a commit message takes");
+  p("  `--why-from commit`; one nobody knows takes `--why-unknown`. Never invent one.");
+  if (P) {
+    p(`- A capability that was already in the product before ${P} and is only now being`);
+    p("  recorded takes `--backfilled`, and prints grey: the product didn't move, the");
+    p("  record did. Everything in the range above is this release's work.");
+  }
+  p("");
 }
 
 /** The parts of a composition its writer edits, without the stamp. */

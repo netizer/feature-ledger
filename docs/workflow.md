@@ -2,7 +2,10 @@
 
 Every workflow, step by step. When you're unsure where you are, run `ledger` on
 its own: it shows what the open release holds, the reasons nobody has given,
-what the cut would say, and the one command to run next.
+what the cut would say, and the one command to run next. Whenever that is agent
+work, it is `ledger agent`, which works out the task and how much of it (see
+[agents.md](agents.md#ledger-agent--the-one-command-for-agent-work)). The
+task names below are what it runs.
 
 The commands come in two kinds:
 
@@ -19,7 +22,7 @@ The commands come in two kinds:
 | | Command | Kind |
 | --- | --- | --- |
 | 1 | `ledger init --product "Acme Portal"` (add `--commit-pdfs` to keep the client PDFs in the repo) | runs |
-| 2 | `ledger bootstrap`: the agent surveys the codebase and writes every entry with how to see it, then stops | agent task |
+| 2 | `ledger agent` (it runs `ledger bootstrap`): the agent surveys the codebase and writes every entry with how to see it, marks the survey finished, then stops | agent task |
 | 3 | `ledger preview`, and fix the wording in `.ledger/features/<id>.json` | by hand |
 | 4 | `ledger status`: checks every file you edited | runs |
 | 5 | Commit `.ledger/` | git |
@@ -34,7 +37,8 @@ worked out from the repository.
 
 Attempted in one pass, a survey runs out of context and starts inventing. In
 batches it's reliable, so the prompt batches, and the agent moves between
-batches on its own. The baseline it hands you is a draft: rewrite the wording
+batches on its own. A survey that stops partway anyway leaves its entries
+behind, and the next `ledger agent` carries it on from them. The baseline it hands you is a draft: rewrite the wording
 straight in the files ([editing.md](editing.md)).
 
 ### The baseline reads as an inventory, not as your work
@@ -121,7 +125,7 @@ prepared". It is free, so run it as often as you like. `--open` opens the PDF,
 | | Command | Kind |
 | --- | --- | --- |
 | 1 | `ledger`: what the release holds, and what the cut would say | runs |
-| 2 | `ledger prepare`, in your agent session, with you there | agent task |
+| 2 | `ledger agent` (it runs `ledger prepare`), in your agent session, with you there | agent task |
 | 3 | Read the diff, and commit | git |
 | 4 | `ledger cut --name "Sprint 6 demo"`: prints the PDF and the message into the client directory, and opens the next release | runs |
 | 5 | Commit `.ledger/` (and `docs/client/`, if you keep the PDFs) | git |
@@ -131,8 +135,9 @@ to see each new or updated entry, and the message to send, for a reader who has
 never seen the code. In the same session it reads the
 code since the last edition for work nobody recorded, asks you the reasons
 nobody gave, and checks what it wrote against the code. Run it mid-release to
-see the near-final text, and again before the cut: it keeps every note that
-nothing has moved under, including your own edits. What it does, and what the
+see the near-final text, and again before the cut: the second time it covers
+only what moved since the first, and keeps every other note, including your own
+edits. What it does, and what the
 cut says before it prints, is in [releasing.md](releasing.md).
 
 The PDF is printed before anything is written, so a machine with no browser
@@ -152,6 +157,10 @@ each commit. A ledger that predates commits fills its history in with
 Record it yourself, with `ledger add <id>` or `ledger change <id>`. Or leave it:
 `ledger prepare` reads the code since the last edition, and records what
 someone using the product would notice that the ledger doesn't account for.
+Between prepares, `ledger agent` sweeps the code nobody has read yet
+(`ledger sweep`): it records what's missing and writes none of the client's
+text. It starts one only for 20 lines or more outside tests and docs, and a
+second run over the same code finds nothing to do.
 
 ## Reading the current state
 
@@ -175,9 +184,9 @@ and the editions already printed are kept. See [releasing.md](releasing.md#start
 | | Command | Kind |
 | --- | --- | --- |
 | 1 | `ledger redraft start`: sets the corpus aside in `.ledger/archive/` and opens the next version on an empty one | runs |
-| 2 | `ledger bootstrap`: the agent surveys the codebase from scratch, and stops before the cut | agent task |
+| 2 | `ledger agent` (it runs `ledger bootstrap`): the agent surveys the codebase from scratch, and stops before the cut | agent task |
 | 3 | Commit `.ledger/` | git |
-| 4 | `ledger redraft check`: the agent compares the new corpus with the old one, puts back anything lost, writes a note for the client, and records the check | agent task |
+| 4 | `ledger agent` (it runs `ledger redraft check`): the agent compares the new corpus with the old one, puts back anything lost, writes a note for the client, and records the check | agent task |
 | 5 | Commit its edits | git |
 | 6 | `ledger cut --name "…"`: the first edition in the new structure, opening with a note that it is reorganized | runs |
 
@@ -220,7 +229,7 @@ since does show: that's the point of improving it.
 | --- | --- | --- |
 | 1 | Edit `.ledger/brand.json` (logo, accent colour) and the wording in `.ledger/config.json` | by hand |
 | 2 | `ledger style set govuk` (or another tone): switches the tone, and updates the agent stanza | runs |
-| 3 | `ledger style rewrite`, to bring the existing entries into the new tone | agent task |
+| 3 | `ledger agent` (it runs `ledger style rewrite`), to bring the existing entries into the new tone, an area at a time; a rewrite that stops carries on from the areas left | agent task |
 | 4 | `ledger status`: shows the resolved palette, fonts and tone | runs |
 
 See [documents.md](documents.md).

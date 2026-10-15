@@ -13,6 +13,8 @@ import * as style from "./commands/style.mjs";
 import * as prepare from "./commands/prepare.mjs";
 import * as migrate from "./commands/migrate.mjs";
 import * as redraft from "./commands/redraft.mjs";
+import * as sweep from "./commands/sweep.mjs";
+import * as agent from "./commands/agent.mjs";
 
 const COMMANDS = {
   init: init.cmdInit,
@@ -34,7 +36,9 @@ const COMMANDS = {
   subcategories: write.cmdSubcategory,
 
   preview: build.cmdPreview,
+  agent: agent.cmdAgent,
   prepare: prepare.cmdPrepare,
+  sweep: sweep.cmdSweep,
   cut: release.cmdCut,
 
   releases: release.cmdReleases,
@@ -88,26 +92,33 @@ map true was a second job. \`ledger prepare\` reads the code since the last edit
   diff: "`ledger preview`, which opens with what the release holds and how much code moved, then prints the draft",
 };
 
-const DELIVERY_HELP = `  Delivering a prompt (prepare, bootstrap, redraft check, style rewrite)
+const DELIVERY_HELP = `  Delivering a prompt (agent, prepare, bootstrap, sweep, redraft check, style rewrite)
     (default)        an explanation for you, then the prompt to paste into your agent session
     --print          the prompt alone, ready to pipe: \`ledger prepare --print | pbcopy\`
     --copy           the prompt, straight onto the clipboard
     --run AGENT      hand it to ${Object.keys(AGENTS).join(", ")} — or to "any command" that reads the prompt on
                      stdin — wait, check what it left behind, and print how to resume its session.
                      Only ever when you type it. A bare --run uses $LEDGER_AGENT, or "agent"
-                     in .ledger/config.json`;
+                     in .ledger/config.json — and so does \`ledger agent\` with no option at all`;
 
 const HELP = `ledger — a client-facing record of what your product does, kept in the repo
 
-  Preview is free, prepare costs tokens, cut prints.
+  Preview is free, the agent costs tokens, cut prints.
 
     ledger                              where things stand, and the one thing to run next
     ledger preview [--html] [--open] [--full]
                                         the edition as it would print now, after a short readout.
                                         Free: no agent
-    ledger prepare                      one interactive agent session that writes the client's text:
+    ledger agent [--plan] [--force]     whatever agent work is due, worked out from .ledger/ and git
+                                        for free: the survey, a rewrite into a new tone, prepare, or
+                                        a sweep of the code for work nobody recorded — only the part
+                                        not done yet. Asks the missing reasons first, at a terminal.
+                                        Nothing due, no agent. --plan shows it; --force sweeps even
+                                        a small change. Spends tokens
+    ledger prepare [--full]             one interactive agent session that writes the client's text:
                                         the "What changed" notes, the summary, how to see each entry
-                                        and the message, and checks it against the code. Spends tokens
+                                        and the message, and checks it against the code. After the
+                                        first, only what moved since the last; --full for all of it
     ledger prepare complete             check what it wrote, and record what it was written from
     ledger cut --name "..." [--date YYYY-MM-DD] [--commit SHA] [--full] [--yes] [--no-pdf] [--html]
                                         print the edition and the message to send with it, and open
@@ -140,7 +151,12 @@ const HELP = `ledger — a client-facing record of what your product does, kept 
   Once, or rarely
     ledger init [--product "Name"] [--accent "#hex"] [--logo path] [--agents auto|none|claude,agents,...]
                 [--style google|govuk|plain-language|ste] [--commit-pdfs]
-    ledger bootstrap                    agent task: survey the codebase and write the baseline
+    ledger bootstrap                    agent task: survey the codebase and write the baseline, or carry
+                                        on a survey that stopped partway
+    ledger bootstrap complete           record that the survey finished
+    ledger sweep                        agent task: read the code since it was last read, and record
+                                        the work nobody recorded
+    ledger sweep complete               record the code as read
     ledger migrate [--dry-run]          bring a ledger written by an earlier version over
     ledger build [v3 | all | draft] [--md] [--pdf] [--full] [--out DIR] [--html]
                                         reprint an edition, or write the Markdown docs
@@ -148,7 +164,11 @@ const HELP = `ledger — a client-facing record of what your product does, kept 
     ledger releases amend <version> --commit SHA
     ledger redraft [start | check | complete --note "..."]
                                         write the corpus again from scratch, keeping the client's record
-    ledger style rewrite                agent task: bring every entry into the project's tone
+    ledger style rewrite [--category "Area"]
+                                        agent task: bring the entries still in an earlier tone into
+                                        the project's tone
+    ledger style rewrite complete [--category "Area" | <id>...]
+                                        record those entries as rewritten (no area or id: all of it)
     ledger completion zsh|bash|fish     shell completion; the script says how to load it
 
   Editing the words (no command — the corpus is yours to edit; run \`ledger status\` after)
@@ -180,14 +200,16 @@ const GLOBAL_FLAGS = ["dir"];
 const DELIVERY_FLAGS = ["print", "prompt-only", "copy", "run"];
 const FLAGS = {
   init: ["root", "product", "tagline", "prepared-for", "logo", "accent", "agents", "style", "commit-pdfs", "force", "gitignore"],
-  bootstrap: [],
+  bootstrap: { default: "brief", brief: [], complete: ["dry-run"] },
+  sweep: { default: "brief", brief: [], complete: ["dry-run"] },
+  agent: ["plan", "force", "print", "copy", "run"],
   migrate: ["dry-run"],
 
   list: ["category", "audience", "size", "changed", "json"],
   show: ["history", "at", "diff", "json"],
   status: ["json", "quiet"],
   rules: [],
-  style: { default: "show", show: ["json"], list: ["json"], set: [], rewrite: [] },
+  style: { default: "show", show: ["json"], list: ["json"], set: [], rewrite: ["category", "dry-run"] },
   export: ["out"],
 
   add: ["file", "audience", "category", "subcategory", "size", "name", "description", "how-to-see", "dev-notes", "paths",
@@ -202,7 +224,7 @@ const FLAGS = {
   subcategories: { default: "list", list: [], add: ["file", "id", "category", "name", "intro", "dry-run"] },
 
   preview: ["out", "html", "open", "full"],
-  prepare: { default: "brief", brief: [], complete: ["dry-run"] },
+  prepare: { default: "brief", brief: ["full"], complete: ["dry-run"] },
   cut: ["name", "date", "commit", "full", "pdf", "html", "out", "yes", "dry-run"],
   releases: { default: "list", list: [], amend: ["commit", "dry-run"] },
   build: ["md", "pdf", "version", "out", "html", "full"],
@@ -213,7 +235,7 @@ const FLAGS = {
 const NEGATED = ["cut pdf", "init gitignore"];
 
 const BOOLEANS = ["dry-run", "json", "history", "changed", "md", "pdf", "html", "open", "force", "quiet", "commit-pdfs",
-  "backfilled", "reason-inferred", "full", "print", "prompt-only", "copy", "yes", "why-unknown", "diff"];
+  "backfilled", "reason-inferred", "full", "print", "prompt-only", "copy", "yes", "why-unknown", "diff", "plan"];
 
 /** Options that used to exist on one command, and what to do instead. */
 const RETIRED_FLAGS = {
@@ -285,7 +307,7 @@ function commandHelp(name, sub) {
     if (taking) picked.push(line);
   }
   if (!picked.length) return null;
-  const prompts = taskFor(name, sub) || ["bootstrap", "prepare"].includes(name);
+  const prompts = taskFor(name, sub) || ["bootstrap", "prepare", "sweep", "agent"].includes(name);
   return `${picked.join("\n")}\n${prompts ? `\n${DELIVERY_HELP}\n` : ""}\n  Global: --dir PATH, --json where offered.\n` +
     "  `ledger --help` lists every command.\n";
 }
@@ -296,7 +318,8 @@ function commandHelp(name, sub) {
  * (`ledger amend` → `ledger releases amend`).
  */
 const SUBCOMMANDS = {
-  amend: ["releases amend"], complete: ["prepare complete", "redraft complete"], start: ["redraft start"],
+  amend: ["releases amend"], complete: ["prepare complete", "bootstrap complete", "sweep complete", "redraft complete"],
+  start: ["redraft start"], next: ["agent"], run: ["agent"], work: ["agent"],
   rewrite: ["style rewrite"], draft: ["preview"], publish: ["cut"], release: ["cut"], print: ["build"],
   check: ["status"], headline: ["prepare"], headlines: ["prepare"], highlights: ["prepare"], size: ["preview"],
   upgrade: ["migrate"], message: ["prepare"],
@@ -305,8 +328,10 @@ const SUBCOMMANDS = {
 function unknownCommand(word) {
   const near = nearest(word, [...Object.keys(COMMANDS), "help"]);
   const homes = SUBCOMMANDS[word];
-  const hint = near ? ` — did you mean \`ledger ${near}\`?`
-    : homes ? ` — did you mean ${homes.map((h) => `\`ledger ${h}\``).join(" or ")}?` : "";
+  // A subcommand's real home beats a near-miss of spelling: `amend` is
+  // `releases amend`, not a typo of `agent`.
+  const hint = homes ? ` — did you mean ${homes.map((h) => `\`ledger ${h}\``).join(" or ")}?`
+    : near ? ` — did you mean \`ledger ${near}\`?` : "";
   usage(`unknown command "${word}"${hint}\n  (\`ledger help\` lists every command)`);
 }
 
@@ -419,7 +444,7 @@ function complete(words) {
 
   if (current.startsWith("-")) {
     const own = (Array.isArray(spec) ? spec : spec[sub ?? spec.default] ?? []).filter((f) => f !== "paths");
-    const delivery = taskFor(command, sub) ? DELIVERY_FLAGS.filter((f) => f !== "prompt-only") : [];
+    const delivery = taskFor(command, sub) && command !== "agent" ? DELIVERY_FLAGS.filter((f) => f !== "prompt-only") : [];
     return say([...own, ...delivery, ...GLOBAL_FLAGS].map((f) => (NEGATED.includes(`${command} ${f}`) ? `--no-${f}` : `--${f}`)));
   }
   if (before.length === 1 && subs.length) return say(subs);

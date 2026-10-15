@@ -8,7 +8,7 @@
     {
       "version": 3,
       "name": "Reasons nobody recorded",
-      "description": "A change whose reason nobody knows, or whose reason was read off a commit message, keeps that on the change until a person gives one. Bare ledger lists them, ledger prepare asks you about them in its session, and ledger cut says how many are left before it prints."
+      "description": "A change whose reason nobody knows, or whose reason was read off a commit message, keeps that on the change until a person gives one. Bare ledger lists them, ledger agent asks you each one before it starts an agent, and ledger cut says how many are left."
     }
   ]
 }

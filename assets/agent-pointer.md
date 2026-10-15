@@ -48,8 +48,8 @@ product. The client has never seen the code: no file names, paths, flags or
 code terms in anything they read; those go in `dev_notes`.
 
 **Don't commit.** What you record lands in the working tree, and the developer
-commits it with everything else. Don't run `ledger prepare` or `ledger cut`
-unless you are asked to.
+commits it with everything else. Don't run `ledger agent`, `ledger prepare` or
+`ledger cut` unless you are asked to.
 
 {build_line}
 <!-- /feature-ledger -->

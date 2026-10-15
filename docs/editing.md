@@ -97,10 +97,11 @@ Not much, and only where a hand-edit would be invisible or wrong.
   change that never says *why*. The one exception: when someone gives the
   reason for a change that had none, it goes into that event's `why`, with
   `"why_from": "person"`. `ledger prepare` does this as it asks you.
-- **`releases.json`, and the stamps in `compositions.json` and
+- **`releases.json`, `state.json`, and the stamps in `compositions.json` and
   `redrafts.json`.** A timeline edited by hand stops matching the editions
-  already handed over, and the `prepared` stamp is what says which changes a
-  prepare has read. The exceptions are a redraft's `note`, and a release's
+  already handed over, the `prepared` stamp is what says which changes a
+  prepare has read, and `state.json` is what says which work `ledger agent`
+  has left to do. The exceptions are a redraft's `note`, and a release's
   `display_version` and `redraft`. The same goes for `.ledger/archive/`: the old
   editions print from it.
 - **Keeping `index.json` complete.** Every write adds a new id and prunes one
