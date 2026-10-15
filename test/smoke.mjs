@@ -131,10 +131,11 @@ assert(
 );
 const v1Html = fs.readFileSync(path.join(dir, "docs/generated/client/Testbed-Feature-Ledger_1.html"), "utf8");
 assert("a first edition is an inventory: every entry in full, with how to see it",
-  v1Html.includes('id="f-delta"><div class="content">') && v1Html.includes("Open Alpha from the main menu.") &&
+  v1Html.includes('<article class="feature" id="f-delta">') && v1Html.includes("Open Alpha from the main menu.") &&
   !v1Html.includes('class="summary"'));
-assert("…and its cover says how many features, in one line",
-  v1Html.includes('class="tally"') && v1Html.includes("<b>4</b> features across <b>2</b> areas") && !v1Html.includes('class="bar"'));
+assert("…and its cover says how many features, in how many areas",
+  v1Html.includes('class="tally"') && v1Html.includes('<div class="stat is-total"><b>4</b><span>features</span></div>') &&
+  v1Html.includes('<div class="stat is-plain"><b>2</b><span>areas</span></div>'));
 assert(
   "the empty in-progress release still prints on request",
   run(["build", "v2", "--html"]).includes("Testbed-Feature-Ledger_2-draft.html"),
@@ -475,63 +476,72 @@ fs.rmSync(writer);
 run(["build", "--pdf", "--html"]);
 run(["build", "--md"]);
 const v2 = fs.readFileSync(path.join(dir, "docs/generated/Testbed-Feature-Ledger_2-draft.html"), "utf8");
-assert("the third register draws in its own colour", v2.includes("tag-backfilled") && v2.includes("ALREADY IN PLACE"));
+assert("the third register draws in its own colour", v2.includes('<span class="status is-backfilled">Already in place</span>'));
 assert("…and never puts the internal key in front of a client", !v2.includes(">BACKFILLED<"));
 assert("a removal found late is reported, apart from this cycle's news", v2.includes("No longer present"));
 // The page after the cover: the release's summary, each item followed by links to the entries it sums up.
 const summary = v2.slice(v2.indexOf('<section class="summary">'), v2.indexOf("</section>"));
 assert("the edition opens with a summary of what's different", summary.includes("different in this edition"));
-assert("…as numbered lists of items, each followed by numbered links to the entries it covers",
-  summary.includes("<ol>") && summary.includes("<li>The cluster handles four new parts. <span class=\"refs\">" +
-    '<a class="ref" href="#f-c1">[1]</a><a class="ref" href="#f-c2">[2]</a><a class="ref" href="#f-c3">[3]</a>' +
-    '<a class="ref" href="#f-c4">[4]</a></span></li>') && v2.includes('id="f-c4"'));
+assert("…as lists of items, each followed by the numbers of the entries it covers, in number order",
+  summary.includes("<ol>") && /<li><span class="text">The cluster handles four new parts\.<\/span> <span class="refs">/.test(summary) &&
+  /<a class="ref" href="#f-c1">(\d+\.\d+)<\/a><a class="ref" href="#f-c2">\d+\.\d+<\/a><a class="ref" href="#f-c3">\d+\.\d+<\/a><a class="ref" href="#f-c4">\d+\.\d+<\/a><\/span><\/li>/.test(summary) &&
+  v2.includes('id="f-c4"'));
+{
+  // The number a reference cites is the number the entry prints beside it.
+  const cited = summary.match(/<a class="ref" href="#f-c4">([\d.]+)<\/a>/)?.[1];
+  assert("…and each number is the one its entry prints in the margin",
+    Boolean(cited) && v2.includes(`id="f-c4"><div class="rail"><span class="no">${cited}</span>`));
+}
 assert("…leaving out what it left out", !summary.includes("f-beta"));
 assert("…and, once it is prepared, no draft note", !summary.includes("draft-note"));
-assert("…under plain headings", summary.includes("<h3><i></i>What&#39;s new</h3>") && summary.includes("<h3><i></i>What changed</h3>"));
+assert("…under plain headings", summary.includes("<h3>What&#39;s new</h3>") && summary.includes("<h3>What changed</h3>"));
 // gamma, the one removal this cycle, was team-only, so it has no group here.
 assert("…grouped the way the ledger colours them",
   ["is-new", "is-updated", "is-backfilled", "is-gone", "is-other"].every((g) => summary.includes(`sum-group ${g}`)) &&
   !summary.includes("is-removed"));
 assert("…with a removal listed by the name of what went, not its reason",
-  summary.includes('<a href="#closing-gone-earlier">Solo</a>') && !summary.includes("No longer part of the product."));
+  summary.includes('<a href="#gone-solo">Solo</a>') && v2.includes('id="gone-solo"') && !summary.includes("No longer part of the product."));
 assert("…and nothing that only the team reads", !summary.includes("Tooling"));
 // Short without dropping work: everything that moved in full, then one line
 // for everything else.
 assert("every entry that moved prints in full, beta among them though the summary leaves it out",
-  v2.includes('id="whats-changed"') && v2.includes('id="f-beta"><div class="content">') &&
+  v2.includes('id="whats-changed"') && /<article class="feature[^"]*" id="f-beta">/.test(v2) &&
   v2.includes("Its window was narrower; it was widened for the overnight batch."));
 {
   const card = v2.slice(v2.indexOf('id="f-alpha"')).split('class="feature')[0];
-  assert("an updated entry's card leads with what changed, under the first sentence of its description",
-    card.includes('<div class="desc">Does the alpha thing, and the adjacent one.</div><div class="changes">') &&
+  assert("an updated entry leads with what changed, under the first sentence of its description",
+    card.includes('<p class="desc is-brief">Does the alpha thing, and the adjacent one.</p><div class="changes">') &&
     !card.includes("It remembers where you left off."));
 }
 assert("…with how to see it under each",
   v2.slice(v2.indexOf('id="f-alpha"')).split('class="feature')[0].includes("Open Alpha, then Adjacent."));
 assert("…with why it matters, where a reason was given",
   v2.includes('<div class="matters"><span class="label">Why it matters to you</span><p>Users reach the adjacent thing without a second search.</p></div>'));
-assert("the first page opens with the overview, then the summary, then the counts",
+assert("the first page opens with the overview, then the counts, then the summary",
   v2.indexOf('class="overview">This edition adds a cluster of four parts') > 0 &&
-  v2.indexOf('class="overview"') < v2.indexOf('<section class="summary">') && v2.indexOf("</section>") < v2.indexOf('class="tally"') &&
-  v2.indexOf('class="tally"') < v2.indexOf('id="whats-changed"'));
-assert("…with what the colours and the sizes mean said once, under the counts",
-  v2.includes('class="key"') && v2.includes("Size is how much of the service a capability is") && !v2.includes('class="callout"'));
-assert("…and no contents list: the first page is the contents", !v2.includes('<div class="contents">'));
+  v2.indexOf('class="overview"') < v2.indexOf('class="tally"') && v2.indexOf('class="tally"') < v2.indexOf('<section class="summary">') &&
+  v2.indexOf('<section class="summary">') < v2.indexOf('id="whats-changed"'));
+assert("…with what the sizes mean said once, where the catalogue compares them",
+  v2.split('class="size-key"').length === 2 && v2.indexOf('class="size-key"') > v2.indexOf('id="everything-else"') &&
+  v2.includes("Size is how much of the service a feature is") && !v2.includes('class="callout"'));
+assert("…and no contents list: the first page is the contents", !v2.includes('<nav class="contents">'));
 assert("the catalogue lists every capability once, with its size, name and first sentence",
-  v2.includes('id="everything-else"') && v2.includes('<li id="f-delta"><span class="sz"><span class="size size-small">') &&
-  v2.includes('<span class="nm">Delta</span><span class="first">Does the delta thing.</span></li>') &&
-  !v2.includes("nobody reads on a one-line listing") && !v2.includes('id="f-delta"><div class="content">'));
+  v2.includes('id="everything-else"') && /<li id="f-delta"><span class="no">[\d.]+<\/span><span class="sz"><span class="size size-small"/.test(v2) &&
+  v2.includes('<span class="nm">Delta</span><span class="first">Does the delta thing.</span><span class="mv"></span></li>') &&
+  !v2.includes("nobody reads on a one-line listing") && !v2.includes('<article class="feature" id="f-delta">'));
 assert("…marks what moved, linking to its details",
-  v2.includes('<span class="nm">Alpha<a class="moved is-updated" href="#f-alpha">updated</a></span>'));
+  v2.includes('<span class="nm">Alpha</span><span class="first">Does the alpha thing, and the adjacent one.</span>' +
+    '<span class="mv"><a class="moved is-updated" href="#f-alpha">Changed</a></span>'));
 assert("…and opens an area with its overview", v2.includes('<p class="area-intro">Everything second, in one place.</p>'));
-assert("the cover counts it all in one line",
-  /<span class="is-new"><b>4<\/b> new<\/span>/.test(v2) && /<span class="is-backfilled"><b>2<\/b> already in place<\/span>/.test(v2) &&
-  /<span class="is-same"><b>1<\/b> unchanged<\/span>/.test(v2));
+assert("the cover counts it all in one row",
+  v2.includes('<div class="stat is-new"><b>4</b><span>new</span></div>') &&
+  v2.includes('<div class="stat is-backfilled"><b>2</b><span>already in place</span></div>') &&
+  v2.includes('<div class="stat is-same"><b>1</b><span>unchanged</span></div>'));
 run(["build", "v2", "--html", "--full"]);
 const v2Full = fs.readFileSync(path.join(dir, "docs/generated/Testbed-Feature-Ledger_2-draft.html"), "utf8");
 assert("`--full` prints every entry in full instead, with a contents list",
-  v2Full.includes('id="f-delta"><div class="content">') && !v2Full.includes('id="everything-else"') &&
-  v2Full.includes("It remembers where you left off.") && v2Full.includes('<div class="contents">'));
+  v2Full.includes('<article class="feature" id="f-delta">') && !v2Full.includes('id="everything-else"') &&
+  v2Full.includes("It remembers where you left off.") && v2Full.includes('<nav class="contents">'));
 const md2 = fs.readFileSync(path.join(dir, "docs/generated/FEATURES.md"), "utf8");
 assert("the living docs use the same words", md2.includes("Already in place]"));
 assert("a reason read off a commit is listed until somebody vouches for it",
@@ -835,7 +845,7 @@ assert("…`--full` is kept with the release, so every reprint is in full",
   cutJson()[2].layout === "full" && run(["releases"], { cwd: repo }).includes("printed in full"));
 run(["build", "v3", "--html"], { cwd: repo });
 assert("…and a reprint without the flag still prints every entry in full",
-  fs.readFileSync(path.join(repo, "docs/generated/client/Audited-Feature-Ledger_6.html"), "utf8").includes('id="f-steady"><div class="content">'));
+  fs.readFileSync(path.join(repo, "docs/generated/client/Audited-Feature-Ledger_6.html"), "utf8").includes('<article class="feature" id="f-steady">'));
 const timeline = cutJson();
 assert("two releases can share a date when the code moved between them",
   timeline[1].date === timeline[2].date && timeline[1].commit !== timeline[2].commit);
@@ -1037,7 +1047,7 @@ run(["build", "--pdf", "--html", "--version", "2"], { cwd: rd });
 const reorganized = fs.readFileSync(path.join(rd, "docs/generated/Redrafted-Feature-Ledger_2-draft.html"), "utf8");
 assert("the first edition after a redraft says it is reorganized, with the note",
   reorganized.includes("This edition is reorganized") && reorganized.includes("Exports are part of Kept."));
-assert("…and marks nothing as new", !reorganized.includes("class=\"tag tag-new\""));
+assert("…and marks nothing as new", !reorganized.includes('class="status is-new"'));
 run(["build", "--pdf", "--html", "--version", "1"], { cwd: rd });
 assert("an archived edition still prints, from its archive",
   fs.readFileSync(path.join(rd, "docs/client/Redrafted-Feature-Ledger_1.html"), "utf8").includes("Quiet export"));
@@ -1050,7 +1060,7 @@ writeComposition(3, { new: [{ text: "Does a later thing.", covers: ["later"] }],
 run(["build", "--pdf", "--html", "--version", "3"], { cwd: rd });
 const after = fs.readFileSync(path.join(rd, "docs/generated/Redrafted-Feature-Ledger_3-draft.html"), "utf8");
 assert("from the next edition, changes are marked again",
-  after.includes("class=\"tag tag-new\"") && !after.includes("This edition is reorganized"));
+  after.includes('class="status is-new"') && !after.includes("This edition is reorganized"));
 fs.rmSync(rd, { recursive: true, force: true });
 
 // ---- Migrating a ledger written by an earlier version ----

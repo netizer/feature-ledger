@@ -39,24 +39,38 @@ every edition with the current wording, and `--html` writes HTML instead of PDF
 
 ## What an edition holds
 
+Every feature has **one number** throughout an edition: its area and its place
+in it, `2.4`. The summary cites it, the details print it in the margin and the
+catalogue lists by it, so a reader holding paper can follow any reference, and
+on screen every number is a link. The PDF carries bookmarks for every part, area
+and changed entry, so the reader's sidebar is a contents list.
+
+Every status is printed as a word (*New*, *Changed*, *Already in place*,
+*Removed*) as well as worn in a colour, so an edition survives a black-and-white
+printer.
+
 The **first edition**, and the first after a redraft, is an inventory: the
-cover, then every entry in full, area by area, each with how to see it.
+first page with the counts (features, areas, sizes), a contents list and a key
+to the sizes, then every entry in full, area by area, each with how to see it.
 
 **Every later edition** is short without dropping work:
 
 1. **The first page is the update**, the page most clients stop at: the
-   version, its name and date, an overview of two or three sentences on what the
-   release is about, the summary lists (below), one line of counts —
-   "5 new · 2 updated · 6 unchanged" — and a quiet key to the colours and sizes.
-2. **What's new and what changed, in detail**: every new, updated, in-place and
-   removed entry, with its size. A new entry prints its description; an updated
-   one leads with what changed, under the first sentence of its description,
-   since the client read the rest last time. Each can say why it matters to the
-   client and how to see it. Then the product-wide notes. The summary picks
+   version, its name and date, what it is compared with, an overview of two or
+   three sentences on what the release is about, a row of counts (new, changed,
+   removed, unchanged, and features in all) and the summary lists (below).
+2. **The changes in detail**, starting on a new page: every new, changed,
+   in-place and removed entry, grouped the way the summary groups them, and in
+   number order within each group. Each entry has a margin with its number,
+   status and size. A new entry prints its description; an updated one leads
+   with what changed, under the first sentence of its description, since the
+   client read the rest last time. Each can say why it matters to the client
+   and how to see it. Then the product-wide notes. The summary picks
    highlights; this section never leaves recorded work out.
-3. **What the product provides**: every capability, area by area, one line each
-   (its size, its name and its first sentence) under the area's one-sentence
-   overview. What moved carries a mark that links to its details.
+3. **Everything the product does**, starting on a new page: every feature,
+   area by area, one line each (its number, its size, its name and its first
+   sentence) under the area's one-sentence overview, with the key to the sizes
+   at the top. What moved carries its status, which links to its details.
 
 `ledger cut --full` (or `ledger build vN --full`) prints any edition as a full
 inventory instead, with a contents list and what moved still marked. An edition
@@ -69,17 +83,18 @@ are missing.
 
 ## The summary page
 
-From the second edition on, the first page lists what differs from
-the last edition as short numbered lists, each under a plain heading in the
-colour its entries wear: *What's new*, *What changed*, *Already in place*, *No
-longer available*, and the product-wide notes. The first three are written by
-`ledger prepare`: each item is a sentence that reads on its own, followed by
-numbered links, `[1] [2] [3]`, to the entries it sums up. A removal is listed by
-its name, and a product-wide note by its first sentence.
+From the second edition on, the first page lists what differs from the last
+edition as short lists, each under a plain heading in the colour its entries
+wear: *What's new*, *What changed*, *Already in place*, *No longer available*,
+and *Across the product* for the product-wide notes. The first three are written
+by `ledger prepare`: each item is a sentence that reads on its own, followed by
+the numbers of the entries it sums up, `1.3 2.6 4.1`, in number order. A
+removal is listed by its name, and a product-wide note by its first sentence.
 
-A draft says in a note at the top of the page when changes were recorded that
+A draft says in a note at the top of the list when changes were recorded that
 `prepare` hasn't read, and lists the entries by name where nothing is prepared
-yet. An edition cut without a summary lists its entries by name too.
+yet. An edition cut without a summary lists its entries by name too. Every page
+of a draft says *Draft, not yet presented* in its footer.
 
 ## The message
 
@@ -91,8 +106,8 @@ builds a plain one from the summary.
 
 The summary page's heading, the sentence under it and its first two list
 headings are `summary_title`, `summary_intro`, `summary_new` and
-`summary_updated` in the `docs.pdf` block of `.ledger/config.json` (`{date}` in
-the intro becomes the last edition's date). The two parts after it are
+`summary_updated` in the `docs.pdf` block of `.ledger/config.json`; the details
+reuse the two list headings for their groups. The two parts after it are
 `changed_title`, `changed_intro`, `rest_title` and `rest_intro`; the label over
 a reason for the client is `matters_label`, and the line on sizes is `key_sizes`.
 

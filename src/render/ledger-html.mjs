@@ -16,12 +16,17 @@ import { prepareReport, prepareLine, hasLists } from "../compose.mjs";
  * plain inventory with no flags anywhere on it: exactly what you want when
  * the corpus is a baseline of a codebase that already existed.
  *
- * Every later edition is short without dropping work: the cover, a summary
- * page, then every new, updated, backfilled and removed entry in full — its
+ * Every later edition is short without dropping work: a first page that is
+ * the update (the counts, and what's new and what changed as short lists),
+ * then every new, updated, backfilled and removed entry in full — its
  * description, its "What changed" note and how to see it — and then one line
- * for each entry that didn't move. Reprinting every unchanged entry in full
- * every time was most of an edition's length. `full` prints them all in full
- * instead, the way an inventory does.
+ * for every capability, the catalogue. Reprinting every unchanged entry in
+ * full every time was most of an edition's length. `full` prints them all in
+ * full instead, the way an inventory does.
+ *
+ * One number per feature ("2.4", its area and its place in it) ties the three
+ * together: the summary cites it, the details print it in the margin, the
+ * catalogue lists by it. A status is always a word as well as a colour.
  *
  * Rendered as real HTML/CSS and printed with headless Chromium the same way
  * a person would print a styled page — not hand-positioned PDF drawing.
@@ -90,16 +95,13 @@ class LedgerHtml {
         const rows = this.buildRows(members);
         if (!rows.length) continue;
 
-        // When the whole sub-section is arriving at once, it's drawn as one
-        // green card and its rows stay plain inside it, rather than printing
-        // a stack of identical NEW cards. Only the *drawing* moves: `badge`
-        // itself is left alone, since the front-matter tallies and the
-        // contents dots still have to count eight new features as eight.
-        // A sub-section arriving all at once is one card, not a stack of
-        // identical chips — and a sub-section the audit found all at once is
-        // the same shape of statement, so it collapses the same way. Only
-        // "updated" never collapses: a column of reworked entries each has
-        // its own reason, which is the part worth reading.
+        // When the whole sub-section is arriving at once, its heading says so
+        // once and its rows don't repeat it eight times. Only the *drawing*
+        // moves: `badge` itself is left alone, since the tallies still have
+        // to count eight new features as eight. A sub-section the audit found
+        // all at once is the same shape of statement, so it collapses the
+        // same way. Only "updated" never collapses: a column of reworked
+        // entries each has its own reason, which is the part worth reading.
         const uniform = ["new", "backfilled"].find((b) => rows.every((r) => r.badge === b)) ?? null;
         const whole = this.predecessor ? uniform : null;
         if (whole) rows.forEach((r) => { r.showBadge = false; });
@@ -110,7 +112,6 @@ class LedgerHtml {
       const rows = live.flatMap(([, r]) => r);
       if (!rows.length) continue;
 
-      this.markSeams(live, rows);
       out.push([category, rows, live]);
     }
     this._categoryRows = out;
@@ -136,30 +137,9 @@ class LedgerHtml {
         else badge = f.firstVersion === this.version ? "new" : "updated";
       }
       if (!this.predecessor) badge = null; // nothing to diff a first edition against
-      rows.push({ feature: f, state, badge, showBadge: true, noLine: false });
+      rows.push({ feature: f, state, badge, showBadge: true });
     }
     return rows;
-  }
-
-  /**
-   * Which rows drop their bottom hairline. This can't be left to
-   * `.feature:last-child`, because a row's DOM parent isn't the category —
-   * the first row of every group is wrapped with its heading to keep the two
-   * on one page, which makes it its wrapper's last child and would silently
-   * eat the separator under the first feature of every section. So the seam
-   * is decided here, over the category's real row order, and travels to the
-   * markup as a class.
-   */
-  markSeams(groups, rows) {
-    const groupOf = new Map();
-    groups.forEach(([, grows], gi) => grows.forEach((r) => groupOf.set(r, gi)));
-
-    rows.forEach((row, i) => {
-      const next = rows[i + 1];
-      row.noLine = !next                                  // end of the category
-        || groupOf.get(next) !== groupOf.get(row)         // a heading comes next
-        || this.displayBadge(next) !== null;              // a coloured card comes next
-    });
   }
 
   displayBadge(row) {
@@ -213,60 +193,100 @@ class LedgerHtml {
     return this.set.otherChanges({ version: this.version, audience: "user" });
   }
 
-  /* ---- fragments ------------------------------------------------------ */
+  /* ---- numbering and labels ------------------------------------------- */
+
+  /**
+   * Every capability's number: its area and its place in it ("2.4"), or just
+   * its place in an undivided ledger. It is the document's one way of
+   * pointing at an entry — the summary cites it, the details print it in the
+   * margin, the catalogue lists by it — so a reader holding paper can follow
+   * any reference by number, the way they would in a contract or a manual.
+   * It is this edition's numbering, not a permanent ID: a feature added to an
+   * area moves the ones after it along.
+   */
+  get numbers() {
+    if (this._numbers) return this._numbers;
+    const m = new Map();
+    this.categoryRows.forEach(([, rows], i) => rows.forEach((r, j) => {
+      m.set(r.feature.id, this.set.unstructured ? `${j + 1}` : `${i + 1}.${j + 1}`);
+    }));
+    this._numbers = m;
+    return m;
+  }
 
   /** Anchor an entry answers to, so its line in the summary can link to it. */
   featureId(id) {
     return `f-${id}`;
   }
 
-  categoryNumber(i) {
-    return String(i + 1).padStart(2, "0");
-  }
-
-  /** Anchor an area heading answers to, so the Contents entry for it can be
-   *  a real link. Chromium carries `<a href="#id">` into the printed PDF as
-   *  an internal jump, which is the only reason the contents list is
-   *  clickable — index-based, so it can't collide with a category name. */
+  /** Anchor an area heading answers to. Chromium carries `<a href="#id">`
+   *  into the printed PDF as an internal jump, which is what makes the
+   *  contents and every cross-reference clickable on screen. */
   categoryId(i) {
     return `area-${i + 1}`;
   }
 
-  catHead(category, index, count, nNew, nUpd, nBack) {
-    let meta = `${count} ${count === 1 ? "feature" : "features"}`;
-    if (nNew > 0) meta += ` · <em>${nNew} new</em>`;
-    if (nUpd > 0) meta += ` · <i>${nUpd} updated</i>`;
-    if (nBack > 0) meta += ` · <b>${nBack} already in place</b>`;
-    return `<div class="cat-head" id="${this.categoryId(index)}"><span class="num">${this.categoryNumber(index)}</span>` +
-      `<h2>${h(category)}</h2><span class="meta">${meta}</span></div>`;
+  /**
+   * The word a status prints as. Colour is a second signal, never the only
+   * one: an edition is often printed on an office laser in black and white,
+   * and read by people who can't tell green from blue.
+   */
+  statusLabel(badge) {
+    if (badge === "backfilled") return this.words.tags.backfilled;
+    return { new: "New", updated: "Changed" }[badge] ?? "";
   }
 
-  /** A name a step down from the category head, with the one-line overview
-   *  that stands in for the single oversized entry the sub-section grew out
-   *  of. It carries no NEW chip of its own — a wholly-new sub-section is
-   *  drawn as one green card with this heading inside it, and green already
-   *  means exactly that. */
-  subHead(sub) {
-    return `<div class="sub-head"><div class="sub-name">${h(sub.name)}</div>` +
-      `<div class="sub-intro">${h(sub.intro)}</div></div>`;
+  statusMark(badge) {
+    return badge ? `<span class="status is-${badge}">${h(this.statusLabel(badge))}</span>` : "";
+  }
+
+  /** "7 features · 2 new · 1 changed": an area's size and what moved in it. */
+  areaMeta(rows) {
+    const n = (b) => rows.filter((r) => r.badge === b).length;
+    const parts = [`${rows.length} ${rows.length === 1 ? "feature" : "features"}`];
+    for (const b of ["new", "updated", "backfilled"]) {
+      if (n(b)) parts.push(`<span class="is-${b}">${n(b)} ${h(this.statusLabel(b).toLowerCase())}</span>`);
+    }
+    return parts.join(" · ");
+  }
+
+  /** The one-sentence overview of an area, from `area_intros` in config.json, or null. */
+  areaIntro(category) {
+    const text = this.config.area_intros?.[category];
+    return typeof text === "string" && text.trim() ? text.trim() : null;
+  }
+
+  /** An area's heading, with its number, its size and its overview. */
+  areaHead(category, i, rows, level) {
+    const intro = this.areaIntro(category);
+    return `<div class="area-head" id="${this.categoryId(i)}"><span class="num">${i + 1}</span>` +
+      `<h${level}>${h(category)}</h${level}><span class="meta">${this.areaMeta(rows)}</span></div>` +
+      (intro ? `<p class="area-intro">${h(intro)}</p>` : "");
+  }
+
+  /** A name a step down from the area head, with its one-line overview. A
+   *  sub-section that arrived whole carries the status once, here, rather
+   *  than on every entry inside it. */
+  subHead(sub, level) {
+    return `<div class="sub-head"><h${level} class="sub-name">${h(sub.name)}${this.statusMark(sub.badge)}</h${level}>` +
+      `<p class="sub-intro">${h(sub.intro)}</p></div>`;
   }
 
   /**
-   * Big/Medium/Small drawn as three steps of one scale: the same filled chip,
-   * three tints deep, with a 3-segment meter showing how many steps up this
-   * one sits. The meter is what makes the ranking legible to someone who
-   * never read the legend on the front page.
-   *
-   * All three are capabilities; the scale ranks them within this product, and
-   * says nothing about how detailed an entry is allowed to be.
+   * Big/Medium/Small as three steps of one scale: a three-bar meter with
+   * one, two or three bars lit, and the word beside it. The meter is what
+   * makes the ranking legible to someone who never read the key.
    */
-  sizeChip(size) {
+  sizeMark(size, { word = true } = {}) {
     const key = String(size ?? "").toLowerCase();
     const lit = SIZE_LEVELS[key];
-    if (!lit) return ""; // unsized entries just get no chip
+    if (!lit) return "";
     const bars = [1, 2, 3].map((i) => `<i class="${i <= lit ? "on" : "off"}"></i>`).join("");
-    return `<span class="size size-${key}"><span class="meter">${bars}</span>${h(String(size).toUpperCase())}</span>`;
+    return `<span class="size size-${key}" title="${h(String(size))}"><span class="meter">${bars}</span>` +
+      `${word ? `<span class="word">${h(String(size))}</span>` : ""}</span>`;
   }
+
+  /* ---- an entry --------------------------------------------------------- */
 
   /** Only ever rendered on a row flagged new/updated for *this* edition — a
    *  `changes` list left over from an older version describes a diff the
@@ -296,67 +316,73 @@ class LedgerHtml {
   }
 
   /**
-   * The word printed on a row's chip. "new" and "updated" happen to be the
-   * label as well as the key; the third register does not, and printing the key
-   * would put an internal term in front of a client. It comes from the
-   * overridable wording instead, so a project can pick its own phrasing.
-   */
-  badgeLabel(badge) {
-    if (badge === "backfilled") return this.words.tags.backfilled.toUpperCase();
-    return badge.toUpperCase();
-  }
-
-  /** One ledger row. Shared by the "first row, glued to its section heading
-   *  so the heading can never be orphaned at the foot of a page" case and by
-   *  every row after it, so the two can't drift apart.
+   * One entry, on a two-column grid: a narrow margin with its number, its
+   * status and its size, and the text beside it. The margin is what a reader
+   * scans; the text is what they read once they've found it.
    *
-   *  In a short edition an updated entry leads with what changed: the client
-   *  read its description last time, so it gets its first sentence, to say
-   *  what the entry is, and the full text stays in the catalogue. */
-  featureRow(row) {
+   * In a short edition an updated entry leads with its first sentence, to say
+   * what the entry is, and then what changed, which is the news; the full
+   * description stays in the catalogue. Shared by every layout, so an entry
+   * reads the same wherever it prints.
+   */
+  featureRow(row, level = 3) {
     const f = row.feature;
     const s = row.state;
     const badge = this.displayBadge(row);
-    const classes = ["feature", badge, row.noLine ? "no-line" : null].filter(Boolean).join(" ");
-    const was = s.renamedFrom ? `<span class="was">previously &ldquo;${h(s.renamedFrom)}&rdquo;</span>` : "";
-    const tag = badge ? `<span class="tag tag-${badge}">${h(this.badgeLabel(badge))}</span>` : "";
+    const was = s.renamedFrom ? `<span class="was">Previously &ldquo;${h(s.renamedFrom)}&rdquo;</span>` : "";
     const updated = Boolean(row.badge) && f.firstVersion !== this.version;
-    const desc = this.short && updated ? firstSentence(s.description) : s.description;
+    const brief = this.short && updated;
+    const desc = brief ? firstSentence(s.description) : s.description;
 
-    return `<div class="${classes}" id="${h(this.featureId(f.id))}"><div class="content">` +
-      `<div class="badges">${this.sizeChip(f.size)}${tag}</div>` +
-      `<div class="body"><div class="name">${h(s.name)}${was}</div>` +
-      `<div class="desc">${h(desc)}</div>` +
+    return `<article class="feature${badge ? ` is-${badge}` : ""}" id="${h(this.featureId(f.id))}">` +
+      `<div class="rail"><span class="no">${h(this.numbers.get(f.id) ?? "")}</span>` +
+      `${this.statusMark(badge)}${this.sizeMark(f.size)}</div>` +
+      `<div class="body"><h${level} class="name">${h(s.name)}</h${level}>${was}` +
+      `<p class="desc${brief ? " is-brief" : ""}">${h(desc)}</p>` +
       `${updated ? this.changesPanel(s) : ""}` +
       `${row.badge ? this.mattersPanel(f) : ""}` +
-      `${row.badge || !this.short ? this.howPanel(s) : ""}</div></div></div>`;
+      `${row.badge || !this.short ? this.howPanel(s) : ""}</div></article>`;
   }
 
-  /** One capability in the catalogue: its size, its name and its first
-   *  sentence, with a mark and a link to its details when it moved. */
+  /** A capability that went, on the same grid as one that's here. */
+  removedRow([f, s], backfilled = false) {
+    const label = backfilled ? this.words.tags.backfilled_removed : "Removed";
+    return `<article class="feature is-removed${backfilled ? " is-gone" : ""}" id="gone-${h(f.id)}">` +
+      `<div class="rail"><span class="status is-${backfilled ? "gone" : "removed"}">${h(label)}</span></div>` +
+      `<div class="body"><h4 class="name">${h(f.currentName)}</h4><p class="desc">${h(s.reason)}</p></div></article>`;
+  }
+
+  /** One capability in the catalogue: its number, size, name and first
+   *  sentence, and — when it moved — its status, linking to its details. */
   catalogueLine(row) {
     const s = row.state;
     const id = this.featureId(row.feature.id);
-    const mark = row.badge ? `<a class="moved is-${row.badge}" href="#${h(id)}">${h(this.badgeLabel(row.badge).toLowerCase())}</a>` : "";
-    return `<li${row.badge ? "" : ` id="${h(id)}"`}><span class="sz">${this.sizeChip(row.feature.size)}</span>` +
-      `<span class="nm">${h(s.name)}${mark}</span><span class="first">${h(firstSentence(s.description))}</span></li>`;
+    const mark = row.badge
+      ? `<a class="moved is-${row.badge}" href="#${h(id)}">${h(this.statusLabel(row.badge))}</a>`
+      : "";
+    return `<li${row.badge ? "" : ` id="${h(id)}"`}><span class="no">${h(this.numbers.get(row.feature.id))}</span>` +
+      `<span class="sz">${this.sizeMark(row.feature.size, { word: false })}</span>` +
+      `<span class="nm">${h(s.name)}</span><span class="first">${h(firstSentence(s.description))}</span>` +
+      `<span class="mv">${mark}</span></li>`;
   }
 
+  /* ---- the first page --------------------------------------------------- */
+
   /**
-   * The page that follows the cover: what this edition prints as news, as
-   * short numbered lists under plain headings ("What's new", "What changed"),
-   * so a reader can see what differs from the last edition without reading
-   * the ledger for its stripes.
+   * What this edition prints as news, as short lists under plain headings
+   * ("What's new", "What changed"), so a reader can see what differs from the
+   * last edition without turning a page.
    *
    * The lists are the release's summary (src/compose.mjs): each item is a
-   * sentence written to be read on its own, followed by numbered links to the
-   * entries it sums up, in the order it names them. An entry the summary left
-   * out still prints in the ledger, striped, and links to nothing here.
+   * sentence written to be read on its own, followed by the numbers of the
+   * entries it sums up — the same numbers those entries print in the margin
+   * of the details and in the catalogue, so a reference can be followed on
+   * paper as well as clicked. An entry the summary left out still prints in
+   * the details, and is cited by nothing here.
    *
    * Removals and product-wide notes list themselves. A removal's item is the
-   * name of what went, which under "No longer available" says all a list
-   * needs to; the reason is one link away. A note's is its first sentence,
-   * which is where the style guides put the point.
+   * name of what went; the reason is one link away. A note's is its first
+   * sentence, which is where the style guides put the point.
    *
    * An edition with no summary (one cut with the check skipped, or a draft)
    * lists each entry by its name instead: it says less, but leaving them out
@@ -364,105 +390,195 @@ class LedgerHtml {
    * summary is missing or out of date, so a preview passed around can't be
    * mistaken for one whose summary has caught up.
    */
-  summaryHtml({ removed, goneEarlier, other, predDateLabel }) {
+  summaryHtml({ removed, goneEarlier, other }) {
     if (!this.predecessor) return "";
     const w = this.words.pdf;
     const rows = this.categoryRows.flatMap(([, r]) => r);
     const printed = new Set(rows.map((r) => r.feature.id));
-    const item = (href, text) => `<li><a href="#${h(href)}">${h(text)}</a></li>`;
+    const ref = (id) => `<a class="ref" href="#${h(this.featureId(id))}">${h(this.numbers.get(id))}</a>`;
+    const line = (text, refs) => `<li><span class="text">${text}</span>` +
+      `${refs ? ` <span class="refs">${refs}</span>` : ""}</li>`;
     const byName = (badge) => rows.filter((r) => r.badge === badge)
-      .map((r) => item(this.featureId(r.feature.id), r.state.name));
+      .map((r) => line(`<a href="#${h(this.featureId(r.feature.id))}">${h(r.state.name)}</a>`, ref(r.feature.id)));
     // A composition that only carries notes (an edition cut before summaries
     // existed, or one nobody prepared) has no lists, and prints its entries
     // by name.
     const composed = this.project.compositionOf(this.version);
     const written = hasLists(composed) ? composed : null;
-    const curated = (key) => (written?.[key] ?? []).map((it) => {
-      const refs = (it.covers ?? []).filter((id) => printed.has(id))
-        .map((id, n) => `<a class="ref" href="#${h(this.featureId(id))}">[${n + 1}]</a>`).join("");
-      return `<li>${h(it.text)}${refs ? ` <span class="refs">${refs}</span>` : ""}</li>`;
-    });
+    // In number order, not the order the summary names them in, so a reader
+    // turning pages meets them in the order they're cited.
+    const byNumber = (a, b) => {
+      const [x, y] = [a, b].map((id) => this.numbers.get(id).split(".").map(Number));
+      return x[0] - y[0] || (x[1] ?? 0) - (y[1] ?? 0);
+    };
+    const curated = (key) => (written?.[key] ?? []).map((it) =>
+      line(h(it.text), (it.covers ?? []).filter((id) => printed.has(id)).sort(byNumber).map(ref).join("")));
     const entries = written ? curated : (badge) => byName({ new: "new", changed: "updated", in_place: "backfilled" }[badge]);
+    const plain = (href, text) => line(`<a href="#${h(href)}">${h(text)}</a>`, "");
 
     const groups = [
       ["new", w.summary_new, entries("new")],
       ["updated", w.summary_updated, entries("changed")],
       ["backfilled", this.words.tags.backfilled, entries("in_place")],
-      ["removed", "No longer available", removed.map(([f]) => item(CLOSING_IDS.removed, f.currentName))],
-      ["gone", this.words.tags.backfilled_removed, goneEarlier.map(([f]) => item(CLOSING_IDS.goneEarlier, f.currentName))],
-      ["other", "Also since last time", other.map((c) => item(CLOSING_IDS.other, firstSentence(c.description)))],
+      ["removed", "No longer available", removed.map(([f]) => plain(`gone-${f.id}`, f.currentName))],
+      ["gone", this.words.tags.backfilled_removed, goneEarlier.map(([f]) => plain(`gone-${f.id}`, f.currentName))],
+      ["other", OTHER_TITLE, other.map((c) => plain(CLOSING_IDS.other, firstSentence(c.description)))],
     ].filter(([, , items]) => items.length);
     if (!groups.length) return "";
 
     // Only on a preview: a cut edition is what it is.
     const report = this.release.future ? prepareReport(this.project, this.version) : null;
     const draftNote = report && !report.ok && !report.nothing
-      ? `<p class="draft-note">Draft: ${h(report.never
-        ? "nothing has been prepared for this edition yet, so its entries are listed by name and their changes print as recorded."
+      ? `<p class="draft-note"><b>Draft.</b> ${h(report.never
+        ? "Nothing has been prepared for this edition yet, so its entries are listed by name and their changes print as recorded."
         : `${prepareLine(report).replace(/^./, (c) => c.toUpperCase())}, so this summary may not cover them.`)}</p>`
       : "";
-    const intro = w.summary_intro.replaceAll("{date}", predDateLabel ? ` (${predDateLabel})` : "");
+    // {date} in a project's own intro: " (March 4, 2026)", the last edition's date.
+    const predDate = longDate(this.predecessor.date);
+    const intro = w.summary_intro.replaceAll("{date}", predDate ? ` (${predDate})` : "");
     return `<section class="summary">
     <h2>${h(w.summary_title)}</h2>
     <p class="sub">${h(intro)}</p>${draftNote}
     ${groups.map(([key, label, items]) => `<div class="sum-group is-${key}">` +
-      `<h3><i></i>${h(label)}</h3><ol>${items.join("")}</ol></div>`).join("\n    ")}
+      `<h3>${h(label)}</h3><ol>${items.join("")}</ol></div>`).join("\n    ")}
   </section>`;
   }
 
-  /* ---- a short edition's two halves ----------------------------------- */
+  /**
+   * The headline figures, as a row of numbers with their labels under them.
+   * Against the last edition, from the second on; the size of the product,
+   * on an inventory. Each count wears the colour its entries wear inside.
+   */
+  tallyHtml(removedCount) {
+    const stats = this.stats;
+    const cell = (n, label, cls) => `<div class="stat ${cls}"><b>${n}</b><span>${h(label)}</span></div>`;
+    if (!this.predecessor) {
+      const cells = [cell(stats.features, stats.features === 1 ? "feature" : "features", "is-total")];
+      if (stats.areas > 1) cells.push(cell(stats.areas, "areas", "is-plain"));
+      for (const [n, label] of [[stats.big, "big"], [stats.medium, "medium"], [stats.small, "small"]]) {
+        if (n) cells.push(cell(n, label, "is-plain"));
+      }
+      return `<div class="tally">${cells.join("")}</div>`;
+    }
+    const cells = [
+      [stats.new, "new", "is-new", true],
+      [stats.updated, "changed", "is-updated", true],
+      [stats.backfilled, this.words.tags.backfilled.toLowerCase(), "is-backfilled", false],
+      [removedCount, "removed", "is-removed", false],
+      [stats.unchanged, "unchanged", "is-same", true],
+    ].filter(([n, , , always]) => always || n > 0).map(([n, label, cls]) => cell(n, label, cls));
+    cells.push(cell(stats.features, "features in all", "is-total"));
+    return `<div class="tally">${cells.join("")}</div>`;
+  }
+
+  /**
+   * Where everything is, on an inventory or an edition printed in full: every
+   * area, with its count, and whatever closes the document. A short edition
+   * has none: its first page is its contents for the news, every item linking
+   * to its details, and the PDF's bookmarks carry the rest.
+   */
+  contentsHtml(closing) {
+    if (this.short || this.set.unstructured) return "";
+    const areas = this.categoryRows.map(([category, rows], i) => `<li><a href="#${this.categoryId(i)}">` +
+      `<span class="num">${i + 1}</span><span class="nm">${h(category)}</span>` +
+      `<span class="ct">${rows.length}</span></a></li>`).join("");
+    const closingItems = closing.map(([id, title, count]) =>
+      `<li class="closing"><a href="#${id}"><span class="num">&ndash;</span><span class="nm">${h(title)}</span>` +
+      `<span class="ct">${count}</span></a></li>`).join("");
+    return `<nav class="contents"><h2 class="kicker">Contents</h2><ol>${areas}${closingItems}</ol></nav>`;
+  }
+
+  /* ---- a short edition's two parts ------------------------------------ */
 
   /** Every row this edition marks: new, updated or already in place. */
   get changedRows() {
     return this.categoryRows.flatMap(([, rows]) => rows).filter((r) => r.badge);
   }
 
-  /** The one-sentence overview of an area, from `area_intros` in config.json, or null. */
-  areaIntro(category) {
-    const text = this.config.area_intros?.[category];
-    return typeof text === "string" && text.trim() ? text.trim() : null;
+  /**
+   * Every entry that moved, in full, grouped the way the first page groups
+   * them — new, then changed, then already in place, then what went — so
+   * the summary and the details are one structure read at two depths.
+   * Within a group, entries keep their catalogue order, so their numbers
+   * rise down the page and any one can be found by thumbing. The summary
+   * picks highlights; this never leaves recorded work out.
+   */
+  changedSection({ removed, goneEarlier, other }) {
+    const w = this.words.pdf;
+    const rows = this.changedRows;
+    const areaOf = new Map(this.categoryRows.flatMap(([category, rs]) => rs.map((r) => [r, category])));
+    const group = (badge, title, intro) => {
+      const these = rows.filter((r) => r.badge === badge);
+      if (!these.length) return "";
+      // An area label wherever the area changes, so an entry is never read
+      // out of the context of the part of the product it belongs to.
+      let last = null;
+      const items = these.map((r) => {
+        const area = areaOf.get(r);
+        const label = !this.set.unstructured && area !== last ? `<div class="area-label">${h(area)}</div>` : "";
+        last = area;
+        return `${label}${this.featureRow({ ...r, showBadge: true }, 4)}`;
+      });
+      return this.statusGroup(badge, title, these.length, intro, items);
+    };
+    const parts = [
+      group("new", w.summary_new),
+      group("updated", w.summary_updated),
+      group("backfilled", this.words.tags.backfilled, "Part of the product already, and listed here for the first time."),
+      removed.length ? this.statusGroup("removed", "No longer available", removed.length, null,
+        removed.map((r) => this.removedRow(r)), CLOSING_IDS.removed) : "",
+      // Deliberately vague about timing: these went before the last cutoff,
+      // and nothing records which release they went in.
+      goneEarlier.length ? this.statusGroup("gone", this.words.tags.backfilled_removed, goneEarlier.length,
+        "Gone before the last edition, and recorded here for the first time.",
+        goneEarlier.map((r) => this.removedRow(r, true)), CLOSING_IDS.goneEarlier) : "",
+      this.otherHtml(other),
+    ].join("");
+    if (!parts) return "";
+    return `<section class="part" id="${SECTION_IDS.changed}" data-page-start><div class="part-head"><h2>${h(w.changed_title)}</h2>` +
+      `<p class="sub">${h(w.changed_intro)}</p></div>${parts}</section>`;
   }
 
-  /**
-   * Every entry that moved, in full: description, "What changed" note, and
-   * how to see it. The summary page picks highlights; this never leaves
-   * recorded work out.
-   */
-  changedSection() {
-    const w = this.words.pdf;
-    const groups = this.categoryRows.map(([category, rows]) => [category, rows.filter((r) => r.badge)]).filter(([, rows]) => rows.length);
-    if (!groups.length) return "";
-    const inner = groups.map(([category, rows]) => {
-      // Each one is a card of its own here, so none needs a rule under it.
-      const cards = rows.map((r) => this.featureRow({ ...r, showBadge: true, noLine: true }));
-      const head = this.set.unstructured ? "" : `<div class="area-label">${h(category)}</div>`;
-      return `<div class="changed-area"><div class="cat-open">${head}${cards[0]}</div>${cards.slice(1).join("")}</div>`;
-    }).join("");
-    return `<section class="part" id="${SECTION_IDS.changed}"><div class="part-head"><h2>${h(w.changed_title)}</h2>` +
-      `<p class="sub">${h(w.changed_intro)}</p></div>${inner}</section>`;
+  /** One group of the details, its heading glued to its first entry. */
+  statusGroup(key, title, count, intro, items, id = null) {
+    return `<div class="status-group is-${key}"${id ? ` id="${id}"` : ""}><div class="keep">` +
+      `<div class="group-head"><h3>${h(title)}<span class="count">${count}</span></h3>` +
+      `${intro ? `<p class="sub">${h(intro)}</p>` : ""}</div>${items[0]}</div>${items.slice(1).join("")}</div>`;
+  }
+
+  /** Changes that belong to no one feature. */
+  otherHtml(other) {
+    if (!other.length) return "";
+    return `<div class="status-group is-other" id="${CLOSING_IDS.other}"><div class="keep"><div class="group-head">` +
+      `<h3>${OTHER_TITLE}<span class="count">${other.length}</span></h3>` +
+      `<p class="sub">Changes that run across the whole product rather than belonging to any one feature.</p></div>` +
+      `<ul class="other-list">${other.map((c) => `<li>${h(c.description)}</li>`).join("")}</ul></div></div>`;
   }
 
   /**
    * What the service provides: every capability, area by area, one line
-   * each — its size, its name and its first sentence — under the area's own
-   * one-sentence overview. What moved carries a mark that links to its
-   * details. The whole service, in a page or two.
+   * each — its number, size, name and first sentence — under the area's own
+   * one-sentence overview. What moved carries its status, linking to its
+   * details. The whole service in a page or two, and the index the numbers
+   * everywhere else point into.
    */
   catalogueSection() {
     if (!this.categoryRows.length) return "";
     const w = this.words.pdf;
     const inner = this.categoryRows.map(([category, rows, groups], i) => {
-      const intro = this.areaIntro(category);
-      const head = this.set.unstructured ? "" : `<div class="cat-head" id="${this.categoryId(i)}">` +
-        `<span class="num">${this.categoryNumber(i)}</span><h2>${h(category)}</h2>` +
-        `<span class="meta">${rows.length} ${rows.length === 1 ? "feature" : "features"}</span></div>` +
-        (intro ? `<p class="area-intro">${h(intro)}</p>` : "");
+      const head = this.set.unstructured ? "" : this.areaHead(category, i, rows, 3);
       const lists = groups.map(([sub, grows]) => `${sub ? `<div class="rest-sub">${h(sub.name)}</div>` : ""}` +
         `<ul class="rest-list">${grows.map((r) => this.catalogueLine(r)).join("")}</ul>`).join("");
       return `<div class="rest-area">${head}${lists}</div>`;
     }).join("");
-    return `<section class="part rest" id="${SECTION_IDS.rest}"><div class="part-head"><h2>${h(w.rest_title)}</h2>` +
-      `<p class="sub">${h(w.rest_intro)}</p></div>${inner}</section>`;
+    return `<section class="part rest" id="${SECTION_IDS.rest}" data-page-start><div class="part-head"><h2>${h(w.rest_title)}</h2>` +
+      `<p class="sub">${h(w.rest_intro)}</p>${this.sizeKey()}</div>${inner}</section>`;
+  }
+
+  /** What the size meter means, said once, where sizes are compared. */
+  sizeKey() {
+    return `<p class="size-key">${["Big", "Medium", "Small"].map((s) => this.sizeMark(s)).join("")}` +
+      `<span>${h(this.words.pdf.key_sizes)}</span></p>`;
   }
 
   /* ---- the document --------------------------------------------------- */
@@ -480,135 +596,72 @@ class LedgerHtml {
     const rel = this.release;
     const dateLabel = longDate(rel.date);
     const predDateLabel = this.predecessor ? longDate(this.predecessor.date) : null;
-    const stats = this.stats;
     const w = this.words.pdf;
-    const footerLeft = `${this.brand.name} · The Feature Ledger · Version ${this.label}` +
-      (dateLabel ? ` · ${dateLabel}` : "");
+    const footerLeft = `${this.brand.name} · Feature Ledger · Version ${this.label}` +
+      (dateLabel ? ` · ${dateLabel}` : "") + (rel.future ? " · Draft, not yet presented" : "");
 
-    const body = this.short ? "" : this.categoryRows.map(([category, rows, groups], i) => {
-      const nNew = rows.filter((r) => r.badge === "new").length;
-      const nUpd = rows.filter((r) => r.badge === "updated").length;
-      const nBack = rows.filter((r) => r.badge === "backfilled").length;
-
-      // Every heading is glued to its own first row, so neither a category
-      // head nor a sub-section head can be stranded at the foot of a page.
-      // The category head rides along with the first LOOSE row; a category
-      // made only of sub-sections stands alone and leans on break-after.
-      // An undivided ledger prints no area heading at all: one heading above
-      // the only list in the document is a structure the reader has to read
-      // past to get to the product.
-      const head = this.set.unstructured ? "" : this.catHead(category, i, rows.length, nNew, nUpd, nBack);
-
-      const inner = groups.map(([sub, grows], gi) => {
-        if (sub === null) {
-          return `<div class="cat-open">${head}${this.featureRow(grows[0])}</div>` +
-            grows.slice(1).map((r) => this.featureRow(r)).join("");
-        }
-        const alone = gi === 0 && head ? `<div class="cat-open cat-alone">${head}</div>` : "";
-        return `${alone}<div class="subsection${sub.badge ? ` ${sub.badge}` : ""}"><div class="sub-body">` +
-          `<div class="sub-open">${this.subHead(sub)}${this.featureRow(grows[0])}</div>` +
-          grows.slice(1).map((r) => this.featureRow(r)).join("") +
-          "</div></div>";
-      }).join("");
-
-      return `<div class="category">${inner}</div>`;
-    }).join("");
-
-    // The three closing sections are resolved before the contents list so it
-    // can link to whichever of them this edition actually prints.
     const removed = this.removedThisVersion;
     const goneEarlier = this.backfilledRemovals;
     const other = this.otherChanges;
+
+    // An inventory, or an edition printed in full: every area, every entry,
+    // each in the same two-column form the details use.
+    const body = this.short ? "" : this.categoryRows.map(([category, rows, groups], i) => {
+      // Every heading is glued to its own first entry, so neither an area
+      // head nor a sub-section head can be stranded at the foot of a page.
+      // An undivided ledger prints no area heading at all: one heading above
+      // the only list in the document is a structure the reader has to read
+      // past to get to the product.
+      const head = this.set.unstructured ? "" : this.areaHead(category, i, rows, 2);
+      const inner = groups.map(([sub, grows], gi) => {
+        const level = sub ? 4 : 3;
+        const entries = grows.map((r) => this.featureRow(r, level));
+        if (sub === null) return `<div class="keep">${head}${entries[0]}</div>${entries.slice(1).join("")}`;
+        const alone = gi === 0 && head ? `<div class="keep cat-alone">${head}</div>` : "";
+        return `${alone}<div class="subsection"><div class="keep">${this.subHead(sub, 3)}${entries[0]}</div>` +
+          `${entries.slice(1).join("")}</div>`;
+      }).join("");
+      return `<section class="category">${inner}</section>`;
+    }).join("");
+
+    const fullClosing = this.short ? "" : [
+      removed.length ? this.statusGroup("removed", "No longer available as of this edition", removed.length, null,
+        removed.map((r) => this.removedRow(r)), CLOSING_IDS.removed) : "",
+      goneEarlier.length ? this.statusGroup("gone", this.words.tags.backfilled_removed, goneEarlier.length,
+        "Gone before the last edition, and recorded here for the first time.",
+        goneEarlier.map((r) => this.removedRow(r, true)), CLOSING_IDS.goneEarlier) : "",
+      this.otherHtml(other),
+    ].join("");
     const closing = [
-      [removed.length, CLOSING_IDS.removed, "No longer available as of this edition", removed.length],
-      [goneEarlier.length, CLOSING_IDS.goneEarlier, this.words.tags.backfilled_removed, goneEarlier.length],
-      [other.length, CLOSING_IDS.other, "Also since last time", other.length],
-    ].filter(([present]) => present);
+      [removed.length, CLOSING_IDS.removed, "No longer available"],
+      [goneEarlier.length, CLOSING_IDS.goneEarlier, this.words.tags.backfilled_removed],
+      [other.length, CLOSING_IDS.other, OTHER_TITLE],
+    ].filter(([n]) => n).map(([n, id, title]) => [id, title, n]);
 
-    const dots = (rows) => '<i class="dot-new"></i>'.repeat(rows.filter((r) => r.badge === "new").length)
-      + '<i class="dot-updated"></i>'.repeat(rows.filter((r) => r.badge === "updated").length)
-      + '<i class="dot-backfilled"></i>'.repeat(rows.filter((r) => r.badge === "backfilled").length);
-    // Only a full edition has a contents list: a short one's first page is
-    // its contents, with every item linking to its details, and the
-    // catalogue at the end is the index of the whole service.
-    const contents = this.short ? "" : this.categoryRows.map(([category, rows], i) => `<li><a href="#${this.categoryId(i)}">` +
-      `<span class="num">${this.categoryNumber(i)}</span><span class="nm">${h(category)}</span>` +
-      `<span class="flags">${dots(rows)}</span><span class="ct">${rows.length}</span></a></li>`).join("");
-
-    // Deliberately not numbered and deliberately quieter: these are notes
-    // about what moved, not areas of the product, and a reader scanning
-    // "01…08" shouldn't have to wonder why the count went up.
-    const closingContents = closing.map(([, id, title, count]) =>
-      `<li><a href="#${id}"><span class="num">&mdash;</span><span class="nm">${h(title)}</span>` +
-      `<span class="ct">${count}</span></a></li>`).join("");
-
-    const summary = this.summaryHtml({ removed, goneEarlier, other, predDateLabel });
+    const summary = this.summaryHtml({ removed, goneEarlier, other });
     const overview = this.predecessor ? this.project.compositionOf(this.version)?.overview : null;
 
-    // One line on the first page: what this edition holds, against the last one.
-    const tally = this.predecessor
-      ? [[stats.new, "new", "is-new"], [stats.updated, "updated", "is-updated"],
-        [stats.backfilled, this.words.tags.backfilled.toLowerCase(), "is-backfilled"],
-        [removed.length, "no longer available", "is-removed"], [stats.unchanged, "unchanged", "is-same"]]
-        .filter(([n, , cls]) => n > 0 || cls === "is-new" || cls === "is-updated" || cls === "is-same")
-        .map(([n, label, cls]) => `<span class="${cls}"><b>${n}</b> ${h(label)}</span>`).join('<span class="sep">·</span>')
-      : `<span><b>${stats.features}</b> feature${stats.features === 1 ? "" : "s"}${stats.areas > 1 ? ` across <b>${stats.areas}</b> areas` : ""}</span>`;
-
-    // What the colours and the sizes mean, said once, quietly, under the
-    // counts: a key, not a paragraph to read before the news.
-    const colours = this.predecessor
-      ? [["dot-new", "new"], ["dot-updated", "changed"],
-        ...(stats.backfilled > 0 ? [["dot-backfilled", `${this.words.tags.backfilled.toLowerCase()}, listed for the first time`]] : [])]
-        .map(([cls, label]) => `<span><i class="${cls}"></i> ${h(label)}</span>`).join("")
-      : "";
-    const key = `<div class="key">${colours ? `<div class="legend">${colours}</div>` : ""}` +
-      `<p>${h(w.key_sizes)}</p></div>`;
-
-    // Where the green/blue callout would go, had there been something to diff
-    // against. Slate, like the third register, because it is the same kind of
-    // fact: the document moved, the product didn't.
+    // Where the summary would go, had there been something to diff against.
+    // Slate, like the third register, because it is the same kind of fact:
+    // the document moved, the product didn't.
     const redraftBlock = this.redraftReplaces ? (() => {
       const versions = this.redraftReplaces.map((v) => this.project.releases.labelOf(v));
       const note = this.project.redraftOpening(this.version)?.note;
       return `
-      <div class="callout redraft"><div class="callout-content">
+      <div class="callout redraft">
         <b>${h(this.words.redraft.title)}.</b> ${h(redraftBody(this.words, versions))}
         ${note ? `<p class="redraft-note">${h(note)}</p>` : ""}
-      </div></div>`;
+      </div>`;
     })() : "";
 
-    const removedBox = ([f, s], cls = "") =>
-      `<div class="removed-box${cls}"><div class="removed-box-content">` +
-      `<span class="name">${h(f.currentName)}</span> &mdash; ${h(s.reason)}</div></div>`;
-
-    const removedBlock = removed.length ? `
-      <div class="category">
-        <div class="cat-head" id="${CLOSING_IDS.removed}"><span class="num">&mdash;</span><h2>No longer available as of this edition</h2></div>
-        ${removed.map((r) => removedBox(r)).join("")}
-      </div>` : "";
-
-    // Deliberately its own block, and deliberately vague about timing: these
-    // went before the last cutoff, and nothing records which release they went
-    // in, so the document cannot honestly name one.
-    const goneEarlierBlock = goneEarlier.length ? `
-      <div class="category">
-        <div class="cat-head" id="${CLOSING_IDS.goneEarlier}"><span class="num">&mdash;</span><h2>${h(this.words.tags.backfilled_removed)}</h2>
-          <span class="meta">recorded here for the first time</span></div>
-        ${goneEarlier.map((r) => removedBox(r, " backfilled")).join("")}
-      </div>` : "";
-
-    const otherBlock = other.length ? `
-      <div class="other-changes" id="${CLOSING_IDS.other}">
-        <h2>Also since last time</h2>
-        <p class="sub">Changes that run across the whole product rather than belonging to any one feature above.</p>
-        <ul>${other.map((c) => `<li>${h(c.description)}</li>`).join("")}</ul>
-      </div>` : "";
-
     const pages = this.short
-      ? `${this.changedSection()}${removedBlock}${goneEarlierBlock}${otherBlock}${this.catalogueSection()}`
-      : `${body}${removedBlock}${goneEarlierBlock}${otherBlock}`;
-    const since = predDateLabel ? `Compared with the edition of ${predDateLabel}.` : "";
-    const meta = [dateLabel, since].filter(Boolean).map(h).join(" · ") +
+      ? `${this.changedSection({ removed, goneEarlier, other })}${this.catalogueSection()}`
+      : `<div class="ledger" data-page-start>${body}${fullClosing}</div>`;
+    const since = this.predecessor
+      ? `Changes since version ${h(this.project.releases.labelOf(this.predecessor.version))}` +
+        (predDateLabel ? `, ${h(predDateLabel)}` : "")
+      : "";
+    const meta = [dateLabel ? h(dateLabel) : "", since].filter(Boolean).join('<span class="sep">·</span>') +
       (rel.future ? '<span class="edition is-draft">Draft, not yet presented</span>' : "");
 
     return `<!doctype html>
@@ -633,25 +686,20 @@ ${this.project.themeCss()}
       <div class="imprint">${w.title_html}</div>
     </div>
 
-    <h1 class="release-title">Version ${this.label}${rel.name ? `<span class="release-name"> · ${h(rel.name)}</span>` : ""}</h1>
+    <h1 class="release-title">Version ${this.label}${rel.name ? `<span class="release-name">${h(rel.name)}</span>` : ""}</h1>
     <div class="release-meta">${meta}</div>
     ${overview ? `<p class="overview">${h(overview)}</p>` : this.predecessor ? "" : `<p class="intro">${h(w.intro)}</p>`}
     ${redraftBlock}
+    ${this.tallyHtml(removed.length)}
     ${summary}
-    <div class="tally">${tally}</div>
-    ${key}
+    ${this.contentsHtml(closing)}
+    ${this.short ? "" : this.sizeKey()}
   </header>
-
-  ${this.set.unstructured || this.short ? "" : `<div class="contents">
-    <div class="kicker">Contents</div>
-    <ol>${contents}</ol>
-    ${closingContents ? `<ul class="closing">${closingContents}</ul>` : ""}
-  </div>`}
 
   ${pages}
 
   <div class="colophon">
-    ${h(this.brand.name)} · The Feature Ledger · Version ${this.label}${dateLabel ? ` · ${dateLabel}` : ""}.
+    ${h(this.brand.name)} · Feature Ledger · Version ${this.label}${dateLabel ? ` · ${dateLabel}` : ""}.
     ${h(w.colophon)}
   </div>
 </body>
@@ -662,471 +710,368 @@ ${this.project.themeCss()}
   paletteCss() {
     const b = this.brand;
     return `  :root {
-    --ink: #151a23; --ink-soft: #4e5766; --ink-faint: #8d95a4; --ink-ghost: #c2c8d2;
-    --paper: #ffffff; --line: #e6e9ef; --line-soft: #eef0f5;
+    --ink: #161b24; --ink-soft: #485160; --ink-faint: #848c9a; --ink-ghost: #c3c8d0;
+    --paper: #ffffff; --line: #dfe3ea; --line-soft: #eceef3; --wash: #f6f7f9;
 
     --accent: ${b.accent}; --accent-deep: ${b.accent_deep}; --accent-quiet: ${b.accent_quiet};
     --accent-mid: ${b.accent_mid}; --accent-pale: ${b.accent_pale};
 
-    --green: #12744a; --green-deep: #0b5233; --green-soft: #e7f4ed; --green-line: #cfe6d9;
+    --green: #12744a; --green-deep: #0b5233; --green-soft: #e7f4ed;
     --blue: #2a51c8; --blue-deep: #1c3c99; --blue-soft: #eaf0fd;
 
     /* The third register. Deliberately not a fourth hue: green and blue are
        already spoken for, and brand.json forbids an accent in the green/blue
-       band precisely so those two keep their meaning — a fifth hue would
-       squeeze every brand into reds, oranges, purples and browns. It is also
-       not the same KIND of fact. Green and blue say the software moved; this
-       says the document caught up. Neutral grey is the one family a brand
-       accent never occupies, so it is safe against every palette, and it
-       recedes, which is the point. */
-    --slate: #6b7280; --slate-deep: #414753; --slate-soft: #edeff2; --slate-line: #dfe2e7;
+       band precisely so those two keep their meaning. It is also not the same
+       KIND of fact. Green and blue say the software moved; this says the
+       document caught up. Neutral grey is the one family a brand accent never
+       occupies, so it is safe against every palette, and it recedes, which is
+       the point. */
+    --slate: #6b7280; --slate-deep: #414753; --slate-soft: #edeff2;
 
     --font-display: '${b.fonts.display}', '${SYMBOL_FACE[0]}', Georgia, 'Times New Roman', serif;
     --font-body: '${b.fonts.body}', '${SYMBOL_FACE[0]}', 'Helvetica Neue', Arial, sans-serif;
 
-    /* One shared text measure — roughly 70 characters at body size, the
-       comfortable-reading width. Descriptions and change notes both honour
-       it, so every block of prose starts and ends on the same two invisible
-       vertical lines instead of running the full width of the page. */
-    --measure: 500px;
+    /* The grid every entry sits on: a margin for what a reader scans (number,
+       status, size) and a column for what they read, held to about 75
+       characters a line. Headings, lists and notes all hang off the same two
+       vertical lines, so the eye never has to find a new left edge. */
+    --rail: 92px; --gutter: 22px; --measure: 470px;
   }`;
   }
 }
+
+/** The heading over product-wide notes, here and on the first page. */
+const OTHER_TITLE = "Across the product";
 
 /*
  * The stylesheet. Every tint is a real flat colour rather than an alpha
  * blend, so what a CMYK press or an office laser prints is what's specified.
  *
+ * Two faces, two jobs: the serif names things (the title, sections, entries,
+ * figures) and the sans explains them. Colour is never the only carrier of a
+ * meaning — every status is also a word — so the document survives a
+ * black-and-white printer intact.
+ *
  * A note on tracked caps and copy-paste: PDF text extractors read a wide
- * enough gap between two letters as a word break, so the display kickers on
- * the cover copy out spelled apart ("T H E L E D G E R"). That's the cost of
- * the look and it's paid by six decorative labels — every line of actual
- * content copies verbatim. The one place it was worth trading a hair of
- * tracking for is .changes .label, which sits INSIDE a feature's prose rather
- * than over it.
+ * enough gap between two letters as a word break, so the small tracked labels
+ * copy out spaced. Every line of actual content copies verbatim.
  */
 const STYLES = `
+  @page { size: letter; }
   * { box-sizing: border-box; }
   body {
-    margin: 0; font-family: var(--font-body); color: var(--ink);
-    font-size: 10.5pt; line-height: 1.55; -webkit-font-smoothing: antialiased;
+    margin: 0; font-family: var(--font-body); color: var(--ink); background: var(--paper);
+    font-size: 9.75pt; line-height: 1.5; -webkit-font-smoothing: antialiased;
+    font-feature-settings: "kern", "liga"; orphans: 2; widows: 2;
   }
-  h1, h2, h3 { margin: 0; line-height: 1.15; }
+  h1, h2, h3, h4 { margin: 0; line-height: 1.2; font-weight: inherit; font-size: inherit; }
+  p { margin: 0; }
+  a { color: inherit; text-decoration: none; }
 
-  /* Serif for anything that names something (the title, section names,
-     feature names, figures); sans for anything that explains it. The two
-     jobs never share a face, which is what lets a reader skim names and read
-     prose without the page having to shout. */
-  .serif { font-family: var(--font-display); }
+  /* Small tracked capitals: the labels over a note and the margin statuses. */
+  .kicker, .label, .status, .area-label, .size .word {
+    font-family: var(--font-body); font-size: 6.8pt; font-weight: 700;
+    letter-spacing: .09em; text-transform: uppercase;
+  }
 
-  /* ======================= FRONT MATTER ======================= */
+  /* ======================= THE FIRST PAGE ======================= */
   /* The first page is the update: which edition this is, what it is about,
-     and what changed, in a list. Most readers stop there, so nothing on it is
-     decoration. A short edition's details start clean on page 2; an
-     inventory's contents follow on the same page. */
-  .front.is-short { break-after: page; }
+     how much moved, and what, in a list. Most readers stop there, so
+     nothing on it is decoration. */
 
   .masthead {
-    display: flex; align-items: flex-end; justify-content: space-between;
-    padding-bottom: 14px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: space-between;
+    padding-bottom: 12px; border-bottom: 1px solid var(--line);
   }
   .masthead img { display: block; }
   /* The stand-in when a project hasn't got a logo file yet: the product name
      set in the display face, which reads as a considered masthead rather
      than as a missing image. */
   .masthead .wordmark {
-    font-family: var(--font-display); font-size: 17pt; font-weight: 700;
-    letter-spacing: -.015em; color: var(--accent-deep);
+    font-family: var(--font-display); font-size: 15pt; font-weight: 700;
+    letter-spacing: -.01em; color: var(--accent-deep);
   }
   .masthead .imprint {
-    font-family: var(--font-display); font-size: 13pt; font-weight: 700; color: var(--ink); text-align: right;
+    font-family: var(--font-body); font-size: 7.5pt; font-weight: 700; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--ink-faint); text-align: right;
   }
-  .masthead .imprint em { font-style: normal; color: var(--accent); }
+  .masthead .imprint em { font-style: normal; color: var(--ink-faint); }
 
   h1.release-title {
-    font-family: var(--font-display); font-size: 30pt; font-weight: 900; letter-spacing: -.02em;
-    margin-top: 30px; line-height: 1.08;
+    font-family: var(--font-display); font-size: 32pt; font-weight: 900; letter-spacing: -.02em;
+    margin-top: 34px; line-height: 1.05; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 16px;
   }
-  h1.release-title .release-name { font-weight: 700; color: var(--ink-soft); }
-  .release-meta { margin-top: 8px; font-size: 9.5pt; color: var(--ink-faint); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
-  .overview { margin: 18px 0 0; font-size: 11.5pt; line-height: 1.55; color: var(--ink); max-width: 560px; }
-  .front .summary { margin: 26px 0 0; }
-
-  /* The key under the counts: colours and sizes, said once and quietly. */
-  .key { margin-top: 14px; font-size: 8.5pt; color: var(--ink-faint); max-width: 560px; }
-  .key p { margin: 6px 0 0; }
-  .legend { display: flex; gap: 18px; flex-wrap: wrap; }
-  .legend span { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--ink-soft); }
-  .legend i { width: 4px; height: 12px; border-radius: 2px; display: inline-block; }
-
+  h1.release-title .release-name { font-weight: 400; font-style: italic; color: var(--accent-deep); letter-spacing: -.01em; }
+  .release-meta {
+    margin-top: 10px; font-size: 9.5pt; color: var(--ink-soft);
+    display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0;
+  }
+  .release-meta .sep { color: var(--ink-ghost); margin: 0 9px; }
   .edition {
-    display: inline-flex; align-items: center; gap: 7px; font-weight: 700; font-size: 7.5pt;
-    letter-spacing: .1em; text-transform: uppercase; border-radius: 3px; padding: 4px 10px 4px 8px;
+    display: inline-flex; align-items: center; gap: 6px; margin-left: 14px;
+    font-weight: 700; font-size: 6.8pt; letter-spacing: .1em; text-transform: uppercase;
+    border: 1px dashed var(--accent); color: var(--accent-deep); border-radius: 3px; padding: 3px 8px;
   }
-  .edition::before { content: ""; width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
-  .edition.is-draft { background: var(--accent-pale); color: var(--accent-deep); }
-  .edition.is-draft::before { background: var(--accent); }
-  /* Deliberately neutral, not green: green is spoken for — it means "new
-     since last time" and nothing else anywhere in this document. */
-  .edition.is-final { background: #eef0f5; color: var(--ink-soft); }
-  .edition.is-final::before { background: var(--ink-faint); }
-
-  .intro { margin-top: 22px; color: var(--ink-soft); max-width: var(--measure); }
-
-  /* The accent strip is a flat-coloured gap between two flat rectangles —
-     the dark backdrop (.callout) and the lighter inset on top of it
-     (.callout-content, offset right by margin) — clipped together by one
-     border-radius + overflow: hidden on the shared outer shape. That's what
-     makes the strip's rounded cap and the card's own corner the same curve
-     instead of two separately-drawn arcs that have to be nudged into lining
-     up. Same trick powers .feature and .removed-box below. */
-  .callout { margin-top: 32px; background: var(--blue); border-radius: 8px; overflow: hidden; }
-  .callout-content { background: var(--blue-soft); margin-left: 5px; padding: 16px 20px; font-size: 9.5pt; }
-  .callout b { color: var(--blue-deep); }
-  .callout.redraft { background: var(--slate); }
-  .callout.redraft .callout-content { background: var(--slate-soft); }
-  .callout.redraft b { color: var(--slate-deep); }
-  .callout .redraft-note { margin: 10px 0 0; }
-  .dot-new { background: var(--green); }
-  .dot-updated { background: var(--blue); }
-  .dot-backfilled { background: var(--slate); }
-
-  .kicker {
-    font-size: 7.5pt; font-weight: 800; letter-spacing: .14em; text-transform: uppercase;
-    color: var(--accent); margin-bottom: 12px;
+  .overview, .intro {
+    margin-top: 18px; font-family: var(--font-display); font-size: 12.5pt; line-height: 1.5;
+    color: var(--ink); max-width: 560px;
   }
 
   /* ---- The tally ----
-     One line, read as a sentence: what this edition holds against the last
-     one. Each count wears the colour its entries wear inside. */
+     The edition in figures, before any of its sentences: a row of numbers,
+     each over its label, each in the colour its entries wear inside. */
   .tally {
-    margin-top: 24px; padding-top: 14px; border-top: 1px solid var(--line);
-    font-family: var(--font-display); font-size: 14pt; color: var(--ink-soft);
-    display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px;
+    display: flex; margin-top: 22px; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--line);
   }
-  .tally b { font-weight: 700; font-size: 20pt; color: var(--ink); margin-right: 3px; }
-  .tally .sep { color: var(--ink-ghost); }
-  .tally .is-new b { color: var(--green-deep); }
-  .tally .is-updated b { color: var(--blue-deep); }
-  .tally .is-backfilled b { color: var(--slate-deep); }
-  .tally .is-removed b { color: var(--accent-deep); }
-  .tally .is-same b { color: var(--ink-faint); }
+  .stat { flex: 1; padding: 10px 0 10px 14px; border-left: 1px solid var(--line); }
+  .stat:first-child { border-left: none; padding-left: 0; }
+  .stat b {
+    display: block; font-family: var(--font-display); font-size: 22pt; font-weight: 700;
+    line-height: 1; font-variant-numeric: lining-nums tabular-nums; color: var(--ink);
+  }
+  .stat span { display: block; margin-top: 4px; font-size: 8pt; color: var(--ink-soft); }
+  .stat.is-new b { color: var(--green); }
+  .stat.is-updated b { color: var(--blue); }
+  .stat.is-backfilled b { color: var(--slate); }
+  .stat.is-removed b { color: var(--accent-deep); }
+  .stat.is-same b, .stat.is-plain b { color: var(--ink-faint); }
+  .stat.is-total { flex: 1.3; }
 
   /* ---- What's different ----
-     Read, not scanned: plain headings and numbered sentences at body size,
-     with nothing beside them to compare. Each heading carries the stripe its
-     entries wear in the ledger, so the page is visibly an index of the
-     highlights rather than a fourth way of drawing them. The whole sentence is
-     the link, so it stays the same ink as the text around it. */
-  .summary { padding-top: 14px; border-top: 2px solid var(--accent); }
-  .summary h2 { font-family: var(--font-display); font-size: 15pt; font-weight: 700; }
-  .sum-group:first-of-type { margin-top: 16px; }
-  .summary p.sub { margin: 3px 0 0; font-size: 9pt; color: var(--ink-faint); max-width: var(--measure); }
-  .sum-group { margin-top: 22px; }
-  .sum-group h3 {
-    display: flex; align-items: center; gap: 9px; break-after: avoid;
-    font-family: var(--font-display); font-size: 12.5pt; font-weight: 700;
-  }
-  .sum-group h3 i { width: 4px; height: 15px; border-radius: 2px; display: inline-block; }
-  .sum-group.is-new h3 { color: var(--green-deep); } .sum-group.is-new h3 i { background: var(--green); }
-  .sum-group.is-updated h3 { color: var(--blue-deep); } .sum-group.is-updated h3 i { background: var(--blue); }
-  .sum-group.is-backfilled h3, .sum-group.is-gone h3 { color: var(--slate-deep); }
-  .sum-group.is-backfilled h3 i, .sum-group.is-gone h3 i { background: var(--slate); }
-  .sum-group.is-removed h3, .sum-group.is-other h3 { color: var(--accent-deep); }
-  .sum-group.is-removed h3 i, .sum-group.is-other h3 i { background: var(--accent-deep); }
-  .summary ol { margin: 8px 0 0; padding-left: 26px; max-width: var(--measure); }
-  .summary li { break-inside: avoid; margin-bottom: 5px; padding-left: 4px; color: var(--ink); }
-  .summary li::marker { color: var(--ink-faint); font-variant-numeric: tabular-nums; font-size: 9.5pt; }
-  .summary a { color: inherit; text-decoration: none; }
-  .summary .refs { white-space: nowrap; font-size: 8.5pt; }
-  .summary a.ref { color: var(--accent-deep); font-variant-numeric: tabular-nums; margin-left: 2px; }
-  .changes.is-draft .label { font-style: italic; }
+     Read, not scanned: plain headings and sentences at body size. Each
+     sentence ends with the numbers of the entries it covers, set in the
+     accent so they read as references rather than as part of the text. */
+  .summary { margin-top: 26px; }
+  .summary > h2 { font-family: var(--font-display); font-size: 16pt; font-weight: 700; letter-spacing: -.01em; }
+  .summary > p.sub { margin-top: 3px; font-size: 8.5pt; color: var(--ink-faint); }
   .summary p.draft-note {
-    margin: 10px 0 0; padding: 6px 10px; max-width: var(--measure); font-size: 9pt;
-    background: var(--accent-pale); color: var(--accent-deep); border-radius: 3px;
+    margin-top: 10px; padding: 7px 11px; font-size: 8.5pt; color: var(--accent-deep);
+    border: 1px dashed var(--accent); border-radius: 3px; max-width: 560px;
   }
+  .sum-group { margin-top: 16px; break-inside: avoid; }
+  .sum-group h3, .group-head h3 {
+    display: flex; align-items: baseline; gap: 8px; break-after: avoid;
+    font-family: var(--font-display); font-size: 12pt; font-weight: 700;
+  }
+  .sum-group h3::before, .group-head h3::before {
+    content: ""; width: 8px; height: 8px; border-radius: 2px; flex: 0 0 auto;
+    background: var(--ink-faint); transform: translateY(-1px);
+  }
+  .count {
+    font-family: var(--font-body); font-size: 8pt; font-weight: 600; color: var(--ink-faint);
+    font-variant-numeric: tabular-nums;
+  }
+  .is-new > h3, .is-new .group-head h3 { color: var(--green-deep); }
+  .is-new > h3::before, .is-new .group-head h3::before { background: var(--green); }
+  .is-updated > h3, .is-updated .group-head h3 { color: var(--blue-deep); }
+  .is-updated > h3::before, .is-updated .group-head h3::before { background: var(--blue); }
+  .is-backfilled > h3, .is-gone > h3, .is-backfilled .group-head h3, .is-gone .group-head h3 { color: var(--slate-deep); }
+  .is-backfilled > h3::before, .is-gone > h3::before,
+  .is-backfilled .group-head h3::before, .is-gone .group-head h3::before { background: var(--slate); }
+  .is-removed > h3, .is-other > h3, .is-removed .group-head h3, .is-other .group-head h3 { color: var(--accent-deep); }
+  .is-removed > h3::before, .is-other > h3::before,
+  .is-removed .group-head h3::before, .is-other .group-head h3::before { background: var(--accent); }
+
+  .summary ol { margin: 5px 0 0; padding: 0; list-style: none; }
+  .summary li {
+    break-inside: avoid; display: flex; gap: 16px; align-items: baseline;
+    padding: 4px 0 4px 16px; border-bottom: 1px solid var(--line-soft);
+  }
+  .summary li:last-child { border-bottom: none; }
+  .summary li .text { flex: 1; max-width: var(--measure); }
+  .summary .refs {
+    margin-left: auto; flex: 0 0 auto; display: flex; gap: 7px; justify-content: flex-end;
+    font-size: 8.5pt; font-weight: 600; font-variant-numeric: tabular-nums;
+  }
+  .summary a.ref { color: var(--accent-deep); }
 
   /* ---- Contents ---- */
-  .contents { padding-top: 14px; border-top: 2px solid var(--accent); margin-bottom: 34px; break-inside: avoid; }
-  .contents ol { columns: 2; column-gap: 34px; margin: 14px 0 0; padding: 0; list-style: none; }
+  .contents { margin-top: 28px; padding-top: 10px; border-top: 1px solid var(--ink); break-inside: avoid; }
+  .kicker { color: var(--ink-faint); margin-bottom: 6px; }
+  .contents ol { columns: 2; column-gap: 32px; margin: 4px 0 0; padding: 0; list-style: none; }
   .contents li { break-inside: avoid; border-bottom: 1px solid var(--line-soft); }
-  .contents a {
-    display: flex; align-items: baseline; gap: 8px;
-    padding: 5px 0; font-size: 9.5pt;
-    color: inherit; text-decoration: none;
+  .contents li a { display: flex; align-items: baseline; gap: 9px; padding: 4px 0; font-size: 9pt; }
+  .contents .num {
+    flex: 0 0 14px; font-family: var(--font-display); font-weight: 700; color: var(--accent);
+    font-variant-numeric: lining-nums tabular-nums;
   }
-  .contents .num { font-family: var(--font-display); font-weight: 700; color: var(--accent); font-size: 9.5pt; flex: 0 0 auto; }
-  .contents .nm { font-family: var(--font-display); font-weight: 600; flex: 1; min-width: 0; }
-  .contents .flags { display: flex; gap: 3px; flex: 0 0 auto; }
-  .contents .flags i { width: 4px; height: 11px; border-radius: 1px; display: inline-block; }
-  .contents .ct { flex: 0 0 auto; color: var(--ink-faint); font-size: 8.5pt; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .contents .nm { flex: 1; min-width: 0; font-family: var(--font-display); font-weight: 600; }
+  .contents .ct { flex: 0 0 auto; color: var(--ink-faint); font-size: 8pt; font-variant-numeric: tabular-nums; }
+  .contents li.closing .num { color: var(--ink-ghost); }
+  .contents li.closing .nm { font-weight: 400; color: var(--ink-soft); }
 
-  /* The closing sections: same grid, dashed instead of numbered and a shade
-     quieter, so they read as notes after the areas rather than as areas. */
-  .contents .closing { columns: 2; column-gap: 34px; margin: 6px 0 0; padding: 0; list-style: none; }
-  .contents .closing li { break-inside: avoid; border-bottom: 1px solid var(--line-soft); }
-  .contents .closing .num { color: var(--ink-ghost); font-weight: 400; }
-  .contents .closing .nm { font-weight: 500; color: var(--ink-soft); }
+  /* ---- The size key ---- */
+  .size-key {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px;
+    margin-top: 14px; font-size: 8pt; color: var(--ink-faint); max-width: 600px;
+  }
+  .size-key > span:last-child { flex-basis: 100%; }
 
-  /* ======================= THE LEDGER ======================= */
-  .category { margin-top: 30px; }
-  .front + .category, .category:first-of-type { margin-top: 0; }
+  .callout.redraft {
+    margin-top: 24px; padding: 13px 16px; font-size: 9pt; max-width: 600px;
+    background: var(--slate-soft); border-left: 3px solid var(--slate);
+  }
+  .callout.redraft b { color: var(--slate-deep); }
+  .callout .redraft-note { margin-top: 8px; }
 
-  /* Header and first row are glued together so a section name can never be
-     stranded alone at the foot of a page. */
-  .cat-open { break-inside: avoid; }
+  /* ======================= THE PARTS ======================= */
+  /* Each part opens a page, under a heading the size of a chapter, so a
+     reader always knows which of the two they are in. */
+  [data-page-start] { break-before: page; }
+  .part-head { padding-top: 12px; border-top: 2px solid var(--accent); margin-bottom: 4px; break-after: avoid; }
+  .part-head h2 { font-family: var(--font-display); font-size: 20pt; font-weight: 700; letter-spacing: -.015em; }
+  .part-head p.sub { margin-top: 4px; font-size: 9pt; color: var(--ink-soft); max-width: 560px; }
+
+  .status-group { margin-top: 26px; }
+  .group-head { padding-bottom: 6px; border-bottom: 1px solid var(--ink); break-after: avoid; }
+  .group-head p.sub { margin: 2px 0 0 16px; font-size: 8.5pt; color: var(--ink-faint); }
+  .area-label {
+    margin: 14px 0 0 calc(var(--rail) + var(--gutter)); color: var(--ink-faint); break-after: avoid;
+  }
+
+  /* Heading and first entry are glued together so a heading can never be
+     stranded at the foot of a page. When the first entry alone is taller
+     than a page, src/render/pdf.mjs lifts the glue, and these keep the
+     heading on the entry's opening lines even then. */
+  .keep { break-inside: avoid; }
   .cat-alone { break-after: avoid; }
-  /* The glue above gives way when the first row alone is taller than a page
-     (src/render/pdf.mjs lifts it, or Chromium would push the row to a fresh
-     page and still split it there, leaving the heading alone on an empty
-     one). These keep the heading on the row's opening lines even then. */
-  .cat-head, .sub-head, .feature .name { break-after: avoid; }
-  .cat-head {
-    display: flex; align-items: baseline; gap: 11px; padding-top: 14px;
-    border-top: 2px solid var(--accent); margin-bottom: 6px;
+  .area-head, .sub-head, .group-head, .area-label, .feature .name { break-after: avoid; }
+
+  /* ======================= AN ENTRY ======================= */
+  .feature {
+    display: grid; grid-template-columns: var(--rail) 1fr; column-gap: var(--gutter);
+    padding: 12px 0 13px; border-bottom: 1px solid var(--line); break-inside: avoid;
   }
-  .cat-head .num { font-family: var(--font-display); font-size: 15pt; font-weight: 700; color: var(--accent); }
-  .cat-head h2 { font-family: var(--font-display); font-size: 15pt; font-weight: 700; flex: 1; letter-spacing: -.005em; }
-  .cat-head .meta { font-size: 8pt; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-faint); white-space: nowrap; }
-  .cat-head .meta em { font-style: normal; color: var(--green-deep); }
-  .cat-head .meta i { font-style: normal; color: var(--blue-deep); }
-  .cat-head .meta b { font-weight: 700; color: var(--slate-deep); }
+  .area-label + .feature { padding-top: 5px; }
 
-  /* ---- Sub-sections ----
-     One area inside a category that got big enough to swamp its neighbours.
-     It has to read as a clear step DOWN from a category head and a clear
-     step UP from a feature name, and those two neighbours are both set in
-     the display face at 15pt and 12pt. So the separation is carried by
-     weight and colour rather than by squeezing a third size in between: a
-     hairline accent rule above (against the category's full 2pt one), the
-     name in accent ink, and the overview set in the body face so it can't be
-     mistaken for another feature's description. */
-  .subsection { margin-top: 20px; }
-  .sub-open { break-inside: avoid; }
-  .sub-head { padding-top: 11px; border-top: 1px solid var(--accent-mid); margin-bottom: 4px; }
-  .sub-name {
-    font-family: var(--font-display); font-size: 13pt; font-weight: 700;
-    color: var(--accent-deep); letter-spacing: -.005em;
+  .rail { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; padding-top: 1px; }
+  .rail .no {
+    font-family: var(--font-display); font-size: 12pt; font-weight: 700; line-height: 1.1;
+    color: var(--accent-deep); font-variant-numeric: lining-nums tabular-nums;
   }
-  /* Reads as an overview, not a caption: this line stands in for the single
-     oversized entry the sub-section replaced, so it gets the same ink as the
-     descriptions below it rather than being greyed back into a subtitle
-     nobody reads. */
-  .sub-intro { margin-top: 3px; font-size: 9.5pt; color: var(--ink-soft); max-width: var(--measure); }
 
-  /* ---- A wholly-new sub-section ----
-     Green already means "new since last time" everywhere else in this
-     document, so a sub-section that arrives complete is drawn as ONE green
-     card — heading, overview and every feature inside it — rather than as a
-     heading with a NEW chip over a stack of separately-green rows.
-     Deliberately NOT break-inside: avoid — eight entries can't be asked to
-     fit on one page — so it fragments across pages the way a long tinted
-     block should. Inside it the rows drop their own 5px strip gutter and
-     take the card's, which keeps every badge and feature name on the same
-     two vertical lines as the ungrouped rows above and below. */
-  .subsection.new { background: var(--green); border-radius: 7px; overflow: hidden; margin: 16px 0 6px; }
-  .subsection.new > .sub-body { background: var(--green-soft); margin-left: 5px; }
-  .subsection.new .sub-head { border-top: none; padding: 15px 15px 0; margin-bottom: 0; }
-  .subsection.new .sub-name { color: var(--green-deep); }
-  .subsection.new .sub-intro { color: var(--ink); }
-  .subsection.new .feature .content { margin-left: 0; }
-  /* --line is a cool grey; against green-soft it reads as a smudge rather
-     than a rule, so separators inside the card are a green of their own. */
-  .subsection.new .feature { border-bottom-color: var(--green-line); }
+  /* The status in the margin: a word, with a short bar of its colour beside
+     it. The word carries the meaning; the colour lets a reader find every
+     New on a page at a glance. */
+  .status { display: inline-flex; align-items: center; gap: 5px; color: var(--ink-soft); }
+  .status::before { content: ""; width: 3px; height: 10px; border-radius: 1px; background: currentColor; }
+  .status.is-new { color: var(--green-deep); }
+  .status.is-updated { color: var(--blue-deep); }
+  .status.is-backfilled, .status.is-gone { color: var(--slate-deep); }
+  .status.is-removed { color: var(--accent-deep); }
+  .rail .status { white-space: normal; line-height: 1.25; }
 
-  /* Same card, quieter register — a sub-section the audit found all at once. */
-  .subsection.backfilled { background: var(--slate); border-radius: 7px; overflow: hidden; margin: 16px 0 6px; }
-  .subsection.backfilled > .sub-body { background: var(--slate-soft); margin-left: 5px; }
-  .subsection.backfilled .sub-head { border-top: none; padding: 15px 15px 0; margin-bottom: 0; }
-  .subsection.backfilled .sub-name { color: var(--slate-deep); }
-  .subsection.backfilled .sub-intro { color: var(--ink); }
-  .subsection.backfilled .feature .content { margin-left: 0; }
-  .subsection.backfilled .feature { border-bottom-color: var(--slate-line); }
+  .feature .body { min-width: 0; max-width: var(--measure); }
+  .feature .name { font-family: var(--font-display); font-weight: 700; font-size: 12pt; letter-spacing: -.005em; }
+  .feature .was { display: block; margin-top: 1px; font-size: 8pt; color: var(--ink-faint); }
+  .feature .desc { margin-top: 3px; color: var(--ink); }
+  /* An updated entry's first sentence is a reminder of what it is, not the
+     news: it steps back, and what changed below it carries the ink. */
+  .feature .desc.is-brief { color: var(--ink-soft); }
 
-  /* The coloured accent strip on a flagged row is not a separately-rounded
-     bar sitting next to a separately-rounded box — two independent curves
-     never line up exactly, they only get close. Instead: .feature itself
-     (dark) and .content (light, inset by margin) are both plain flat-edged
-     rectangles; .feature's own border-radius + overflow: hidden clip the pair
-     of them together as one shape. The strip's rounded cap and the card's
-     outer corner are then literally the same curve, and the accent's right
-     edge — where dark meets light — stays a perfectly straight line, since
-     nothing about that edge is rounded at all. .content carries the padding
-     (not .feature), and as the only flex child it stretches to .feature's
-     full height automatically — so the strip reaches top and bottom exactly.
-     It's rendered for every row, flagged or not, so the gutter it occupies
-     never shifts content out of alignment between plain and highlighted
-     rows. */
-  .feature { border-bottom: 1px solid var(--line); display: flex; break-inside: avoid; }
-  .feature .content { flex: 1; display: flex; gap: 16px; padding: 13px 5px 13px 15px; margin-left: 5px; min-width: 0; }
+  .changes, .matters, .how { margin-top: 9px; }
+  .label { display: block; color: var(--ink-faint); margin-bottom: 2px; }
+  .changes .label { color: var(--blue-deep); }
+  .changes.is-draft .label { font-style: italic; }
+  .changes ul { margin: 0; padding: 0; list-style: none; }
+  .changes li { position: relative; padding-left: 13px; margin-top: 3px; color: var(--ink); }
+  .changes li::before {
+    content: ""; position: absolute; left: 1px; top: .58em; width: 5px; height: 5px;
+    border-radius: 1px; background: var(--blue);
+  }
+  /* On an entry recorded late the list isn't news, so it takes the entry's
+     own grey rather than the blue of this cycle's changes. */
+  .feature.is-backfilled .changes .label { color: var(--slate-deep); }
+  .feature.is-backfilled .changes li::before { background: var(--slate); }
+  .matters p { color: var(--ink); }
 
-  /* A plain row's border-bottom is a straight, unrounded edge — fine between
-     two plain rows, but if the row it's touching is a rounded coloured box,
-     that straight line just cuts across the box's curve instead of framing
-     it. The coloured box's own edge already reads as a clear boundary, so
-     the line is redundant there anyway. Same at the end of a category and
-     just above a sub-section heading. Which rows those are is decided in
-     markSeams(), not by :last-child, which can only see a row's wrapper. */
-  .feature.no-line { border-bottom: none; }
-
-  .feature.new, .feature.updated, .feature.backfilled { border-radius: 7px; overflow: hidden; margin: 3px 0; }
-  .feature.new { background: var(--green); }
-  .feature.new .content { background: var(--green-soft); padding-top: 15px; padding-bottom: 15px; }
-  .feature.updated { background: var(--blue); }
-  .feature.updated .content { background: var(--blue-soft); padding-top: 15px; padding-bottom: 15px; }
-  .feature.backfilled { background: var(--slate); }
-  .feature.backfilled .content { background: var(--slate-soft); padding-top: 15px; padding-bottom: 15px; }
-
-  .badges { flex: 0 0 98px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+  /* How to see it: an instruction the reader can act on, set apart on a
+     quiet wash so it can be found again when they sit down to check. */
+  .how { padding: 6px 10px 7px; background: var(--wash); border-left: 2px solid var(--ink-ghost); }
+  .how p { color: var(--ink-soft); }
 
   /* ---- The size scale ----
-     Big / Medium / Small are three steps of ONE idea, so they're drawn as
-     three steps of one thing: the same filled chip in the same hue, three
-     tints deep, each carrying a three-segment meter with 3, 2 or 1 bars lit.
-     Nothing switches from filled to outlined, nothing drops out of the accent
-     hue into grey, and the meter states the ranking outright for a reader who
-     never reads the legend on page one. */
-  .size {
-    display: inline-flex; align-items: center; gap: 6px; border-radius: 4px;
-    font-weight: 700; font-size: 7.2pt; letter-spacing: .09em; padding: 4px 9px; white-space: nowrap;
-  }
+     Three steps of one idea, drawn as three steps of one thing: a meter with
+     one, two or three bars lit, in the accent. */
+  .size { display: inline-flex; align-items: center; gap: 5px; color: var(--ink-faint); white-space: nowrap; }
   .meter { display: inline-flex; align-items: flex-end; gap: 1.5px; height: 9px; }
-  .meter i { width: 2.5px; border-radius: .5px; display: block; }
+  .meter i { width: 3px; border-radius: .5px; display: block; background: var(--accent); }
+  .meter i.off { background: var(--accent-mid); }
   .meter i:nth-child(1) { height: 4px; } .meter i:nth-child(2) { height: 6.5px; } .meter i:nth-child(3) { height: 9px; }
-  /* An unlit slot is always paper white — the same "nothing here" on every
-     chip — so all three read as the same three-slot gauge at different
-     settings rather than three differently-drawn badges. That's also why the
-     two lighter chips are tinted deeply enough for white to show against
-     them at 2.5px wide. */
-  .size .meter i { background: var(--accent); }
-  .size .meter i.off { background: var(--paper); }
-  .size-big { background: var(--accent); color: #fff; }
-  .size-big .meter i { background: #fff; }
-  .size-medium { background: var(--accent-mid); color: var(--accent-deep); }
-  .size-small { background: var(--accent-pale); color: var(--accent-quiet); }
 
-  .tag {
-    display: inline-block; border-radius: 4px; font-weight: 800; font-size: 7.2pt;
-    letter-spacing: .1em; padding: 4px 9px; white-space: nowrap; color: #fff;
+  /* ---- Areas and sub-sections ---- */
+  .category + .category { margin-top: 30px; }
+  .area-head {
+    display: flex; align-items: baseline; gap: 10px; padding-top: 10px;
+    border-top: 2px solid var(--accent);
   }
-  .tag-new { background: var(--green); }
-  .tag-updated { background: var(--blue); }
-  .tag-backfilled {
-    background: var(--slate);
-    white-space: normal; max-width: 98px; line-height: 1.3;
+  .area-head .num {
+    flex: 0 0 auto; font-family: var(--font-display); font-size: 16pt; font-weight: 700; color: var(--accent);
+    font-variant-numeric: lining-nums;
+  }
+  .area-head h2, .area-head h3 { flex: 1; font-family: var(--font-display); font-size: 16pt; font-weight: 700; letter-spacing: -.01em; }
+  .area-head .meta { font-size: 8pt; color: var(--ink-faint); white-space: nowrap; }
+  .area-head .meta .is-new { color: var(--green-deep); font-weight: 600; }
+  .area-head .meta .is-updated { color: var(--blue-deep); font-weight: 600; }
+  .area-head .meta .is-backfilled { color: var(--slate-deep); font-weight: 600; }
+  .area-intro { margin-top: 3px; padding-bottom: 6px; font-size: 9pt; color: var(--ink-soft); max-width: 560px; break-after: avoid; }
+
+  .subsection { margin-top: 16px; }
+  .sub-head { margin-left: calc(var(--rail) + var(--gutter)); padding-bottom: 2px; }
+  .sub-name {
+    display: flex; align-items: baseline; gap: 10px;
+    font-family: var(--font-display); font-size: 12.5pt; font-weight: 700; color: var(--accent-deep);
+  }
+  .sub-intro { margin-top: 2px; font-size: 9pt; color: var(--ink-soft); max-width: var(--measure); }
+
+  /* ---- Across the product ---- */
+  .other-list { margin: 10px 0 0 calc(var(--rail) + var(--gutter)); padding: 0; list-style: none; max-width: var(--measure); }
+  .other-list li { position: relative; padding-left: 13px; margin-bottom: 6px; }
+  .other-list li::before {
+    content: ""; position: absolute; left: 1px; top: .58em; width: 5px; height: 5px;
+    border-radius: 1px; background: var(--accent);
   }
 
-  .feature .body { flex: 1; min-width: 0; }
-  .feature .name { font-family: var(--font-display); font-weight: 700; font-size: 12pt; letter-spacing: -.005em; }
-  /* Its own line under the name: set inline it wraps into the title and turns
-     a two-word rename note into visual noise. */
-  .feature .name .was {
-    display: block; font-family: var(--font-body); font-weight: 500;
-    color: var(--ink-faint); font-size: 8.5pt; line-height: 1.4; margin-top: 2px;
+  /* ======================= THE CATALOGUE ======================= */
+  /* The whole product, one line a feature, numbered: the index every other
+     number in the document points into. */
+  .rest .size-key { margin-top: 10px; }
+  .rest-area { margin-top: 22px; }
+  .rest .area-head { border-top-width: 1px; border-top-color: var(--ink); }
+  .rest .area-head .num, .rest .area-head h3 { font-size: 13pt; }
+  .rest-sub {
+    margin: 10px 0 0 64px; font-family: var(--font-display); font-weight: 700; font-size: 10pt;
+    color: var(--accent-deep); break-after: avoid;
   }
-  .feature .desc { margin-top: 4px; color: var(--ink-soft); max-width: var(--measure); }
-
-  /* ---- What changed ----
-     Reads as a continuation of the description, not as a louder rival to it.
-     The tinted card has already told the reader this entry is one of the few
-     that moved — spending a white panel, a rule and heavier ink on saying so
-     again just outranks the description, which is the thing that explains
-     what the feature actually IS. So: no panel, no border, same size and same
-     ink as the description above it, and only the small uppercase label to
-     name the list. The blue is left on the label and the bullet marks, where
-     it identifies the list without weighting it. */
-  .changes { margin-top: 10px; max-width: var(--measure); }
-  .changes .label {
-    display: block; font-weight: 800; font-size: 7.2pt; letter-spacing: .1em;
-    text-transform: uppercase; color: var(--blue-deep); margin-bottom: 5px;
-  }
-  .changes ul { margin: 0; padding: 0; list-style: none; }
-  .changes li { position: relative; padding-left: 16px; margin-bottom: 4px; color: var(--ink-soft); }
-  .changes li:last-child { margin-bottom: 0; }
-  .changes li::before {
-    content: ""; position: absolute; left: 0; top: .55em; width: 6px; height: 6px;
-    border-radius: 1.5px; background: var(--blue);
-  }
-  /* The blue on the label and the bullets identifies the list as this cycle's
-     news. On a backfilled row it isn't news, so it takes the row's own hue —
-     otherwise the one blue thing on a grey card reads as a stray highlight. */
-  .feature.backfilled .changes .label { color: var(--slate-deep); }
-  .feature.backfilled .changes li::before { background: var(--slate); }
-
-  /* ---- How to see it ----
-     Instructions, not a claim: the same quiet label as "What changed", in the
-     row's own ink, so it reads as the last thing to know about the entry. */
-  .how { margin-top: 10px; max-width: var(--measure); }
-  .how .label {
-    display: block; font-weight: 800; font-size: 7.2pt; letter-spacing: .1em;
-    text-transform: uppercase; color: var(--ink-faint); margin-bottom: 3px;
-  }
-  .how p { margin: 0; color: var(--ink-soft); }
-
-  /* ---- A short edition's two halves ----
-     Everything that moved, in full, then everything else, one line each. Each
-     half opens on a heading the size of a section, so the switch from cards
-     to lines is announced rather than stumbled into. */
-  .part { margin-top: 30px; }
-  .part-head { padding-top: 14px; border-top: 2px solid var(--accent); margin-bottom: 8px; break-after: avoid; }
-  .part-head h2 { font-family: var(--font-display); font-size: 17pt; font-weight: 700; letter-spacing: -.005em; }
-  .part-head p.sub { margin: 3px 0 0; font-size: 9pt; color: var(--ink-faint); max-width: var(--measure); }
-  .area-label {
-    margin: 16px 0 4px; font-size: 7.5pt; font-weight: 800; letter-spacing: .12em;
-    text-transform: uppercase; color: var(--ink-faint); break-after: avoid;
-  }
-  /* The catalogue is its own part of the document, read on its own: it starts
-     on a fresh page rather than leaving its heading at the foot of the last. */
-  .part.rest { break-before: page; margin-top: 0; }
-  .rest .cat-head { border-top-width: 1px; margin-top: 18px; }
-  .rest-area { break-inside: auto; }
-  .rest-sub { margin: 10px 0 2px; font-family: var(--font-display); font-weight: 700; font-size: 10.5pt; color: var(--accent-deep); }
-  .rest-list { margin: 0; padding: 0; list-style: none; }
+  .rest-list { margin: 2px 0 0; padding: 0; list-style: none; }
   .rest-list li {
-    break-inside: avoid; padding: 6px 0; border-bottom: 1px solid var(--line-soft);
-    display: flex; gap: 12px; align-items: baseline;
+    break-inside: avoid; display: grid; grid-template-columns: 34px 22px 27% 1fr 64px; column-gap: 8px;
+    align-items: baseline; padding: 5px 0; border-bottom: 1px solid var(--line-soft);
   }
-  .rest-list .sz { flex: 0 0 82px; }
-  .rest-list .sz .size { font-size: 6.5pt; padding: 3px 7px; }
-  .rest-list .nm { flex: 0 0 30%; font-family: var(--font-display); font-weight: 700; font-size: 10.5pt; }
-  .rest-list .first { flex: 1; color: var(--ink-soft); font-size: 9.5pt; }
-  /* What moved, marked where it sits in the service, and one click from its details. */
+  .rest-list .no {
+    font-family: var(--font-display); font-weight: 700; font-size: 9pt; color: var(--accent-deep);
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+  .rest-list .sz .size { transform: translateY(1px); }
+  .rest-list .nm { font-family: var(--font-display); font-weight: 700; font-size: 10pt; line-height: 1.3; }
+  .rest-list .first { color: var(--ink-soft); font-size: 8.75pt; }
+  .rest-list .mv { text-align: right; }
+  .rest-list .moved { white-space: nowrap; }
+  .rest-list .moved::after {
+    content: ""; display: inline-block; width: 6px; height: 6px; margin-left: 5px; border-radius: 1px;
+    background: currentColor; transform: translateY(-1px);
+  }
   .rest-list .moved {
-    display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 3px; vertical-align: 1px;
-    font-family: var(--font-body); font-size: 6.5pt; font-weight: 800; letter-spacing: .08em;
-    text-transform: uppercase; color: #fff; text-decoration: none;
+    font-size: 6.8pt; font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
   }
-  .rest-list .moved.is-new { background: var(--green); }
-  .rest-list .moved.is-updated { background: var(--blue); }
-  .rest-list .moved.is-backfilled { background: var(--slate); }
-  .area-intro { margin: 2px 0 6px; font-size: 9.5pt; color: var(--ink-soft); max-width: var(--measure); }
+  .rest-list .moved.is-new { color: var(--green-deep); }
+  .rest-list .moved.is-updated { color: var(--blue-deep); }
+  .rest-list .moved.is-backfilled { color: var(--slate-deep); }
 
-  /* Why a change matters: the client's side of it, in the row's own ink. */
-  .matters { margin-top: 10px; max-width: var(--measure); }
-  .matters .label {
-    display: block; font-weight: 800; font-size: 7.2pt; letter-spacing: .1em;
-    text-transform: uppercase; color: var(--ink-faint); margin-bottom: 3px;
+  .colophon {
+    margin-top: 36px; padding-top: 10px; border-top: 1px solid var(--line);
+    font-size: 7.5pt; color: var(--ink-faint); break-inside: avoid;
   }
-  .matters p { margin: 0; color: var(--ink); }
-
-  .removed-box { margin-top: 12px; background: var(--accent-deep); border-radius: 7px; overflow: hidden; break-inside: avoid; }
-  .removed-box-content { background: var(--accent-pale); margin-left: 5px; padding: 13px 16px; font-size: 9.5pt; }
-  .removed-box .name { font-family: var(--font-display); font-weight: 700; font-size: 11pt; color: var(--accent-deep); }
-  .removed-box.backfilled { background: var(--slate); }
-  .removed-box.backfilled .removed-box-content { background: var(--slate-soft); }
-  .removed-box.backfilled .name { color: var(--slate-deep); }
-
-  .other-changes { margin-top: 30px; padding-top: 14px; border-top: 2px solid var(--accent); break-inside: avoid; }
-  .other-changes h2 { font-family: var(--font-display); font-size: 15pt; font-weight: 700; }
-  .other-changes p.sub { margin: 3px 0 0; font-size: 9pt; color: var(--ink-faint); }
-  .other-changes ul { margin: 12px 0 0; padding: 0; list-style: none; max-width: var(--measure); }
-  .other-changes li { position: relative; padding-left: 16px; margin-bottom: 7px; color: var(--ink-soft); }
-  .other-changes li::before {
-    content: ""; position: absolute; left: 0; top: .55em; width: 6px; height: 6px;
-    border-radius: 1.5px; background: var(--accent);
-  }
-
-  .colophon { margin-top: 34px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 8pt; color: var(--ink-faint); break-inside: avoid; }
 `;
 
 export { LedgerHtml };

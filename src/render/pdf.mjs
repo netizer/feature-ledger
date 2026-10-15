@@ -109,7 +109,7 @@ async function checkEmbeddedFonts(page) {
 
 // Letter, in inches; the margins leave room for Chromium's running footer.
 const PAPER = { width: 8.5, height: 11 };
-const MARGIN = { top: 0.55, bottom: 0.62, left: 0.6, right: 0.6 };
+const MARGIN = { top: 0.6, bottom: 0.7, left: 0.75, right: 0.75 };
 const PX_PER_IN = 96;
 
 /**
@@ -137,6 +137,27 @@ async function releaseOversizedBlocks(page) {
 }
 
 /**
+ * A part of the document (`data-page-start`) opens a fresh page — unless what
+ * comes before it spilled a few lines onto a page of its own, where the break
+ * would leave that page almost empty. Then the part follows straight on. The
+ * first page is the one this matters for, since the summary is as long as the
+ * release, so only the first part is measured: everything above it is the
+ * front page, which lays out unpaginated much as it prints.
+ */
+async function softenPageStarts(page) {
+  await page.evaluate((pageHeight) => {
+    const first = document.querySelector("[data-page-start]");
+    if (!first) return;
+    const before = first.getBoundingClientRect().top + window.scrollY;
+    const tail = before % pageHeight;
+    if (before > pageHeight && tail < pageHeight * 0.5) {
+      first.style.breakBefore = "auto";
+      first.style.marginTop = "34px";
+    }
+  }, (PAPER.height - MARGIN.top - MARGIN.bottom) * PX_PER_IN);
+}
+
+/**
  * @param {{ checkFonts?: boolean }} opts — `checkFonts` is off when the brand
  * asked for faces this package doesn't bundle: then everything is a system
  * font by design, and the build has already warned about it.
@@ -157,6 +178,7 @@ export async function htmlToPdf(html, outPath, { checkFonts = true } = {}) {
     await page.evaluate(() => document.fonts.ready);
     if (checkFonts) await checkEmbeddedFonts(page);
     await releaseOversizedBlocks(page);
+    await softenPageStarts(page);
 
     // The printed running footer is Chromium's, not the page's — it lives in
     // the paper margin, outside the document flow, so it can't be styled from
@@ -173,15 +195,20 @@ export async function htmlToPdf(html, outPath, { checkFonts = true } = {}) {
       height: `${PAPER.height}in`,
       printBackground: true,
       margin: Object.fromEntries(Object.entries(MARGIN).map(([k, v]) => [k, `${v}in`])),
+      // Bookmarks from the headings, so the PDF reader's sidebar is a contents
+      // list of every part, area and changed entry; and tagged, so a screen
+      // reader gets the same structure.
+      outline: true,
+      tagged: true,
       displayHeaderFooter: true,
       headerTemplate: "<span></span>",
       footerTemplate: `
-        <div style="width: 100%; font-size: 7px; letter-spacing: .06em; color: #a2aab7;
-                    font-family: Helvetica, Arial, sans-serif; padding: 0 0.6in;
+        <div style="width: 100%; font-size: 7px; letter-spacing: .04em; color: #8a92a0;
+                    font-family: Helvetica, Arial, sans-serif; padding: 0 ${MARGIN.left}in;
                     display: flex; justify-content: space-between; align-items: baseline;">
           <span>${esc(footerLeft)}</span>
           <span style="font-variant-numeric: tabular-nums;">
-            <span class="pageNumber"></span> / <span class="totalPages"></span>
+            Page <span class="pageNumber"></span> of <span class="totalPages"></span>
           </span>
         </div>`,
     });

@@ -13,6 +13,20 @@
     {
       "version": 2,
       "description": "Every edition marks its own changes against the edition before it: green for a new feature, blue with a \"What changed\" note for a reworked one, and grey, marked Already in place, for one that was already part of the product and is listed for the first time. The front page counts how many of each. A first edition has nothing to compare against, so it prints as a plain inventory with no stripes."
+    },
+    {
+      "version": 3,
+      "description": "Every edition marks what moved since the last one, in words and colour: New in green, Changed in blue with a \"What changed\" note, and Already in place in grey for a feature listed for the first time. A first edition prints as a plain inventory."
+    }
+  ],
+  "events": [
+    {
+      "version": 3,
+      "kind": "change",
+      "what": "Each mark now prints as a word, New, Changed or Already in place, beside its colour, and the changes in detail are grouped in that order.",
+      "why": "A client should see at once what changed and what the product does, and find their way around the document without effort.",
+      "why_from": "person",
+      "date": "2026-10-15"
     }
   ]
 }

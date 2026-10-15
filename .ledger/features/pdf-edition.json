@@ -16,7 +16,8 @@
     },
     {
       "version": 3,
-      "description": "Each edition is a PDF: a cover with the masthead and one line of what's new, updated and unchanged, then a summary page, then every entry that moved in full, with its note and how to see it, and one line for everything else. ledger cut prints it into the client folder, and --full prints every entry in full. ledger preview prints the open release as a draft, free and kept apart so it can't be mistaken for an edition, showing the changes as recorded wherever nothing is prepared yet."
+      "description": "Each edition is a PDF: a first page with the counts and what's new and what changed, then each change in full with how to see it, then one line for every feature. Each feature has one number throughout, and the PDF has bookmarks. ledger cut prints an edition; ledger preview prints a draft.",
+      "how_to_see": "Run ledger preview and open the PDF. The numbers after each item on the first page lead to the entries that print the same number in their margin."
     }
   ],
   "events": [
@@ -51,6 +52,14 @@
       "why": "Reprinting every unchanged entry in full was most of an edition's length: this ledger's own second edition ran to 13 pages for 25 features. A preview is the free look at the release, and tokens are spent only when someone asks for them.",
       "why_from": "person",
       "date": "2026-10-12"
+    },
+    {
+      "version": 3,
+      "kind": "change",
+      "what": "Every feature now carries one number, such as 2.4, which the first page, the changes in detail and the full list all cite, and the PDF has bookmarks for every part, area and changed entry.",
+      "why": "A client should see at once what changed and what the product does, and find their way around the document without effort.",
+      "why_from": "person",
+      "date": "2026-10-15"
     }
   ]
 }

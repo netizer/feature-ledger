@@ -90,22 +90,21 @@ export function wording(config) {
         `Everything ${product} does today, in plain language.`,
       ) + " Each entry is one capability you could ask for by name, sized so the biggest pieces stand out.",
       colophon: `Prepared for ${config.prepared_for}; every entry describes behaviour that is built and running.`,
-      // The page after the cover, from the second edition on, and the
-      // headings of its first two lists. {date} is " (March 4, 2026)", the
-      // last edition's date, or nothing.
+      // The first page, from the second edition on, and the headings of its
+      // first two lists, which the details reuse for their two groups.
       summary_title: "What's different in this edition",
-      summary_intro: "The numbers after an item link to its details.",
+      summary_intro: "The numbers after each item are the entries it covers. Every feature keeps its number throughout this document.",
       summary_new: "What's new",
       summary_updated: "What changed",
       // The two parts of every edition after the first page: what moved, in
       // detail, and the whole service, one line per capability.
-      changed_title: "What's new and what changed, in detail",
-      changed_intro: "Each capability added or changed in this edition: what it is, what changed, and how to see it for yourself.",
-      rest_title: `What ${product} provides`,
-      rest_intro: "Every capability, area by area. A coloured mark means it moved in this edition, and its details are above.",
+      changed_title: "The changes in detail",
+      changed_intro: "Each feature added, changed or removed in this edition: what it does, what changed, and how to see it for yourself.",
+      rest_title: `Everything ${product} does`,
+      rest_intro: "Every feature, area by area, numbered as in the rest of this document. A status means it moved in this edition, and links to its details.",
       matters_label: "Why it matters to you",
-      // Under the first page's counts: what the colours and the sizes mean.
-      key_sizes: "Size is how much of the service a capability is: Big, one it is chosen for; Medium, one in its own right inside a bigger one; Small, one narrow enough to describe in a line.",
+      // Beside the size meter, wherever sizes are compared.
+      key_sizes: "Size is how much of the service a feature is: Big, one it is chosen for; Medium, one in its own right inside a bigger one; Small, one narrow enough to describe in a line.",
     },
   };
 
