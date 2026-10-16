@@ -2,7 +2,7 @@ import { escapeHtml as h, longDate } from "../util.mjs";
 import { wording, redraftBody } from "../wording.mjs";
 import { resolveBrand, mastheadHtml } from "./brand.mjs";
 import { fontFaceCss, SYMBOL_FACE } from "./fonts.mjs";
-import { prepareReport, prepareLine, hasLists } from "../compose.mjs";
+import { prepareReport, prepareLine, hasLists, hasSummary } from "../compose.mjs";
 
 /**
  * The client-facing "feature ledger" for one specific release — an archival
@@ -17,8 +17,8 @@ import { prepareReport, prepareLine, hasLists } from "../compose.mjs";
  * the corpus is a baseline of a codebase that already existed.
  *
  * Every later edition is short without dropping work: a first page that is
- * the update (the counts, and what's new and what changed as short lists),
- * then every new, updated, backfilled and removed entry in full — its
+ * the update (the counts, a list of the three parts, and one line for each
+ * entry that moved), then every new, updated, backfilled and removed entry in full — its
  * description, its "What changed" note and how to see it — and then one line
  * for every capability, the catalogue. Reprinting every unchanged entry in
  * full every time was most of an edition's length. `full` prints them all in
@@ -49,7 +49,7 @@ const firstSentence = (text) => text.trim().split(/(?<=[.!?])\s+(?=[A-Z“"(])/)
 const CLOSING_IDS = { removed: "closing-removed", goneEarlier: "closing-gone-earlier", other: "closing-other" };
 
 /** Anchors for the two halves of a short edition. */
-const SECTION_IDS = { changed: "whats-changed", rest: "everything-else" };
+const SECTION_IDS = { summary: "whats-different", changed: "whats-changed", rest: "everything-else" };
 
 class LedgerHtml {
   constructor(project, version, label, { full = false } = {}) {
@@ -308,13 +308,6 @@ class LedgerHtml {
     return `<div class="how"><span class="label">How to see it</span><p>${h(state.how_to_see)}</p></div>`;
   }
 
-  /** Why a change matters to the client, when `prepare` was given a reason to say so. */
-  mattersPanel(feature) {
-    const text = this.project.compositionOf(this.version)?.matters?.[feature.id];
-    if (!text) return "";
-    return `<div class="matters"><span class="label">${h(this.words.pdf.matters_label)}</span><p>${h(text)}</p></div>`;
-  }
-
   /**
    * One entry, on a two-column grid: a narrow margin with its number, its
    * status and its size, and the text beside it. The margin is what a reader
@@ -340,7 +333,6 @@ class LedgerHtml {
       `<div class="body"><h${level} class="name">${h(s.name)}</h${level}>${was}` +
       `<p class="desc${brief ? " is-brief" : ""}">${h(desc)}</p>` +
       `${updated ? this.changesPanel(s) : ""}` +
-      `${row.badge ? this.mattersPanel(f) : ""}` +
       `${row.badge || !this.short ? this.howPanel(s) : ""}</div></article>`;
   }
 
@@ -373,12 +365,16 @@ class LedgerHtml {
    * ("What's new", "What changed"), so a reader can see what differs from the
    * last edition without turning a page.
    *
-   * The lists are the release's summary (src/compose.mjs): each item is a
-   * sentence written to be read on its own, followed by the numbers of the
-   * entries it sums up — the same numbers those entries print in the margin
-   * of the details and in the catalogue, so a reference can be followed on
-   * paper as well as clicked. An entry the summary left out still prints in
-   * the details, and is cited by nothing here.
+   * The lists are the details read at one sentence each: the same groups,
+   * the same entries in the same order, so their counts are the counts at
+   * the top of the page. Each line is the release's sentence for that entry
+   * (`summary` in src/compose.mjs), on what it gives the reader, and links
+   * to the entry; the number after it is the one the entry prints in the
+   * margin of the details and in the catalogue, so it can be followed on
+   * paper as well as clicked.
+   *
+   * An edition prepared before that wrote items that each summed up several
+   * entries, followed by all their numbers, and reprints that way.
    *
    * Removals and product-wide notes list themselves. A removal's item is the
    * name of what went; the reason is one link away. A note's is its first
@@ -413,15 +409,26 @@ class LedgerHtml {
     };
     const curated = (key) => (written?.[key] ?? []).map((it) =>
       line(h(it.text), (it.covers ?? []).filter((id) => printed.has(id)).sort(byNumber).map(ref).join("")));
-    const entries = written ? curated : (badge) => byName({ new: "new", changed: "updated", in_place: "backfilled" }[badge]);
+    // One line per entry, in the order the details print them. An entry with
+    // no sentence yet (a draft) is listed by its name.
+    const perEntry = (badge) => rows.filter((r) => r.badge === badge).map((r) => {
+      const text = written.summary[r.feature.id];
+      return line(`<a href="#${h(this.featureId(r.feature.id))}">${h(text ?? r.state.name)}</a>`, ref(r.feature.id));
+    });
+    const badgeOf = { new: "new", changed: "updated", in_place: "backfilled" };
+    const entries = !written ? (key) => byName(badgeOf[key])
+      : hasSummary(written) ? (key) => perEntry(badgeOf[key]) : curated;
     const plain = (href, text) => line(`<a href="#${h(href)}">${h(text)}</a>`, "");
+    // A removal's line is its sentence, on why it went and what to use
+    // instead, where the release has one; its name otherwise.
+    const goneLine = ([f]) => plain(`gone-${f.id}`, (written && hasSummary(written) && written.summary[f.id]) || f.currentName);
 
     const groups = [
       ["new", w.summary_new, entries("new")],
       ["updated", w.summary_updated, entries("changed")],
       ["backfilled", this.words.tags.backfilled, entries("in_place")],
-      ["removed", "No longer available", removed.map(([f]) => plain(`gone-${f.id}`, f.currentName))],
-      ["gone", this.words.tags.backfilled_removed, goneEarlier.map(([f]) => plain(`gone-${f.id}`, f.currentName))],
+      ["removed", "No longer available", removed.map(goneLine)],
+      ["gone", this.words.tags.backfilled_removed, goneEarlier.map(goneLine)],
       ["other", OTHER_TITLE, other.map((c) => plain(CLOSING_IDS.other, firstSentence(c.description)))],
     ].filter(([, , items]) => items.length);
     if (!groups.length) return "";
@@ -436,12 +443,33 @@ class LedgerHtml {
     // {date} in a project's own intro: " (March 4, 2026)", the last edition's date.
     const predDate = longDate(this.predecessor.date);
     const intro = w.summary_intro.replaceAll("{date}", predDate ? ` (${predDate})` : "");
-    return `<section class="summary">
+    // A count beside each heading when every line is one entry, as the
+    // details print it; an older edition's items don't add up to its entries.
+    const counted = !written || hasSummary(written);
+    return `<section class="summary" id="${SECTION_IDS.summary}">
     <h2>${h(w.summary_title)}</h2>
-    <p class="sub">${h(intro)}</p>${draftNote}
+    <p class="sub">${h(written && !hasSummary(written) ? w.summary_intro_grouped : intro)}</p>${draftNote}
     ${groups.map(([key, label, items]) => `<div class="sum-group is-${key}">` +
-      `<h3>${h(label)}</h3><ol>${items.join("")}</ol></div>`).join("\n    ")}
+      `<h3>${h(label)}${counted && key !== "other" ? `<span class="count">${items.length}</span>` : ""}</h3>` +
+      `<ol>${items.join("")}</ol></div>`).join("\n    ")}
   </section>`;
+  }
+
+  /**
+   * A short edition's map of itself, on its first page: its three parts, each
+   * a link, with a line on what each one is for, so a reader knows what the
+   * document holds before deciding how far to read.
+   */
+  partsHtml() {
+    if (!this.short) return "";
+    const w = this.words.pdf;
+    const parts = [
+      [SECTION_IDS.summary, w.summary_title, w.summary_role],
+      [SECTION_IDS.changed, w.changed_title, w.changed_role],
+      [SECTION_IDS.rest, w.rest_title, w.rest_role],
+    ].map(([id, title, role], i) => `<li><a href="#${id}"><span class="num">${i + 1}</span>` +
+      `<span class="nm">${h(title)}</span><span class="role">${h(role)}</span></a></li>`).join("");
+    return `<nav class="contents parts"><h2 class="kicker">In this edition</h2><ol>${parts}</ol></nav>`;
   }
 
   /**
@@ -709,6 +737,7 @@ ${this.project.themeCss()}
     ${overview ? `<p class="overview">${h(overview)}</p>` : this.predecessor ? "" : `<p class="intro">${h(w.intro)}</p>`}
     ${redraftBlock}
     ${this.tallyHtml(removed.length)}
+    ${this.partsHtml()}
     ${summary}
     ${this.contentsHtml(closing)}
     ${this.short ? "" : this.sizeKey()}
@@ -917,6 +946,11 @@ const STYLES = `
   .contents .ct { flex: 0 0 auto; color: var(--ink-faint); font-size: 8pt; font-variant-numeric: tabular-nums; }
   .contents li.closing .num { color: var(--ink-ghost); }
   .contents li.closing .nm { font-weight: 400; color: var(--ink-soft); }
+  /* The parts of a short edition: one column, each with what it is for. */
+  .contents.parts { margin-top: 22px; }
+  .contents.parts ol { columns: 1; }
+  .contents.parts li a { flex-wrap: wrap; row-gap: 1px; }
+  .contents.parts .role { flex: 0 0 100%; padding-left: 23px; font-size: 8.5pt; color: var(--ink-soft); }
   /* The catalogue's map of itself: quieter than a front-page contents, since
      it sits under a part heading rather than opening the document. */
   .contents.is-index { margin-top: 16px; padding-top: 8px; border-top-color: var(--line); }
@@ -994,7 +1028,7 @@ const STYLES = `
      news: it steps back, and what changed below it carries the ink. */
   .feature .desc.is-brief { color: var(--ink-soft); }
 
-  .changes, .matters, .how { margin-top: 9px; }
+  .changes, .how { margin-top: 9px; }
   .label { display: block; color: var(--ink-faint); margin-bottom: 2px; }
   .changes .label { color: var(--blue-deep); }
   .changes.is-draft .label { font-style: italic; }
@@ -1008,7 +1042,6 @@ const STYLES = `
      own grey rather than the blue of this cycle's changes. */
   .feature.is-backfilled .changes .label { color: var(--slate-deep); }
   .feature.is-backfilled .changes li::before { background: var(--slate); }
-  .matters p { color: var(--ink); }
 
   /* How to see it: an instruction the reader can act on, set apart on a
      quiet wash so it can be found again when they sit down to check. */

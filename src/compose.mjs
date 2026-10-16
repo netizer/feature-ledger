@@ -4,8 +4,7 @@ import { recordedLines } from "./store.mjs";
 /**
  * What an edition says about what moved: a "What changed" note on every
  * updated entry, the short lists it opens with (what's new, what changed and,
- * when there is any, what was already in place), and the message it goes out
- * with.
+ * when there is any, what was already in place).
  *
  * All of it is written once per release, for the whole release, by
  * `ledger prepare`, from three things the CLI already holds: each entry as the
@@ -19,30 +18,37 @@ import { recordedLines } from "./store.mjs";
  *
  *   overview  two or three sentences that open the edition: what this release is about
  *   changes   { id: ["note", …] } for every updated entry
- *   matters   { id: "sentence" }, optional: why a change matters to the client,
- *             only from a reason someone gave
- *   new, changed, in_place   the summary lists, items { text, covers }
- *   quiet     the entries the summary leaves out on purpose (they still print in full)
- *   message   the text to send with the edition
+ *   summary   { id: "sentence" } for every client-facing entry in the release:
+ *             the first page's line for it, saying what it gives the client,
+ *             or, for one removed, why it went and what to use instead
  *   prepared  what `ledger prepare complete` saw: { date, commit, entries: { id: n }, notes }
  *
  * `prepared.entries` counts, per entry, the events it was written from.
  * Events are only ever appended, so one beyond that count is news since, and
  * an entry missing from it arrived since. Editing the words by hand never
  * counts: nothing the product did has moved.
+ *
+ * Editions prepared before the first page had one line per entry carry
+ * `new`, `changed` and `in_place` lists of { text, covers } instead of
+ * `summary`, and `quiet` for the entries they left out. They reprint that
+ * way; a release still being prepared is written with `summary`. They may
+ * also carry `matters` (why a change mattered, now said by the summary) and
+ * `message` (a text to send with the edition, which nobody used), which
+ * nothing reads any more.
  */
 
-/** The lists, in the order the edition prints them, keyed as in the file. */
+/** The lists of an older composition, in the order its edition prints them, keyed as in the file. */
 export const LISTS = [["new", "What's new"], ["changed", "What changed"], ["in_place", "Already in place"]];
 
-/** Long enough that it has stopped being an item in a list. */
-export const ITEM_LIMIT = 160;
+/** Long enough that it has stopped being a line in a list. */
+export const ITEM_LIMIT = 220;
 
 /** Sentences per change in a "What changed" note before it is worth a word. */
 export const NOTE_SENTENCES = 1;
 
-/** Words in a summary item before it stops reading at a glance. */
-export const ITEM_WORDS = 12;
+/** Words in a summary sentence before it stops reading at a glance. It has
+ *  to say what the reader gains, not just name it, so it gets some room. */
+export const ITEM_WORDS = 25;
 
 /** Sentences in the overview that opens the edition. */
 export const OVERVIEW_SENTENCES = 3;
@@ -87,15 +93,28 @@ export function kindAt(feature, version) {
 /** An entry that existed in the last edition, and so gets a "What changed" note. */
 export const needsNote = (feature, version) => feature.firstVersion < version && !feature.entryAt(version)?.removed;
 
-/** Every summary item, with the list it is in. */
+/** Whether a composition has the first page as one line per entry. */
+export const hasSummary = (composition) => Boolean(composition?.summary) &&
+  typeof composition.summary === "object" && !Array.isArray(composition.summary);
+
+/** Whether a composition carries the older lists, items that each sum up several entries. */
+export const hasOldLists = (composition) => Boolean(composition) &&
+  ["new", "changed", "in_place", "quiet"].some((k) => composition[k] !== undefined);
+
+/** Whether a composition says anything for the first page at all. An edition
+ *  cut before summaries existed has notes only, and prints its entries by name. */
+export const hasLists = (composition) => hasSummary(composition) || hasOldLists(composition);
+
+/**
+ * Every line of the first page a composition writes, as { list, text,
+ * covers }: one per entry from `summary`, or the items of an older one's lists.
+ */
 export function summaryItems(composition) {
+  if (hasSummary(composition)) {
+    return Object.entries(composition.summary).map(([id, text]) => ({ list: "summary", id, text, covers: [id] }));
+  }
   return LISTS.flatMap(([key]) => (Array.isArray(composition?.[key]) ? composition[key] : []).map((item) => ({ list: key, ...item })));
 }
-
-/** Whether a composition carries summary lists at all. An edition cut before
- *  summaries existed has notes only, and prints its entries by name. */
-export const hasLists = (composition) => Boolean(composition) &&
-  ["new", "changed", "in_place", "quiet"].some((k) => composition[k] !== undefined);
 
 /* ---- what is wrong with one ------------------------------------------- */
 
@@ -121,17 +140,20 @@ export function shapeProblems(composition) {
   if (composition.quiet !== undefined && !(Array.isArray(composition.quiet) && composition.quiet.every((id) => typeof id === "string"))) {
     problems.push("\"quiet\" is a list of entry ids");
   }
-  for (const key of ["message", "overview"]) {
+  for (const key of ["overview"]) {
     if (composition[key] !== undefined && composition[key] !== null && typeof composition[key] !== "string") {
       problems.push(`"${key}" is text`);
     }
   }
-  const matters = composition.matters;
-  if (matters !== undefined && (typeof matters !== "object" || Array.isArray(matters) ||
-      !Object.values(matters).every((v) => typeof v === "string" && !isBlank(v)))) {
-    problems.push("\"matters\" maps an entry id to one sentence on why the change matters to the client");
+  const summary = composition.summary;
+  for (const key of ["matters", "message"]) {
+    if (composition[key] !== undefined) problems.push(OBSOLETE[key]);
   }
-  for (const item of summaryItems(composition)) {
+  if (summary !== undefined && (!hasSummary(composition) ||
+      !Object.values(summary).every((v) => typeof v === "string" && !isBlank(v)))) {
+    problems.push("\"summary\" maps an entry id to one sentence on what it gives the client");
+  }
+  for (const item of hasSummary(composition) ? [] : summaryItems(composition)) {
     const where = `an item in "${item.list}"`;
     if (typeof item.text !== "string" || isBlank(item.text)) problems.push(`${where} has no "text"`);
     if (!Array.isArray(item.covers) || !item.covers.length || !item.covers.every((id) => typeof id === "string")) {
@@ -152,25 +174,27 @@ export function shapeProblems(composition) {
 
 /**
  * Whether a composition accounts for the release as it stands: every entry
- * covered or quiet, every updated entry with its note, no note on an entry
- * the client has never seen, nothing named that isn't an entry. What
- * `prepare complete` refuses, so the agent fixes it while it is still in the
- * session.
+ * with its line on the first page, every updated entry with its note, no
+ * note on an entry the client has never seen, nothing named that isn't an
+ * entry. What `prepare complete` refuses, so the agent fixes it while it is
+ * still in the session.
  */
 export function accountingProblems(project, version, composition) {
   const targets = composeTargets(project, version);
-  const ids = new Set(targets.map((f) => f.id));
+  const all = releaseEntries(project, version);
+  const ids = new Set(all.map((f) => f.id));
   const problems = [...shapeProblems(composition)];
-  const named = new Set([
-    ...summaryItems(composition).flatMap((i) => (Array.isArray(i.covers) ? i.covers : [])),
-    ...(Array.isArray(composition.quiet) ? composition.quiet : []),
-  ]);
-  const uncovered = targets.filter((f) => !named.has(f.id)).map((f) => f.id);
-  if (uncovered.length) {
-    problems.push(`in no item's "covers" and not in "quiet": ${uncovered.join(", ")}. Every client-facing entry in ` +
-      `v${version} is summed up by an item or left off the summary on purpose`);
+  if (hasOldLists(composition)) {
+    problems.push(`"new", "changed", "in_place" and "quiet" are how an older edition wrote its first page. Write ` +
+      `"summary" instead, one sentence per entry, and remove them`);
   }
-  const unknown = [...named].filter((id) => !ids.has(id));
+  const summary = hasSummary(composition) ? composition.summary : {};
+  const missing = all.filter((f) => isBlank(summary[f.id])).map((f) => f.id);
+  if (missing.length) {
+    problems.push(`no sentence in "summary": ${missing.join(", ")}. Every client-facing entry in v${version}, ` +
+      "removed ones included, has one line on the first page");
+  }
+  const unknown = Object.keys(summary).filter((id) => !ids.has(id));
   if (unknown.length) {
     problems.push(`not a client-facing entry in v${version}: ${unknown.join(", ")}. \`ledger prepare\` lists the ones that are`);
   }
@@ -185,10 +209,14 @@ export function accountingProblems(project, version, composition) {
     problems.push(`a "What changed" note on what isn't an updated entry in v${version}: ${misplaced.join(", ")}. ` +
       "A new entry has no \"before\" for the client; its description says what it does");
   }
-  const strays = Object.keys(composition.matters ?? {}).filter((id) => !ids.has(id));
-  if (strays.length) problems.push(`"matters" names what isn't a client-facing entry in v${version}: ${strays.join(", ")}`);
   return problems;
 }
+
+/** What a composition still being prepared may no longer carry, and why. */
+const OBSOLETE = {
+  matters: "\"matters\" is no longer printed: the entry's sentence in \"summary\" says what the change gives the client. Remove it",
+  message: "\"message\" is no longer written: an edition no longer goes out with a message. Remove it",
+};
 
 /** Summary items past ITEM_WORDS: [text, words]. */
 export function longItems(composition) {
@@ -253,6 +281,11 @@ export function prepareReport(project, version = project.releases.current.versio
   if (!prepared) {
     return { ...base, ok: false, never: true, since: recorded, arrived: entries.map((f) => f.id), moved: [], answered: [], notesSince: notes };
   }
+  // Prepared before the first page had a line per entry: the whole first
+  // page is still to write, whatever has moved since.
+  if (base.applies && hasOldLists(composition) && !hasSummary(composition)) {
+    return { ...base, ok: false, reshape: true, since: 0, arrived: [], moved: [], answered: [], notesSince: 0 };
+  }
   const arrived = entries.filter((f) => !(f.id in prepared.entries)).map((f) => f.id);
   const moved = entries.filter((f) => f.id in prepared.entries && f.eventsAt(version).length > prepared.entries[f.id]).map((f) => f.id);
   const notesSince = Math.max(0, notes - (prepared.notes ?? 0));
@@ -277,6 +310,7 @@ export function prepareLine(report) {
   if (report.never) return `${plural(report.recorded, "change")} recorded, and \`ledger prepare\` hasn't run for v${report.version}`;
   const when = report.prepared.date ? ` (${longDate(report.prepared.date)})` : "";
   if (report.ok) return `prepared${when}, and nothing recorded since`;
+  if (report.reshape) return `prepared${when} with a first page that sums up several entries per line, so it needs \`ledger prepare\` again for one line per entry`;
   const where = [...report.arrived, ...report.moved];
   const what = [where.length ? list(where) : null, report.notesSince ? plural(report.notesSince, "product-wide note") : null]
     .filter(Boolean).join(", and ");
@@ -325,8 +359,8 @@ export function ordered(project, composition) {
   const order = releaseEntries(project, composition.version).map((f) => f.id);
   const byOrder = (a, b) => (order.indexOf(a) + 1 || 1e9) - (order.indexOf(b) + 1 || 1e9);
   out.changes = Object.fromEntries(Object.keys(changes).sort(byOrder).map((id) => [id, changes[id]]));
-  if (composition.matters && Object.keys(composition.matters).length) {
-    out.matters = Object.fromEntries(Object.keys(composition.matters).sort(byOrder).map((id) => [id, composition.matters[id]]));
+  if (hasSummary(composition)) {
+    out.summary = Object.fromEntries(Object.keys(composition.summary).sort(byOrder).map((id) => [id, composition.summary[id]]));
   }
   for (const [key] of LISTS) {
     if (Array.isArray(composition[key]) && composition[key].length) {
@@ -336,7 +370,6 @@ export function ordered(project, composition) {
   // Only when there is one: a composition with no lists at all is how an
   // edition knows to list its entries by name instead.
   if (composition.quiet !== undefined) out.quiet = composition.quiet;
-  if (!isBlank(composition.message)) out.message = composition.message;
   // Anything else an older edition's composition carries is kept as it is.
   for (const [key, value] of Object.entries(composition)) if (!(key in out) && key !== "prepared" && value !== undefined) out[key] = value;
   if (composition.prepared) out.prepared = composition.prepared;
@@ -355,46 +388,6 @@ export function frozenForCut(project, version) {
   const changes = { ...(existing?.changes ?? {}) };
   for (const f of unprepared) changes[f.id] = recordedLines(f.eventsAt(version));
   return ordered(project, { ...(existing ?? {}), version, changes });
-}
-
-/* ---- the message ------------------------------------------------------ */
-
-/**
- * The text to paste into an email or a chat with the edition: one opening
- * line, the summary items as a short list, and a line on anything removed.
- * `prepare` writes one that reads well; this is the plain one a cut builds
- * when it didn't.
- */
-export function defaultMessage(project, version) {
-  const product = project.brand.name ?? project.config.product;
-  const label = project.releases.printedAs(version);
-  const lines = [`Version ${label} of the ${product} feature ledger is attached.`];
-  const composition = project.compositionOf(version);
-  if (!isBlank(composition?.overview)) lines.push("", composition.overview.trim());
-  const previous = project.releases.predecessorOf(version);
-  if (previous) {
-    const items = summaryItems(composition);
-    const fallback = composeTargets(project, version).map((f) => f.stateAt(version).name);
-    const shown = items.length ? items.map((i) => i.text) : fallback;
-    if (shown.length) {
-      lines.push("", `Since the edition of ${longDate(previous.date)}:`, "");
-      for (const t of shown) lines.push(`- ${t}`);
-    }
-    const removed = releaseEntries(project, version).filter((f) => f.entryAt(version).removed);
-    if (removed.length) {
-      lines.push("", `No longer available: ${removed.map((f) => f.currentName).join(", ")}. The edition says why.`);
-    }
-  } else {
-    const n = project.featureSet.features({ audience: "user" }).filter((f) => { const s = f.stateAt(version); return s && !s.removed; }).length;
-    lines.push("", `It describes the ${plural(n, "capability", "capabilities")} ${product} has today, one entry each.`);
-  }
-  return `${lines.join("\n")}\n`;
-}
-
-/** The message a cut writes: what `prepare` wrote, or the plain one. */
-export function messageFor(project, version) {
-  const written = project.compositionOf(version)?.message;
-  return isBlank(written) ? defaultMessage(project, version) : `${String(written).trimEnd()}\n`;
 }
 
 const clip = (s, n) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);

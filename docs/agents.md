@@ -178,7 +178,8 @@ ledger init --agents none               # wire nothing
 The stanza says the ledger exists, that a feature change isn't finished until
 the ledger records it, and lists the commands. It tells the agent to record
 facts — what moved, in a sentence a client could read, and why, never invented
-— with how to see it when it knows; draws the line between recording a change
+and taken from the conversation when you already gave or agreed to it — with
+how to see it when it knows; draws the line between recording a change
 and rewording an entry; names the project's tone; and says not to commit, and
 not to run `prepare` or `cut` unless asked. `ledger style set` and
 `ledger migrate` rewrite it in every agent file, so it never describes a tool

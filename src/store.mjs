@@ -17,9 +17,9 @@ export const LEDGER_DIRNAME = ".ledger";
  *     releases.json        the version timeline
  *     subcategories.json   optional sub-section headings
  *     other-changes.json   changes belonging to no single feature
- *     compositions.json    per release, the "What changed" notes, the summary and the
- *                          message its edition goes out with, and what `ledger prepare`
- *                          had seen when it wrote them
+ *     compositions.json    per release, the overview, the "What changed" notes and the
+ *                          summary its edition prints, and what `ledger prepare` had
+ *                          seen when it wrote them
  *     redrafts.json        every time the corpus was rewritten from scratch, and whether
  *                          the new one has been checked against the old
  *     state.json           how far the agent tasks have got: the style each entry was
@@ -339,8 +339,8 @@ export class Project {
   }
 
   /**
-   * What was written for one release: its "What changed" notes, the summary
-   * lists its edition opens with, the message it goes out with, and what
+   * What was written for one release: its overview, its "What changed" notes,
+   * the summary its edition opens with, and what
    * `ledger prepare` had seen when it wrote them. One per release; an edition
    * prints the one it was cut with, and a cut one is never rewritten.
    */

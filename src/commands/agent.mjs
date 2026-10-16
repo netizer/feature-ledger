@@ -151,9 +151,10 @@ export function agentPlan(project, { force = false } = {}) {
   if (inventory && !report.ok) {
     plan.notes.push(`v${current.version} is a first edition, so \`ledger prepare\` is optional: read it with \`ledger preview\`, then cut it.`);
   } else if (!report.ok && !report.nothing) {
-    if (report.never || !report.prepared) {
+    if (report.never || !report.prepared || report.reshape) {
       due("prepare", `prepare: write the client's text for v${report.version}`,
-        [`${plural(report.recorded, "change")} recorded, not yet prepared`, ...(codeLine ? [codeLine] : [])]);
+        [report.reshape ? "prepared with a first page that sums up several entries per line; it now has one per entry"
+          : `${plural(report.recorded, "change")} recorded, not yet prepared`, ...(codeLine ? [codeLine] : [])]);
     } else {
       const moved = [...report.arrived, ...report.moved];
       const scope = [];

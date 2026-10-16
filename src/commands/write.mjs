@@ -204,8 +204,9 @@ function whyOf(flags, data, id) {
   }
   if (isBlank(data.why)) {
     fail(`${id} existed before this release, so the change needs "why": the reason it moved. The client can see ` +
-      "what it does now from the description; the reason is the part only the person who decided it knows. If you " +
-      "don't know, ask. If nobody can say, pass --why-unknown, which records the gap for `ledger prepare` to ask " +
+      "what it does now from the description; the reason is the part only the person who decided it knows. If they " +
+      "gave it, or agreed to it, earlier in your conversation, that is the reason: pass it as \"why\". Otherwise ask. " +
+      "If nobody can say, pass --why-unknown, which records the gap for `ledger prepare` to ask " +
       "about rather than a plausible-sounding guess. A reason read off a commit message takes --why-from commit.");
   }
   const from = data.why_from ?? "person";

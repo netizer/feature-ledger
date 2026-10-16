@@ -16,8 +16,8 @@
     },
     {
       "version": 3,
-      "description": "Each edition is a PDF whose first page gives an overview of the release, the counts, and what's new and what changed, followed by each change in full with how to see it, then one line for every feature. Every feature keeps one number throughout, and the PDF has bookmarks.",
-      "how_to_see": "Run ledger preview and open the PDF. The numbers after each item on the first page lead to the entries that print the same number in their margin."
+      "description": "Each edition is a PDF whose first page gives an overview of the release, the counts, a list of its parts, and one sentence for each feature that moved, then each change in full and one line for every feature. Every feature keeps one number throughout, and the PDF has bookmarks.",
+      "how_to_see": "Run ledger preview and open the PDF. Under the counts, the first page lists the three parts; each line of What's different in this edition leads to the entry that prints the same number in its margin."
     }
   ],
   "events": [
@@ -74,6 +74,30 @@
       "kind": "change",
       "what": "The list of every feature opens on its own contents: each area with its feature count and how many of its features are new, changed or already in place.",
       "why": "The document should be easy to read: the previous one was a lot of text, with not enough value for the reader per page.",
+      "why_from": "person",
+      "date": "2026-10-16"
+    },
+    {
+      "version": 3,
+      "kind": "change",
+      "what": "The first page now lists the edition's three parts, each a link with a line on what it is for.",
+      "why": "The edition has several parts, and nothing at the start said what they were or let a reader jump to them, so its structure was hard to follow.",
+      "why_from": "person",
+      "date": "2026-10-16"
+    },
+    {
+      "version": 3,
+      "kind": "change",
+      "what": "The first page now gives one sentence for each new, changed or in-place feature, in the order the details give them, instead of items that each summed up several features.",
+      "why": "The grouped items didn't add up to the counts above them, and a changed feature could appear under What's new, so the first page disagreed with the details it summed up.",
+      "why_from": "person",
+      "date": "2026-10-16"
+    },
+    {
+      "version": 3,
+      "kind": "change",
+      "what": "On the first page, a removed feature now has a sentence on why it went and what to use instead, and an entry no longer prints a separate Why it matters line.",
+      "why": "A removed feature listed by name alone told the reader nothing, and the Why it matters line said again what the entry's sentence on the first page already says.",
       "why_from": "person",
       "date": "2026-10-16"
     }

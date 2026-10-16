@@ -42,7 +42,7 @@ change:
 ```
 
 Change `name`, `description` and `how_to_see`, on whichever `history` entry
-carries them, and `dev_notes`. The "What changed" notes and summary items an edition prints
+carries them, and `dev_notes`. The "What changed" notes and summary sentences an edition prints
 live in `.ledger/compositions.json`, under each release's `changes`, `new`,
 `changed` and `in_place`: rewrite their text there the same way. Nothing else
 — not `events`, which are facts somebody recorded, not prose. There is no

@@ -2,8 +2,8 @@ import { openProject } from "../store.mjs";
 import { fail, today, longDate, isBlank, COPY_BLOCK } from "../util.mjs";
 import * as git from "../git.mjs";
 import {
-  LISTS, ITEM_LIMIT, ITEM_WORDS, composes, composeTargets, releaseEntries, kindAt, needsNote, accountingProblems,
-  shapeProblems, textProblems, prepareReport, prepareLine, unknownReasons, stamped, messageFor,
+  LISTS, ITEM_LIMIT, ITEM_WORDS, hasSummary, composes, composeTargets, releaseEntries, kindAt, needsNote, accountingProblems,
+  shapeProblems, textProblems, prepareReport, prepareLine, unknownReasons, stamped,
 } from "../compose.mjs";
 import { eventLine } from "../diff.mjs";
 import { codeSince, stampSweep } from "../state.mjs";
@@ -14,8 +14,8 @@ const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 /**
  * `ledger prepare`: the one step that spends tokens. It prints a brief for an
  * interactive agent session that turns what was recorded into what the
- * client reads — the "What changed" notes, the summary page, how to see each
- * entry, and the message to send — and, in the same session, finds work
+ * client reads — the overview, the "What changed" notes, a sentence per entry
+ * for the first page, and how to see each entry — and, in the same session, finds work
  * nobody recorded, asks the developer the reasons nobody gave, and checks
  * what it wrote against the code. `ledger prepare complete` checks what was
  * written and stamps what it was written from.
@@ -43,11 +43,10 @@ export async function cmdPrepare({ flags, positional }) {
 
 /**
  * Refuses what would print wrong whatever the prose says: an updated entry
- * with no note, a note on an entry the client has never seen, an entry the
- * summary neither covers nor leaves off, an id that is no entry in this
- * release, and an item that won't read as a sentence of its own. Then stamps
- * what it was written from, and prints the summary and the message the way
- * the edition will.
+ * with no note, a note on an entry the client has never seen, an entry with
+ * no line on the first page, an id that is no entry in this release, and a
+ * line that won't read as a sentence of its own. Then stamps
+ * what it was written from, and prints the summary the way the edition will.
  */
 function complete(flags) {
   const project = openProject(flags);
@@ -82,15 +81,12 @@ function complete(flags) {
 
   const notes = Object.keys(next.changes).length;
   out(`prepared v${version} (${next.prepared.date})` + (composes(project, version)
-    ? `: ${plural(notes, "\"What changed\" note")}, and a summary of ${plural(composeTargets(project, version).length, "client-facing entry", "client-facing entries")}.`
+    ? `: ${plural(notes, "\"What changed\" note")}, and a summary of ${plural(releaseEntries(project, version).length, "client-facing entry", "client-facing entries")}.`
     : ", a first edition: it prints as an inventory.") +
     " A change recorded after this shows as news since the last prepare; editing the words by hand doesn't.");
   if (next.overview) { out(""); out(next.overview); }
-  const lists = printedLists(next);
+  const lists = printedLists(next, fresh);
   if (lists) { out(""); out(lists); }
-  out("");
-  out("The message to send with it:");
-  out(messageFor(fresh, version).trimEnd().split("\n").map((l) => `  ${l}`).join("\n"));
 
   const unseen = composeTargets(fresh, version).filter((f) => isBlank(f.stateAt(version).how_to_see));
   const unknown = unknownReasons(fresh, version);
@@ -100,8 +96,19 @@ function complete(flags) {
 }
 
 /** The lists as the edition prints them, with the ids each item covers in place of its links. */
-export function printedLists(composition) {
+export function printedLists(composition, project = null) {
   const lines = [];
+  if (hasSummary(composition) && project) {
+    const targets = releaseEntries(project, composition.version);
+    for (const [kind, title] of [["new", "What's new"], ["updated", "What changed"], ["in place", "Already in place"], ["removed", "No longer available"]]) {
+      const these = targets.filter((f) => kindAt(f, composition.version) === kind);
+      if (!these.length) continue;
+      if (lines.length) lines.push("");
+      lines.push(`${title} (${these.length})`);
+      these.forEach((f, i) => lines.push(`  ${String(i + 1).padStart(2)}. ${composition.summary[f.id] ?? "(none)"}  [${f.id}]`));
+    }
+    return lines.join("\n");
+  }
   for (const [key, title] of LISTS) {
     const items = Array.isArray(composition[key]) ? composition[key] : [];
     if (!items.length) continue;
@@ -142,7 +149,7 @@ function brief(flags) {
   const dirty = hasGit ? git.uncommitted(root).filter((p) => !git.isLedgerPath(project.config, p)) : [];
   const inventory = !previous;
   // Only what moved since the last prepare, when there is one to build on.
-  const delta = !flags.full && !inventory && Boolean(report.prepared) && !report.ok;
+  const delta = !flags.full && !inventory && Boolean(report.prepared) && !report.ok && !report.reshape;
   const fresh = new Set(delta ? [...report.arrived, ...report.moved, ...report.answered] : []);
   const code = delta ? codeSince(project) : null;
 
@@ -189,9 +196,10 @@ function brief(flags) {
     p("summary to write.");
   } else {
     p(`client reads. The client has the ${P} edition (${longDate(previous.date)}) and never saw anything in`);
-    p(`between. The ${N} edition's first page is the update: an overview and a short list of`);
-    p("what's new and what changed. Most readers stop there. Then the details of every new,");
-    p("updated and removed entry, and last a one-line-each catalogue of the whole service.");
+    p(`between. The ${N} edition's first page is the update: an overview, then one sentence`);
+    p("for each new, updated and in-place entry. Most readers stop there. Then the details");
+    p("of the same entries, and the removed ones, in full, and last a one-line-each");
+    p("catalogue of the whole service.");
   }
   p("");
   p("The developer is here in this session. Ask them what only they know, and nothing");
@@ -210,7 +218,7 @@ function brief(flags) {
   }
   if (delta) {
     p("Only the entries given in full below moved since the release was last prepared.");
-    p("The others are listed one line each, for the summary: keep their notes as they are.");
+    p("The others are listed one line each: keep their notes and summary sentences as they are.");
     p("");
   }
   for (const f of entries) {
@@ -249,7 +257,7 @@ function brief(flags) {
   if (composition && !report.never && !inventory) {
     p(`What is written for ${N} so far is below. Entries marked \`*\` above moved since it was`);
     p("written; keep every other entry's note exactly as it is, including any hand-edits,");
-    p("and keep the summary items that still hold.");
+    p("and every other entry's summary sentence too.");
     p("");
     p("```json");
     p(JSON.stringify(withoutStamp(composition), null, 2));
@@ -323,7 +331,9 @@ function brief(flags) {
     p("Every recorded reason came from a person. Ask about any you record in section 2");
     p("without one.");
   } else {
-    p("Ask the developer about each, one at a time:");
+    p("First check what the developer has already said in this session: a reason they");
+    p("stated or agreed to, including one you proposed that they acted on, answers the");
+    p("question, so record it without asking again. Ask about the rest, one at a time:");
     p("");
     for (const { feature, event, index } of unknown) {
       p(`  ${feature.id}, event ${index + 1}: ${event.what}`);
@@ -351,13 +361,8 @@ function brief(flags) {
   if (!inventory) {
     p("  \"overview\": \"Two or three sentences on what this release is about.\",");
     p("  \"changes\":  { \"entry-id\": [\"One note per change.\"] },");
-    p("  \"matters\":  { \"entry-id\": \"Why it matters to the client, when someone said so.\" },");
-    p("  \"new\":      [{ \"text\": \"One sentence.\", \"covers\": [\"entry-id\", \"another-entry-id\"] }],");
-    p("  \"changed\":  [{ \"text\": \"One sentence.\", \"covers\": [\"entry-id\"] }],");
-    p("  \"in_place\": [],");
-    p("  \"quiet\":    [\"entry-id\"],");
+    p("  \"summary\":  { \"entry-id\": \"One sentence on what it gives the client.\" }");
   }
-  p("  \"message\":  \"The text to send with the edition.\"");
   p("}");
   p("```");
   p("");
@@ -371,6 +376,13 @@ function brief(flags) {
     p("**The overview (\"overview\").** Two or three sentences that open the edition, under");
     p("the version number: what this release is about, as a whole. Not a list; the summary");
     p("under it is the list.");
+    const obsolete = composition ? [...LISTS.map(([k]) => k), "quiet", "matters", "message"].filter((k) => composition[k] !== undefined) : [];
+    if (obsolete.length) {
+      p("");
+      p(`What is written so far has ${obsolete.map((k) => `"${k}"`).join(", ")}, from before the first page had one`);
+      p("sentence per entry, and an edition went out with a message. Write \"summary\" (below)");
+      p("from them, then remove those keys.");
+    }
     p("");
   }
   p("**Descriptions.** One or two present-tense sentences, about 40 words, saying what the");
@@ -393,26 +405,23 @@ function brief(flags) {
     p("  this entry works with the new thing, point to it by name (\"see “Name”\"), and stop.");
     p("- An event marked [combined] is an older note that carries its own reason.");
     p("");
-    p("**Why it matters (\"matters\").** Optional, one sentence per new or updated entry, on");
-    p("what the change does for the client: time saved, a mistake that can't happen now, a");
-    p("question they no longer have to ask. Only from a reason the events or the developer");
-    p("gave; where there is none, leave the entry out of \"matters\".");
+    p("**The summary (\"summary\").** Many readers stop at the first page. It lists every");
+    p("entry the details print, in the same groups and order, one line each, linking to it;");
+    p("the edition picks the group from the entry. Each line is your sentence for it.");
     p("");
-    p("**The summary (\"new\", \"changed\", \"in_place\", \"quiet\").** Many readers stop at this");
-    p("page, so it picks what is worth knowing. The edition still prints every recorded");
-    p("change in full after it; \"quiet\" only keeps an entry off this page.");
-    p("");
-    p(`- A handful of items, most important first. Each is one sentence of at most ${ITEM_WORDS}`);
-    p(`  words (never over ${ITEM_LIMIT} characters), starting with a capital, never with a`);
-    p("  command or a file name. \"covers\" lists the entries it sums up, the one that says");
-    p("  most first.");
-    p("- \"new\": what someone can do that they couldn't before. \"changed\": what a client who");
-    p(`  knows ${P} will notice is different. "in_place": only entries marked \`in place\`, and`);
-    p("  nothing there may say or imply they arrived or changed this cycle.");
-    p("- Fold consequences into their cause: three entries that moved because of one new");
-    p("  capability are one item covering all three.");
-    p("- Every entry in section 1 that isn't removed ends up in an item's \"covers\" or in");
-    p("  \"quiet\". Removals and product-wide notes list themselves.");
+    p("- One sentence for every entry in section 1, removed ones included. Product-wide");
+    p("  notes list themselves.");
+    p("- Say what the reader gains, the way they would pass it on to a colleague: what");
+    p(`  they can do now that they couldn't (new), or what is better than in ${P} (updated),`);
+    p("  and, where it helps, what that saves them. Not the entry's name, not a heading, not");
+    p("  how it works: \"Customers can book delivery a month ahead, so regular orders no");
+    p("  longer need a weekly reminder.\", not \"Extended booking window\".");
+    p("- For a removed entry: why it went, and what to use instead, if anything. The");
+    p("  name prints with the entry's details; the sentence is what the client reads first.");
+    p(`- At most ${ITEM_WORDS} words (never over ${ITEM_LIMIT} characters), starting with a capital, never`);
+    p("  with a command or a file name.");
+    p("- An entry marked `in place` was always in the product: say what it does, and");
+    p("  nothing that says or implies it arrived or changed this cycle.");
     p("- Never a reason the events and the developer didn't give. Not \"we\", nothing");
     p("  promotional.");
     p("");
@@ -433,13 +442,6 @@ function brief(flags) {
   p("a reader would reach it, ask the developer; if they can't say, leave it empty rather");
   p("than guess. Set it with `ledger change <id> --how-to-see \"…\"`.");
   p("");
-  p("**The message (\"message\").** The text the developer pastes into an email or a chat");
-  p(`with the edition: an opening line with no greeting ("Version ${project.releases.printedAs(version)} of the ${product} feature`);
-  p("ledger is attached.\"), then " +
-    (inventory ? "a sentence on what it covers." : "the summary items as a short list, and a line on anything removed."));
-  p("Plain text, no Markdown.");
-  p("");
-
   /* 5 */
   p("## 5. Check it against the code");
   p("");
@@ -452,12 +454,13 @@ function brief(flags) {
   p("## When you're done");
   p("");
   p("1. Run `ledger prepare complete`. It refuses an updated entry with no note, a note on");
-  p("   an entry that isn't updated, an entry neither covered nor quiet, and an item that");
-  p("   won't read as a sentence of its own. Fix what it reports and run it again.");
+  p("   an entry that isn't updated, an entry with no summary sentence, and a sentence that");
+  p("   won't read as one on its own. Fix what it reports and run it again.");
   p("2. Run `ledger status` and fix anything it says about what you wrote.");
   p("3. End with a short list for the developer: each file you changed and what changed in");
-  p("   it, what you recorded in section 2, the reasons still unknown, and anything you");
-  p("   found in section 5 that is still open. Don't commit.");
+  p("   it, what you recorded in section 2, the reasons you took from what they said in");
+  p("   this session, the reasons still unknown, and anything you found in section 5");
+  p("   that is still open. Don't commit.");
 
   out(lines.join("\n"));
 }
@@ -481,8 +484,11 @@ export function recordingRules(p, P) {
   p("  polish is part of the capability it belongs to, never an entry of its own. A name");
   p("  is a short noun phrase in the users' words: not a caption, not the mechanism.");
   p("- A refactor, a fix nobody would notice, a tidy: record nothing.");
-  p("- The reason: ask the developer. One read off a commit message takes");
-  p("  `--why-from commit`; one nobody knows takes `--why-unknown`. Never invent one.");
+  p("- The reason: never invent one, and don't ask for one you were already given. A");
+  p("  reason the developer stated or agreed to in this session, including one you");
+  p("  proposed that they then acted on, is theirs: record it with \"why\". Ask only when");
+  p("  nothing said explains it. One read off a commit message takes `--why-from commit`;");
+  p("  one nobody knows takes `--why-unknown`.");
   if (P) {
     p(`- A capability that was already in the product before ${P} and is only now being`);
     p("  recorded takes `--backfilled`, and prints grey: the product didn't move, the");

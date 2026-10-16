@@ -60,17 +60,16 @@ something to say:
    commit message. The agent asks you, one at a time, and writes your answer
    into the event.
 4. **What to write.** The overview that opens the edition, the "What changed"
-   note on each updated entry, why a change matters where a reason was given,
-   the summary lists, `how_to_see` for each new or updated entry, an overview
-   for any area without one, and the message to send. All of it for a reader
-   who has never seen the code.
+   note on each updated entry, a sentence per entry for the first page,
+   `how_to_see` for each new or updated entry, and an overview for any area
+   without one. All of it for a reader who has never seen the code.
 5. **Check it against the code.** Every sentence it wrote, and every
    description it touched. Where the text and the code disagree, it tells you,
    and you fix the code or the text right there.
 
 It ends with `ledger prepare complete`, which refuses what would print wrong
-(an updated entry with no note, an entry neither summed up nor left off the
-summary on purpose, an item that won't read as a sentence) and records what the
+(an updated entry with no note, an entry with no summary sentence, a sentence
+that won't read as one on its own) and records what the
 release looked like when it was prepared. Then a short list of what it changed.
 It doesn't commit.
 
@@ -83,7 +82,7 @@ editing the words by hand never does.
 Once a release is prepared, the next brief covers only what moved since: the
 entries with new events, new entries, new product-wide notes, and entries
 whose missing reason someone has given since. Those are given in full, the rest
-one line each, so the summary can still account for them, and section 2 reads
+one line each, keeping their notes and sentences, and section 2 reads
 only the code since it was last read (by a prepare or a sweep), not since the
 last edition. `ledger prepare --full` prepares the whole release again. With
 nothing moved, `ledger prepare` prepares the whole release, since you asked for
@@ -102,19 +101,15 @@ from nowhere else. Steps toward one result are one note; a change a later one
 undid is no note at all. A change whose "before" is itself new this release
 says how the entry works with the new thing and points to it by name.
 
-### Why it matters
+### The summary
 
-Optional, one sentence per new or updated entry, on what the change does for the
-client: time saved, a mistake that can't happen now. Only from a reason the
-events or you gave; otherwise left out.
-
-### The summary lists
-
-A handful of items of at most 12 words, most important first, each followed by
-links to the entries it covers: *What's new*, *What changed*, and *Already in
-place* for capabilities recorded late. Removals and product-wide notes list
-themselves. The summary picks highlights; the edition still prints every
-recorded change in detail after it. `quiet` only keeps an entry off the list.
+One sentence for every entry in the release, at most 25 words: what the reader
+gains, said the way they would pass it on ("Customers can book delivery a month
+ahead, so regular orders no longer need a weekly reminder."), not the entry's
+name. For a removed entry, why it went and what to use instead. The first page
+prints them under *What's new*, *What changed*, *Already in place* and *No
+longer available*, the same groups and order as the details, each linking to
+its entry. Product-wide notes list themselves.
 
 ### How to see it
 
@@ -124,16 +119,11 @@ are selectable." It lives next to the description, so an old edition reprints
 the instructions it was sent with. Plain instructions, read off the routes and
 labels in the code; left empty rather than guessed.
 
-### The message
-
-The text to paste into an email or chat with the edition: an opening line with
-no greeting ("Version 6 of the Acme Portal feature ledger is attached."), the
-summary items as a short list, and a line on anything removed. Plain text. When
-`prepare` didn't write one, the cut builds a plain one from the summary.
-
 ## Reasons nobody recorded
 
-The ledger never invents a reason. A change recorded with `--why-unknown`, or
+The ledger never invents a reason, and an agent doesn't ask for one you have
+already given: a reason you stated or agreed to in the session is recorded as
+yours. A change recorded with `--why-unknown`, or
 with a reason read off a commit (`--why-from commit`), keeps that on its event.
 Bare `ledger` lists them; `ledger agent`, run at a terminal, asks you each one
 before it starts anything, for free; `ledger prepare` asks the rest; the cut
@@ -147,8 +137,7 @@ the note says what changed, and stops.
 ledger cut --name "Sprint 6 demo"
 ```
 
-It prints the edition into the client directory with the message beside it,
-records the release's commit, and opens the next release. It **refuses** only
+It prints the edition into the client directory, records the release's commit, and opens the next release. It **refuses** only
 when the edition would be wrong:
 
 - the corpus doesn't load (a broken file),

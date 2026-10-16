@@ -11,12 +11,11 @@ The ledger produces two kinds of document:
 ## Editions and drafts
 
 An **edition** is a release that was cut. `ledger cut` prints it into the client
-directory under the name the client sees, with the message to send beside it,
-and that is the only way a file gets there:
+directory under the name the client sees, and that is the only way a file gets
+there:
 
 ```
 docs/client/Acme-Portal-Feature-Ledger_6.pdf
-docs/client/Acme-Portal-Feature-Ledger_6-message.txt
 ```
 
 A **draft** is the open release as it stands. `ledger preview` prints it, after
@@ -58,15 +57,16 @@ to the sizes, then every entry in full, area by area, each with how to see it.
 1. **The first page is the update**, the page most clients stop at: the
    version, its name and date, what it is compared with, an overview of two or
    three sentences on what the release is about, a row of counts (new, changed,
-   removed, unchanged, and features in all) and the summary lists (below).
+   removed, unchanged, and features in all), the edition's three parts, each a
+   link with a line on what it is for, and the summary lists (below).
 2. **The changes in detail**, starting on a new page: every new, changed,
    in-place and removed entry, grouped the way the summary groups them, and in
    number order within each group. Each entry has a margin with its number,
    status and size. A new entry prints its description; an updated one leads
    with what changed, under the first sentence of its description, since the
-   client read the rest last time. Each can say why it matters to the client
-   and how to see it. Then the product-wide notes. The summary picks
-   highlights; this section never leaves recorded work out.
+   client read the rest last time. Each can say how to see it. Then the
+   product-wide notes. The summary lists the same
+   entries, one sentence each; this section gives them in full.
 3. **Everything the product does**, starting on a new page: every feature,
    area by area, one line each (its number, its size, its name and its first
    sentence) under the area's one-sentence overview. It opens on its own
@@ -86,31 +86,39 @@ are missing.
 
 From the second edition on, the first page lists what differs from the last
 edition as short lists, each under a plain heading in the colour its entries
-wear: *What's new*, *What changed*, *Already in place*, *No longer available*,
-and *Across the product* for the product-wide notes. The first three are written
-by `ledger prepare`: each item is a sentence that reads on its own, followed by
-the numbers of the entries it sums up, `1.3 2.6 4.1`, in number order. A
-removal is listed by its name, and a product-wide note by its first sentence.
+wear, with its count: *What's new*, *What changed*, *Already in place*, *No
+longer available*, and *Across the product* for the product-wide notes.
+
+The lists are the changes in detail read at one sentence each: the same groups,
+the same entries in the same order, so the counts on the page agree with each
+other. Each new, changed or in-place entry gets one line, linking to its
+details and followed by its number. The line is the entry's sentence in
+`summary` in `compositions.json`, written by `ledger prepare`: what the reader
+gains, said the way they would pass it on ("Customers can book delivery a month
+ahead, so regular orders no longer need a weekly reminder."), not the entry's
+name. A removal's line says why it went and what to use instead, and a
+product-wide note is listed by its first sentence.
+
+Editions prepared before this wrote items that each summed up several entries
+(`new`, `changed`, `in_place` and `quiet` lists of `{ text, covers }`), and
+they reprint that way. They may also carry `matters`, a "Why it matters to
+you" line on an entry, which no edition prints any more (the summary sentence
+says it), and `message`, a text to send with the edition, which the cut no
+longer writes. A release still open with that shape needs
+`ledger prepare` again before its first page has one line per entry.
 
 A draft says in a note at the top of the list when changes were recorded that
 `prepare` hasn't read, and lists the entries by name where nothing is prepared
 yet. An edition cut without a summary lists its entries by name too. Every page
 of a draft says *Draft, not yet presented* in its footer.
 
-## The message
-
-Next to every edition, `ledger cut` writes the text to paste into an email or a
-chat: an opening line with no greeting, the summary items as a short list, and a
-line on anything removed. `ledger prepare` writes it as part of the release (it
-is `message` in `compositions.json`, yours to edit); when it didn't, the cut
-builds a plain one from the summary.
-
 The summary page's heading, the sentence under it and its first two list
 headings are `summary_title`, `summary_intro`, `summary_new` and
 `summary_updated` in the `docs.pdf` block of `.ledger/config.json`; the details
 reuse the two list headings for their groups. The two parts after it are
-`changed_title`, `changed_intro`, `rest_title` and `rest_intro`; the label over
-a reason for the client is `matters_label`, and the line on sizes is `key_sizes`.
+`changed_title`, `changed_intro`, `rest_title` and `rest_intro`; what each of
+the three parts is for, in the list on the first page, is `summary_role`,
+`changed_role` and `rest_role`. The line on sizes is `key_sizes`.
 
 ## Writing for the client
 
@@ -120,7 +128,7 @@ little else. `ledger status` warns when what they read drifts from that:
 - a description past one or two sentences, or about 55 words for a Big entry,
   45 for a Medium and 35 for a Small;
 - a "What changed" note past one sentence per change;
-- a summary item past 12 words, or an overview past three sentences;
+- a summary sentence past 25 words, or an overview past three sentences;
 - client text that reads like code: something in backticks, a file name, a
   path into the source or a command-line flag. Those go in `dev_notes`.
 

@@ -12,7 +12,7 @@
     },
     {
       "version": 3,
-      "description": "The ledger's prose is yours to rewrite in place: a feature's name, description, how to see it and dev notes, and an edition's notes, summary and message. Nothing is recorded against the release, because the product did not move, and ledger status then checks every file.",
+      "description": "The ledger's prose is yours to rewrite in place: a feature's name, description, how to see it and dev notes, and an edition's overview, notes and summary. Nothing is recorded against the release, because the product did not move, and ledger status then checks every file.",
       "how_to_see": "Reword a description in .ledger/features/<id>.json, or a note in .ledger/compositions.json, then run ledger status: the entry is not listed as changed, and every file is checked."
     }
   ],
@@ -32,6 +32,22 @@
       "why": "They are client-facing prose like the rest of the ledger.",
       "why_from": "person",
       "date": "2026-10-12"
+    },
+    {
+      "version": 3,
+      "kind": "change",
+      "what": "The message sent with an edition is no longer edited by hand: it follows the overview and the summary, which are.",
+      "why": "The message is now built from the overview and the summary, so a hand-edit to it would be lost; the words to edit are those two.",
+      "why_from": "person",
+      "date": "2026-10-16"
+    },
+    {
+      "version": 3,
+      "kind": "change",
+      "what": "There is no message to edit any more: an edition no longer goes out with one.",
+      "why": "The person who sends the editions wouldn't use it.",
+      "why_from": "person",
+      "date": "2026-10-16"
     }
   ]
 }

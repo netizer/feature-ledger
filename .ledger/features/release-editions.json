@@ -16,8 +16,8 @@
     },
     {
       "version": 3,
-      "description": "The command ledger cut gives the open release its name, date and commit, prints its edition with the message to send beside it, and opens the next release. It refuses only an edition that would be wrong, and shows anything else and asks before it goes ahead.",
-      "how_to_see": "With changes not yet prepared, run ledger cut --name \"Demo\": it lists the warnings and asks whether to cut and print the edition anyway before it writes anything. After a cut, the client folder holds the PDF and a message file beside it."
+      "description": "The command ledger cut gives the open release its name, date and commit, prints its edition, and opens the next release. It refuses only an edition that would be wrong, and shows anything else and asks before it goes ahead.",
+      "how_to_see": "With changes not yet prepared, run ledger cut --name \"Demo\": it lists the warnings and asks whether to cut and print the edition anyway before it writes anything. After a cut, the client folder holds the PDF."
     }
   ],
   "events": [
@@ -44,6 +44,22 @@
       "why": "The developer decides what isn't done, and the tool's job is to say it clearly. Lining up the stamps of three agent tasks, with --skip and --force to get round them, made the cut the place the workflow had to be explained, and tokens are spent only when someone asks for them.",
       "why_from": "person",
       "date": "2026-10-12"
+    },
+    {
+      "version": 3,
+      "kind": "change",
+      "what": "The message beside each edition now gives the overview and the first page's lists, with the same sentence for each feature, instead of a text written separately.",
+      "why": "With one sentence per feature on the first page, the message written for it had grown to a long list, 23 lines for version 3.",
+      "why_from": "person",
+      "date": "2026-10-16"
+    },
+    {
+      "version": 3,
+      "kind": "change",
+      "what": "A cut no longer writes a message to send beside the edition; it prints the PDF alone.",
+      "why": "The person who sends the editions wouldn't use it.",
+      "why_from": "person",
+      "date": "2026-10-16"
     }
   ]
 }

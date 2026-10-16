@@ -65,7 +65,7 @@ const ALIASES = [
 
 /** What `prepare` replaced, said once for every command it took over. */
 const PREPARED = `\`ledger prepare\` now. One interactive agent session, run when you ask for it, writes
-the "What changed" notes, the summary and the message, finds work nobody recorded, asks
+the overview, the "What changed" notes and the summary, finds work nobody recorded, asks
 you the reasons nobody gave, and checks what it wrote against the code. \`ledger preview\`
 shows the edition as it would print, for free, at any time.`;
 
@@ -116,12 +116,12 @@ const HELP = `ledger — a client-facing record of what your product does, kept 
                                         Nothing due, no agent. --plan shows it; --force sweeps even
                                         a small change. Spends tokens
     ledger prepare [--full]             one interactive agent session that writes the client's text:
-                                        the "What changed" notes, the summary, how to see each entry
-                                        and the message, and checks it against the code. After the
+                                        the overview, the "What changed" notes, the summary and how
+                                        to see each entry, and checks it against the code. After the
                                         first, only what moved since the last; --full for all of it
     ledger prepare complete             check what it wrote, and record what it was written from
     ledger cut --name "..." [--date YYYY-MM-DD] [--commit SHA] [--full] [--yes] [--no-pdf] [--html]
-                                        print the edition and the message to send with it, and open
+                                        print the edition into the client directory, and open
                                         the next release. Refuses only an edition that would be wrong;
                                         anything else it shows you and asks first (--yes, unattended)
 
@@ -173,7 +173,7 @@ const HELP = `ledger — a client-facing record of what your product does, kept 
 
   Editing the words (no command — the corpus is yours to edit; run \`ledger status\` after)
     .ledger/features/<id>.json          a name, a description, how to see it, dev notes
-    .ledger/compositions.json           a "What changed" note, a summary item, the message
+    .ledger/compositions.json           the overview, a "What changed" note, a summary sentence
     .ledger/subcategories.json          sub-section headings and their overviews
     .ledger/config.json                 product name, tagline, document titles, area overviews
     .ledger/other-changes.json          the product-wide notes
@@ -322,7 +322,7 @@ const SUBCOMMANDS = {
   start: ["redraft start"], next: ["agent"], run: ["agent"], work: ["agent"],
   rewrite: ["style rewrite"], draft: ["preview"], publish: ["cut"], release: ["cut"], print: ["build"],
   check: ["status"], headline: ["prepare"], headlines: ["prepare"], highlights: ["prepare"], size: ["preview"],
-  upgrade: ["migrate"], message: ["prepare"],
+  upgrade: ["migrate"],
 };
 
 function unknownCommand(word) {

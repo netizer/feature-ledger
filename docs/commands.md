@@ -20,12 +20,12 @@ ledger — a client-facing record of what your product does, kept in the repo
                                         Nothing due, no agent. --plan shows it; --force sweeps even
                                         a small change. Spends tokens
     ledger prepare [--full]             one interactive agent session that writes the client's text:
-                                        the "What changed" notes, the summary, how to see each entry
-                                        and the message, and checks it against the code. After the
+                                        the overview, the "What changed" notes, the summary and how
+                                        to see each entry, and checks it against the code. After the
                                         first, only what moved since the last; --full for all of it
     ledger prepare complete             check what it wrote, and record what it was written from
     ledger cut --name "..." [--date YYYY-MM-DD] [--commit SHA] [--full] [--yes] [--no-pdf] [--html]
-                                        print the edition and the message to send with it, and open
+                                        print the edition into the client directory, and open
                                         the next release. Refuses only an edition that would be wrong;
                                         anything else it shows you and asks first (--yes, unattended)
 
@@ -77,7 +77,7 @@ ledger — a client-facing record of what your product does, kept in the repo
 
   Editing the words (no command — the corpus is yours to edit; run `ledger status` after)
     .ledger/features/<id>.json          a name, a description, how to see it, dev notes
-    .ledger/compositions.json           a "What changed" note, a summary item, the message
+    .ledger/compositions.json           the overview, a "What changed" note, a summary sentence
     .ledger/subcategories.json          sub-section headings and their overviews
     .ledger/config.json                 product name, tagline, document titles, area overviews
     .ledger/other-changes.json          the product-wide notes

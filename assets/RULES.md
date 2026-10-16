@@ -93,9 +93,14 @@ A change is two facts. **`what`** moved, in one sentence a client could read.
 are; you don't write the client's note. A feature that changes three times in a
 release is three `ledger change`s, and none is ever revised.
 
-- **Never invent a reason.** If you don't know, ask. If nobody can say, pass
-  `--why-unknown`. A reason read off a commit message or a pull request takes
-  `--why-from commit`. Either stays a question for a person.
+- **Never invent a reason, and don't ask for one you were already given.** A
+  reason the developer stated or agreed to in the conversation you are in,
+  including one you proposed that they then acted on, is theirs: write it as a
+  sentence, record it with `--why`, and list the reasons you took this way when
+  you report back, so a wrong one is caught. Ask only when nothing said
+  explains the change. If nobody can say, pass `--why-unknown`. A reason read
+  off a commit message or a pull request takes `--why-from commit`. Either
+  stays a question for a person.
 - **`description`**: the whole current state, when the change moves what it
   says. **`how_to_see`** too, when the way to reach it moved.
 - A feature **new** in the open release has no "before" for the client: update

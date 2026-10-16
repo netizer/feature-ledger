@@ -115,8 +115,9 @@ function brief(flags) {
   p("for is unrecorded. Record it:");
   p("");
   recordingRules(p, P);
-  p("If nobody is in this session to ask, record the reason you read off a commit with");
-  p("`--why-from commit`, or `--why-unknown`: `ledger prepare` asks a person later.");
+  p("If nobody is in this session, and nothing said in it gives the reason, record the");
+  p("one you read off a commit with `--why-from commit`, or `--why-unknown`: `ledger");
+  p("prepare` asks a person later.");
   p("");
   p("## When you're done");
   p("");

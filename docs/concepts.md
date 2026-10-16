@@ -41,8 +41,8 @@ why an old edition still reproduces exactly what was presented then.
 
 **Facts are recorded; text for the client is prepared.** Alongside its states,
 a feature keeps **events**: what moved and why, as somebody recorded them while
-the work landed. The "What changed" notes, the summary and the message an
-edition goes out with are written once per release, by `ledger prepare`, from
+the work landed. The "What changed" notes and the summary an edition goes out
+with are written once per release, by `ledger prepare`, from
 the two states and the events between, so they describe only differences the
 client will see. See [releasing.md](releasing.md#facts-while-you-build-client-text-once-per-release).
 
@@ -97,7 +97,7 @@ features/<id>.json   one feature: its state at each version (name, description, 
 index.json           the deliberate corpus order (ties within a size band)
 subcategories.json   sub-section headings
 other-changes.json   changes belonging to no single feature
-compositions.json    per release, the "What changed" notes, the summary and the message its
+compositions.json    per release, the overview, the "What changed" notes and the summary its
                      edition goes out with, and what `ledger prepare` had read
 redrafts.json        every redraft, and whether the new corpus was checked against the old
 state.json           how far the agent tasks have got: the tone each entry was last written

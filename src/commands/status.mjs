@@ -281,9 +281,9 @@ function collectWarnings(project) {
     const wordy = longItems(composition);
     if (wordy.length) {
       warnings.push(
-        `${wordy.length} summary item${wordy.length === 1 ? " runs" : "s run"} past ${ITEM_WORDS} words ` +
+        `${wordy.length} summary sentence${wordy.length === 1 ? " runs" : "s run"} past ${ITEM_WORDS} words ` +
         `(${wordy.map(([text, n]) => `“${text.slice(0, 40)}${text.length > 40 ? "…" : ""}” ${n}`).join("; ")}). ` +
-        "An item is read at a glance on the first page; shorten it in .ledger/compositions.json.",
+        "A summary sentence is read at a glance on the first page; shorten it in .ledger/compositions.json.",
       );
     }
     if (composition.overview && sentences(composition.overview) > OVERVIEW_SENTENCES) {
@@ -316,7 +316,6 @@ function collectWarnings(project) {
     ...now.map(([f, st]) => [f.id, st.description]),
     ...(composition ? [
       ...Object.entries(composition.changes ?? {}).flatMap(([id, list]) => (Array.isArray(list) ? list : []).map((n) => [id, n])),
-      ...Object.entries(composition.matters ?? {}),
       ...summaryItems(composition).map((i) => ["the summary", i.text]),
       ["the overview", composition.overview ?? ""],
     ] : []),

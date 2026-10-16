@@ -71,13 +71,13 @@ Elsewhere in `.ledger/`:
 | | |
 | --- | --- |
 | `subcategories.json` | A sub-section's `name` and `intro`. |
-| `compositions.json` | A release's `overview`, its "What changed" notes (`changes`, by entry id), why a change matters (`matters`, by entry id), a summary item's `text` and `covers`, `quiet`, and the `message`. `ledger prepare complete` writes `prepared`. |
+| `compositions.json` | A release's `overview`, its "What changed" notes (`changes`, by entry id), and its line on the first page for each entry (`summary`, by entry id). `ledger prepare complete` writes `prepared`. |
 | `config.json` | Product name, tagline, each area's one-sentence overview (`area_intros`), and the `docs` block that overrides document titles and intros. |
 | `other-changes.json` | The `description` of a product-wide note. |
 | `releases.json` | A release's `display_version` and `redraft` (see [documents.md](documents.md#carrying-on-from-earlier-reports) and [releasing.md](releasing.md#a-redraft-done-by-hand)). Nothing else in the file. |
 | `STYLE.md`, `theme.css` | Prose and CSS. They were always yours. |
 
-A hand-edit of a prepared note or summary item never counts as news since the
+A hand-edit of a prepared note or summary sentence never counts as news since the
 last prepare, and the next `ledger prepare` keeps it unless the entry it is
 about moves again.
 

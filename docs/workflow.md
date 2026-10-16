@@ -89,7 +89,10 @@ whole release, by `ledger prepare`, from what the last edition said, what the
 entry says now and these facts. A feature that changes three times in a release
 is three `ledger change`s, and none of them is ever revised.
 
-`ledger change` refuses a change to an existing feature with no reason. When
+`ledger change` refuses a change to an existing feature with no reason. An
+agent takes the reason from the conversation when you have already given it,
+or agreed to one it proposed, and lists the reasons it took that way when it
+reports back; it asks only when nothing said explains the change. When
 nobody can say why, `--why-unknown` records the gap; a reason read off a commit
 message takes `--why-from commit`. Either stays a question for a person: bare
 `ledger` lists it, and `ledger prepare` asks you. That refusal is deliberate,
@@ -127,11 +130,11 @@ prepared". It is free, so run it as often as you like. `--open` opens the PDF,
 | 1 | `ledger`: what the release holds, and what the cut would say | runs |
 | 2 | `ledger agent` (it runs `ledger prepare`), in your agent session, with you there | agent task |
 | 3 | Read the diff, and commit | git |
-| 4 | `ledger cut --name "Sprint 6 demo"`: prints the PDF and the message into the client directory, and opens the next release | runs |
+| 4 | `ledger cut --name "Sprint 6 demo"`: prints the PDF into the client directory, and opens the next release | runs |
 | 5 | Commit `.ledger/` (and `docs/client/`, if you keep the PDFs) | git |
 
-`prepare` writes the overview, the "What changed" notes, the summary lists, how
-to see each new or updated entry, and the message to send, for a reader who has
+`prepare` writes the overview, the "What changed" notes, a sentence per entry
+for the first page, and how to see each new or updated entry, for a reader who has
 never seen the code. In the same session it reads the
 code since the last edition for work nobody recorded, asks you the reasons
 nobody gave, and checks what it wrote against the code. Run it mid-release to

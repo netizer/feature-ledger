@@ -270,11 +270,11 @@ assert("`ledger prepare` carries each updated entry as the client saw it, as it 
 assert("…every entry it has to account for, and removals", brief.includes("c4  —  Cluster c4"));
 assert("…asks the developer for the reasons nobody recorded, and never invents one",
   brief.includes("## 3. Reasons nobody recorded") && brief.includes("alpha, event 2: It also remembers the last choice.") &&
-  brief.includes("Never invent one"));
+  brief.includes("never invent one") && brief.includes("don't ask for one you were already given"));
 assert("…looks for work nobody recorded, and checks what it writes against the code",
   brief.includes("## 2. Work nobody recorded") && brief.includes("## 5. Check it against the code"));
-assert("…writes how to see each entry, and the message to send",
-  brief.includes("**How to see it") && brief.includes("**The message"));
+assert("…writes how to see each entry, and no message or \"Why it matters\"",
+  brief.includes("**How to see it") && !brief.includes("\"message\":") && !brief.includes("\"matters\""));
 assert("…and never commits", brief.includes("Don't commit"));
 assert("…and nothing that only the team reads", !brief.includes("Tooling"));
 const v2Composition = {
@@ -282,20 +282,30 @@ const v2Composition = {
     alpha: ["It stopped at the alpha thing. The adjacent one was the question every user asked next, so it covers that too."],
     beta: ["It was called “Beta”, which named the release it arrived in rather than what it does."],
   },
-  new: [{ text: "The cluster handles four new parts.", covers: ["c1", "c2", "c3", "c4"] }],
-  changed: [{ text: "Alpha covers the adjacent thing as well as the alpha one.", covers: ["alpha"] }],
-  quiet: ["beta"],
-  message: "Version 2 of the Testbed feature ledger is attached.\n\n- The cluster handles four new parts.\n- Alpha covers the adjacent thing as well as the alpha one.",
+  summary: {
+    c1: "Customers can handle the first new part.",
+    c2: "Customers can handle the second new part.",
+    c3: "Customers can handle the third new part.",
+    c4: "Customers can handle the fourth new part.",
+    alpha: "Alpha covers the adjacent thing as well as the alpha one.",
+    beta: "Beta has a name that says what it does.",
+  },
 };
-assert("an entry the composition neither covers nor leaves off is refused",
-  writeComposition(2, { ...v2Composition, quiet: [] }, { expect: "fail" }).includes("not in \"quiet\": beta"));
+const without = (id) => Object.fromEntries(Object.entries(v2Composition.summary).filter(([k]) => k !== id));
+assert("an entry with no sentence on the first page is refused",
+  writeComposition(2, { ...v2Composition, summary: without("beta") }, { expect: "fail" }).includes("no sentence in \"summary\": beta"));
 assert("…and so is an id that's no entry in the release",
-  writeComposition(2, { ...v2Composition, quiet: ["beta", "tooling"] }, { expect: "fail" }).includes("not a client-facing entry in v2: tooling"));
-assert("…and an item that won't read as a sentence of its own",
-  writeComposition(2, { ...v2Composition, changed: [{ text: "ledger alpha covers more.", covers: ["alpha"] }] }, { expect: "fail" })
+  writeComposition(2, { ...v2Composition, summary: { ...v2Composition.summary, tooling: "Tools." } }, { expect: "fail" })
+    .includes("not a client-facing entry in v2: tooling"));
+assert("…and a sentence that won't read as one of its own",
+  writeComposition(2, { ...v2Composition, summary: { ...v2Composition.summary, alpha: "ledger alpha covers more." } }, { expect: "fail" })
     .includes("starts with a lower-case letter"));
-assert("…and one that sums up no entry",
-  writeComposition(2, { ...v2Composition, changed: [{ text: "Alpha covers more." }] }, { expect: "fail" }).includes("needs \"covers\""));
+assert("…and a message or a \"Why it matters\", which nothing writes any more",
+  writeComposition(2, { ...v2Composition, message: "Hi." }, { expect: "fail" }).includes("\"message\" is no longer written") &&
+  writeComposition(2, { ...v2Composition, matters: { alpha: "Faster." } }, { expect: "fail" }).includes("\"matters\" is no longer printed"));
+assert("…and the lists an older edition wrote its first page with",
+  writeComposition(2, { ...v2Composition, changed: [{ text: "Alpha covers more.", covers: ["alpha"] }] }, { expect: "fail" })
+    .includes("Write \"summary\" instead"));
 assert("…and an updated entry with no note",
   writeComposition(2, { ...v2Composition, changes: { alpha: v2Composition.changes.alpha } }, { expect: "fail" })
     .includes("updated with no \"What changed\" note in \"changes\": beta"));
@@ -322,9 +332,9 @@ const stamp = readJson(path.join(dir, ".ledger/compositions.json")).compositions
 assert("…and the stamp counts, per entry, the changes it was written from",
   stamp.entries.alpha === 3 && stamp.entries.c1 === 0 && Object.keys(stamp.entries).length === 6 && stamp.notes === 1);
 const completed = run(["prepare", "complete"]);
-assert("`prepare complete` prints the summary and the message as the edition will",
-  completed.includes("1. The cluster handles four new parts.  [c1, c2, c3, c4]") &&
-  completed.includes("Version 2 of the Testbed feature ledger is attached."));
+assert("`prepare complete` prints the summary as the edition will, and no message",
+  completed.includes("What's new (4)") && completed.includes("1. Customers can handle the first new part.  [c1]") &&
+  !completed.includes("feature ledger is attached"));
 assert("`ledger compose` and the other retired steps point at `ledger prepare`",
   ["compose", "summary", "review", "verify", "audit"].every((c) => run([c], { expect: "fail" }).includes("`ledger prepare` now")));
 // Editing the prepared words by hand is the point, and asks for nothing.
@@ -334,19 +344,19 @@ const reword = (edit) => {
   edit(all.compositions.find((c) => c.version === 2));
   fs.writeFileSync(compositionsPath, JSON.stringify(all, null, 2));
 };
-reword((x) => { x.changed[0].text = "alpha covers the adjacent thing too."; });
+reword((x) => { x.summary.alpha = "alpha covers the adjacent thing too."; });
 assert("an item hand-edited into lower case is reported", run(["status", "--quiet"]).includes("won't read as a sentence"));
 reword((x) => {
-  x.changed[0].text = "Alpha covers the adjacent thing too.";
   x.changes.alpha = ["It covers the adjacent thing now, said by hand. It runs on past one sentence."];
-  x.changed[0].text = "Alpha covers the adjacent thing too, and a good deal more besides, said at length.";
+  x.summary.alpha = "Alpha covers the adjacent thing too, and a good deal more besides, said at length, " +
+    "with every last detail of how it does it spelled out for the reader.";
   x.overview = "This edition adds a cluster of four parts. Alpha covers the adjacent thing. Beta has a new name. And more.";
 });
 const wordy = run(["status", "--quiet"]);
 assert("…a note past one sentence per change is mentioned", wordy.includes("runs past 1 sentence"));
-assert("…and so is a summary item past twelve words, and an overview past three sentences",
-  wordy.includes("past 12 words") && wordy.includes("overview of v2 runs past 3 sentences"));
-reword((x) => { x.changed[0].text = "Alpha covers the adjacent thing too."; delete x.overview; });
+assert("…and so is a summary sentence past 25 words, and an overview past three sentences",
+  wordy.includes("past 25 words") && wordy.includes("overview of v2 runs past 3 sentences"));
+reword((x) => { x.summary.alpha = "Alpha covers the adjacent thing too."; delete x.overview; });
 reword((x) => { x.changes.alpha = ["It covers the adjacent thing now, said by hand."]; });
 assert("…but a hand-edit doesn't count as news since the prepare", run([]).includes("nothing recorded since"));
 // A change recorded afterwards does, by name, and the brief marks it.
@@ -440,8 +450,8 @@ assert("…and never starts an agent", run(["preview", "--run", "claude"], { exp
 const v2Caught = { ...v2Composition, changes: { alpha: ["It covers the adjacent thing now, said by hand."],
   beta: ["Its window was narrower; it was widened for the overnight batch."] },
 overview: "This edition adds a cluster of four parts, and Alpha now covers the adjacent thing.",
-matters: { alpha: "Users reach the adjacent thing without a second search." },
-in_place: [{ text: "Something the product could always do is on the record.", covers: ["always-there"] }] };
+summary: { ...v2Composition.summary, "always-there": "Something the product could always do is on the record.",
+  solo: "Solo went before the last edition; Alpha does what it did." } };
 // The catalogue opens each area with its own overview, kept with the area.
 run(["categories", "add", "Third area", "--intro", "Things for a third purpose."]);
 run(["categories", "rename", "Third area", "Last area"]);
@@ -480,31 +490,42 @@ assert("the third register draws in its own colour", v2.includes('<span class="s
 assert("…and never puts the internal key in front of a client", !v2.includes(">BACKFILLED<"));
 assert("a removal found late is reported, apart from this cycle's news", v2.includes("No longer present"));
 // The page after the cover: the release's summary, each item followed by links to the entries it sums up.
-const summary = v2.slice(v2.indexOf('<section class="summary">'), v2.indexOf("</section>"));
+const summaryStart = v2.indexOf('<section class="summary"');
+const summary = v2.slice(summaryStart, v2.indexOf("</section>", summaryStart));
 assert("the edition opens with a summary of what's different", summary.includes("different in this edition"));
-assert("…as lists of items, each followed by the numbers of the entries it covers, in number order",
-  summary.includes("<ol>") && /<li><span class="text">The cluster handles four new parts\.<\/span> <span class="refs">/.test(summary) &&
-  /<a class="ref" href="#f-c1">(\d+\.\d+)<\/a><a class="ref" href="#f-c2">\d+\.\d+<\/a><a class="ref" href="#f-c3">\d+\.\d+<\/a><a class="ref" href="#f-c4">\d+\.\d+<\/a><\/span><\/li>/.test(summary) &&
+assert("…as one line per entry: its sentence, linking to it, then its number",
+  summary.includes("<ol>") &&
+  /<li><span class="text"><a href="#f-c1">Customers can handle the first new part\.<\/a><\/span> <span class="refs"><a class="ref" href="#f-c1">\d+\.\d+<\/a><\/span><\/li>/.test(summary) &&
   v2.includes('id="f-c4"'));
+{
+  // The lines are the details at one sentence each: same entries, same order.
+  const order = (html) => [...html.matchAll(/(?:href|id)="#?f-([\w-]+)"/g)].map((m) => m[1]).filter((id, i, a) => a.indexOf(id) === i);
+  const details = v2.slice(v2.indexOf('id="whats-changed"'), v2.indexOf('id="everything-else"'));
+  const inDetails = order(details).filter((id) => details.includes(`<article class="feature`) && details.includes(`id="f-${id}"`));
+  assert("…covering exactly the entries the details print, in the same order",
+    JSON.stringify(order(summary)) === JSON.stringify(inDetails));
+}
 {
   // The number a reference cites is the number the entry prints beside it.
   const cited = summary.match(/<a class="ref" href="#f-c4">([\d.]+)<\/a>/)?.[1];
   assert("…and each number is the one its entry prints in the margin",
     Boolean(cited) && v2.includes(`id="f-c4"><div class="rail"><span class="no">${cited}</span>`));
 }
-assert("…leaving out what it left out", !summary.includes("f-beta"));
+assert("…beta among them", summary.includes("f-beta"));
 assert("…and, once it is prepared, no draft note", !summary.includes("draft-note"));
-assert("…under plain headings", summary.includes("<h3>What&#39;s new</h3>") && summary.includes("<h3>What changed</h3>"));
+assert("…under plain headings, each with its count",
+  summary.includes('<h3>What&#39;s new<span class="count">4</span></h3>') && summary.includes('<h3>What changed<span class="count">'));
 // gamma, the one removal this cycle, was team-only, so it has no group here.
 assert("…grouped the way the ledger colours them",
   ["is-new", "is-updated", "is-backfilled", "is-gone", "is-other"].every((g) => summary.includes(`sum-group ${g}`)) &&
   !summary.includes("is-removed"));
-assert("…with a removal listed by the name of what went, not its reason",
-  summary.includes('<a href="#gone-solo">Solo</a>') && v2.includes('id="gone-solo"') && !summary.includes("No longer part of the product."));
+assert("…with a removal listed by its sentence, not the reason its details give",
+  summary.includes('<a href="#gone-solo">Solo went before the last edition; Alpha does what it did.</a>') && v2.includes('id="gone-solo"') &&
+  !summary.includes("No longer part of the product."));
 assert("…and nothing that only the team reads", !summary.includes("Tooling"));
 // Short without dropping work: everything that moved in full, then one line
 // for everything else.
-assert("every entry that moved prints in full, beta among them though the summary leaves it out",
+assert("every entry that moved prints in full",
   v2.includes('id="whats-changed"') && /<article class="feature[^"]*" id="f-beta">/.test(v2) &&
   v2.includes("Its window was narrower; it was widened for the overnight batch."));
 {
@@ -515,16 +536,20 @@ assert("every entry that moved prints in full, beta among them though the summar
 }
 assert("…with how to see it under each",
   v2.slice(v2.indexOf('id="f-alpha"')).split('class="feature')[0].includes("Open Alpha, then Adjacent."));
-assert("…with why it matters, where a reason was given",
-  v2.includes('<div class="matters"><span class="label">Why it matters to you</span><p>Users reach the adjacent thing without a second search.</p></div>'));
+assert("…and no separate line on why it matters: the summary sentence says it", !v2.includes('class="matters"'));
 assert("the first page opens with the overview, then the counts, then the summary",
   v2.indexOf('class="overview">This edition adds a cluster of four parts') > 0 &&
-  v2.indexOf('class="overview"') < v2.indexOf('class="tally"') && v2.indexOf('class="tally"') < v2.indexOf('<section class="summary">') &&
-  v2.indexOf('<section class="summary">') < v2.indexOf('id="whats-changed"'));
+  v2.indexOf('class="overview"') < v2.indexOf('class="tally"') && v2.indexOf('class="tally"') < v2.indexOf('<section class="summary"') &&
+  v2.indexOf('<section class="summary"') < v2.indexOf('id="whats-changed"'));
+assert("…with its parts listed between the counts and the summary, each a link with what it is for",
+  v2.indexOf('class="tally"') < v2.indexOf('<nav class="contents parts">') &&
+  v2.indexOf('<nav class="contents parts">') < v2.indexOf('<section class="summary"') &&
+  ["whats-different", "whats-changed", "everything-else"].every((id) => v2.includes(`<a href="#${id}">`)) &&
+  v2.includes('<span class="role">Every feature, one line each'));
 assert("…with what the sizes mean said once, where the catalogue compares them",
   v2.split('class="size-key"').length === 2 && v2.indexOf('class="size-key"') > v2.indexOf('id="everything-else"') &&
   v2.includes("Size is how much of the service a feature is") && !v2.includes('class="callout"'));
-assert("…and no contents list: the first page is the contents", !v2.includes('<nav class="contents">'));
+assert("…and no list of areas on it: the catalogue has its own", !v2.includes('<nav class="contents">'));
 assert("the catalogue lists every capability once, with its size, name and first sentence",
   v2.includes('id="everything-else"') && /<li id="f-delta"><span class="no">[\d.]+<\/span><span class="sz"><span class="size size-small"/.test(v2) &&
   v2.includes('<span class="nm">Delta</span><span class="first">Does the delta thing.</span><span class="mv"></span></li>') &&
@@ -640,12 +665,9 @@ assert(
   !fs.existsSync(path.join(kept, "docs/client")) &&
     fs.existsSync(path.join(kept, "docs/generated/Kept-Feature-Ledger_1-draft.html")),
 );
-assert("`ledger cut` prints the edition there itself, with the message to send beside it",
+assert("`ledger cut` prints the edition there itself, and nothing beside it",
   run(["cut", "--name", "Baseline", "--html", "--yes"], { cwd: kept }).includes("docs/client/Kept-Feature-Ledger_1.html") &&
-  fs.existsSync(path.join(kept, "docs/client/Kept-Feature-Ledger_1.html")));
-const keptMessage = path.join(kept, "docs/client/Kept-Feature-Ledger_1-message.txt");
-assert("…a plain one when prepare wrote none",
-  fs.existsSync(keptMessage) && fs.readFileSync(keptMessage, "utf8").startsWith("Version 1 of the Kept feature ledger is attached."));
+  fs.readdirSync(path.join(kept, "docs/client")).join() === "Kept-Feature-Ledger_1.html");
 assert("…and clears away the draft it replaces",
   !fs.existsSync(path.join(kept, "docs/generated/Kept-Feature-Ledger_1-draft.html")));
 fs.rmSync(kept, { recursive: true, force: true });
@@ -817,7 +839,6 @@ assert("an updated entry with no prepared note is said, and the cut goes ahead w
   recordedCut.includes("prints its changes as recorded (one)") && recordedCut.includes("cut v2"));
 const frozen = readJson(path.join(repo, ".ledger/compositions.json")).compositions.find((c) => c.version === 2);
 assert("…its recorded lines frozen with the edition", frozen.changes.one[0] === "It does the two thing as well. Asked for at the demo.");
-assert("…and the message to send written beside it", fs.existsSync(path.join(repo, "docs/generated/client/Audited-Feature-Ledger_5-message.txt")));
 run(["build", "v2", "--html"], { cwd: repo });
 const v2Path = path.join(repo, "docs/generated/client/Audited-Feature-Ledger_5.html");
 const v2Before = fs.readFileSync(v2Path, "utf8");
@@ -839,7 +860,7 @@ assert("a cut records the commit it happened at", /^[0-9a-f]{40}$/.test(cutJson(
 assert("…and keeps a printed number set by hand", cutJson()[0].display_version === 4);
 run(["add", "two"], { cwd: repo, stdin: feature({ audience: "user", size: "Small", name: "Two", description: "Does the two thing.",
   how_to_see: "Open Two." }) });
-writeComposition(3, { new: [{ text: "Does the two thing.", covers: ["two"] }], quiet: [] }, { cwd: repo });
+writeComposition(3, { summary: { two: "Customers can do the two thing." } }, { cwd: repo });
 commitAll("Two, prepared");
 // Prepared and committed: nothing to say, so nothing to confirm.
 const clean = run(["cut", "--name", "Same day, later", "--date", "2026-02-01", "--no-pdf", "--full"], { cwd: repo });
@@ -949,8 +970,7 @@ fs.rmSync(repo, { recursive: true, force: true });
   // Prepare: the whole release the first time, then only what moved.
   on(["change", "one", "--what", "It does the one thing twice.", "--why-unknown"]);
   assert("recorded changes nobody prepared are a prepare", on(["agent", "--plan"]).includes("prepare: write the client's text for v2"));
-  writeComposition(2, { changes: { one: ["It does the one thing twice."] }, changed: [{ text: "One does its thing twice.", covers: ["one"] }],
-    quiet: [] }, { cwd: ag });
+  writeComposition(2, { changes: { one: ["It does the one thing twice."] }, summary: { one: "One does its thing twice." } }, { cwd: ag });
   assert("prepare complete records the code as read", state().sweep?.commit === agit("rev-parse", "HEAD").stdout.trim());
   assert("…and the reasons still open", readJson(path.join(ag, ".ledger/compositions.json")).compositions
     .find((x) => x.version === 2).prepared.unvouched?.join() === "one#0");
@@ -963,7 +983,7 @@ fs.rmSync(repo, { recursive: true, force: true });
     /now: +Does the two thing\./.test(delta));
   assert("…and --full prepares the whole release", !on(["prepare", "--full"]).includes("(prepared, unchanged)"));
   writeComposition(2, { changes: { one: ["It does the one thing twice."], two: ["It does the two thing faster, because it was slow."] },
-    changed: [{ text: "One and Two both do more.", covers: ["one", "two"] }], quiet: [] }, { cwd: ag });
+    summary: { one: "One does its thing twice.", two: "Two does its thing faster." } }, { cwd: ag });
   // A reason given after the note was written makes that note out of date.
   const onePath = path.join(ag, ".ledger/features/one.json");
   const one = readJson(onePath);
@@ -1059,7 +1079,7 @@ run(["cut", "--name", "Reorganized", "--date", "2026-04-01", "--no-pdf", "--yes"
 assert("the timeline lists the archived release where it came from",
   run(["releases"], { cwd: rd }).includes("archived in .ledger/archive/v1/"));
 run(["add", "later"], { cwd: rd, stdin: feature({ audience: "user", size: "Small", name: "Later", description: "Does a later thing." }) });
-writeComposition(3, { new: [{ text: "Does a later thing.", covers: ["later"] }], quiet: [] }, { cwd: rd });
+writeComposition(3, { summary: { later: "Customers can do a later thing." } }, { cwd: rd });
 run(["build", "--pdf", "--html", "--version", "3"], { cwd: rd });
 const after = fs.readFileSync(path.join(rd, "docs/generated/Redrafted-Feature-Ledger_3-draft.html"), "utf8");
 assert("from the next edition, changes are marked again",

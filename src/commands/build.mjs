@@ -187,7 +187,10 @@ export async function cmdPreview({ flags }) {
     out(`v${open.version} has nothing recorded yet, so this draft reads the same as the v${open.version - 1} edition.`);
   }
   const report = prepareReport(project);
-  if (!report.ok && !report.nothing) out(`${color().yellow("!")} ${prepareLine(report)}; the draft shows those changes as recorded.`);
+  if (!report.ok && !report.nothing) {
+    out(`${color().yellow("!")} ${prepareLine(report)}` +
+      (report.reshape ? "; until then the draft prints the first page as it was written." : "; the draft shows those changes as recorded."));
+  }
   const { target } = await printEdition(project, open.version, flags);
   out(`wrote v${open.version} ${color().yellow("· DRAFT, not cut")} → ${rel(target)}`);
   if (flags.open) {

@@ -21,9 +21,13 @@ ledger status                # release, corpus and setup, checked
 Record **facts**, as you work: **what** moved, in one sentence a client could
 read ("Delivery windows can be booked 28 days ahead instead of 14."), and
 **why**. The text the client reads is written later, once per release, by
-`ledger prepare`. Never invent a reason: ask. If nobody can say, pass
-`--why-unknown`, and a reason you read off a commit message takes
-`--why-from commit`. Either stays a question for a person.
+`ledger prepare`. Never invent a reason, and don't ask for one you were
+already given: a reason the developer stated or agreed to in this
+conversation, including one you proposed that they then acted on, is theirs.
+Record it with `--why` and say so when you report back. Ask only when nothing
+said explains it. If nobody can say, pass `--why-unknown`, and a reason you
+read off a commit message takes `--why-from commit`. Either stays a question
+for a person.
 
 `how_to_see` says how a reader checks the claim themselves ("Open Settings →
 Delivery and choose *Book ahead*"). Give it when you know; leave it out

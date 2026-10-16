@@ -32,6 +32,14 @@
       "why": "Coding agents never commit for the developer, and the free preview reads well only if the recorded facts do.",
       "why_from": "person",
       "date": "2026-10-12"
+    },
+    {
+      "version": 3,
+      "kind": "change",
+      "what": "The stanza now tells an agent to take a reason from the conversation when the developer stated it or agreed to it, and to ask only when nothing said explains the change.",
+      "why": "Agents asked for reasons the conversation had already made plain, so the developer was asked far more often than needed.",
+      "why_from": "person",
+      "date": "2026-10-16"
     }
   ]
 }

@@ -93,7 +93,9 @@ export function wording(config) {
       // The first page, from the second edition on, and the headings of its
       // first two lists, which the details reuse for their two groups.
       summary_title: "What's different in this edition",
-      summary_intro: "The numbers after each item are the entries it covers. Every feature keeps its number throughout this document.",
+      summary_intro: "One line for each feature that moved, in the order the details give them. The number after each is the feature's number, which it keeps throughout this document.",
+      // The first page of an edition prepared when each item summed up several entries.
+      summary_intro_grouped: "The numbers after each item are the entries it covers. Every feature keeps its number throughout this document.",
       summary_new: "What's new",
       summary_updated: "What changed",
       // The two parts of every edition after the first page: what moved, in
@@ -102,7 +104,10 @@ export function wording(config) {
       changed_intro: "Each feature added, changed or removed in this edition: what it does, what changed, and how to see it for yourself.",
       rest_title: `Everything ${product} does`,
       rest_intro: "Every feature, area by area, numbered as in the rest of this document. A status means it moved in this edition, and links to its details.",
-      matters_label: "Why it matters to you",
+      // What each part is for, in the list of parts on the first page.
+      summary_role: "One sentence for each change, on this page. Read this to know what's different.",
+      changed_role: "Each new, changed or removed feature in full, with how to see it for yourself.",
+      rest_role: "Every feature, one line each, area by area. Use it to look something up.",
       // Beside the size meter, wherever sizes are compared.
       key_sizes: "Size is how much of the service a feature is: Big, one it is chosen for; Medium, one in its own right inside a bigger one; Small, one narrow enough to describe in a line.",
     },

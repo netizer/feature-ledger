@@ -3,7 +3,7 @@ import path from "node:path";
 import { openProject, pdfsAreCommitted } from "../store.mjs";
 import { fail, usage, isBlank, today, longDate, EXIT, UserError } from "../util.mjs";
 import { color, mark } from "../ui.mjs";
-import { prepareReport, prepareLine, unpreparedNotes, unknownReasons, frozenForCut, messageFor } from "../compose.mjs";
+import { prepareReport, prepareLine, unpreparedNotes, unknownReasons, frozenForCut } from "../compose.mjs";
 import { redraftReport, redraftSteps } from "./redraft.mjs";
 import { editionFile, printEdition } from "./build.mjs";
 import * as git from "../git.mjs";
@@ -219,15 +219,11 @@ async function confirm(question) {
   }
 }
 
-/** The file the message goes in: next to the edition, named after it. */
-export function messageFile(editionPath) {
-  return editionPath.replace(/\.(pdf|html)$/i, "") + "-message.txt";
-}
 
 /**
  * Cutting a release is the one moment the timeline moves: the open release
  * gets its name, date and commit, its edition is printed into the client
- * directory with the message to send beside it, and a fresh open release
+ * directory, and a fresh open release
  * starts behind it.
  *
  * It refuses only what would print a wrong edition (see cutReport). Anything
@@ -318,9 +314,6 @@ export async function cmdCut({ flags }) {
       EXIT.error, { raw: true });
     }
   }
-  const message = messageFile(printed ?? editionFile(project, version, flags).target);
-  fs.mkdirSync(path.dirname(message), { recursive: true });
-  fs.writeFileSync(message, messageFor(project, version));
   if (frozen) project.saveComposition(frozen);
   project.saveReleases();
   if (draftFile && fs.existsSync(draftFile)) fs.unlinkSync(draftFile);
@@ -330,7 +323,6 @@ export async function cmdCut({ flags }) {
     `${plural(touched, "entry", "entries")}${other ? ` and ${plural(other, "product-wide note")}` : ""}` +
     (report.warnings.length ? `, with ${plural(report.warnings.length, "warning")}` : ""));
   out(printed ? `  wrote ${rel(printed)}` : `  no edition printed (--no-pdf) — \`ledger build v${version}\` prints it`);
-  out(`  wrote ${rel(message)}, the message to send with it`);
   out(`  v${version + 1} is now open; new work records against it.`);
   const ledgerRel = path.relative(project.root, project.ledgerDir) || ".ledger";
   out(`Next: commit ${ledgerRel}/` +

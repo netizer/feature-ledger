@@ -15,7 +15,7 @@ software do, and what's new since last time?* The feature ledger does:
   catalogue of the whole service.
 - **Every change says why**, or says that nobody knows: the ledger never
   invents a reason.
-- **A PDF edition per release**, with the message to send beside it, so "what
+- **A PDF edition per release**, so "what
   did we show them in March" always has an answer. [Here's what one looks
   like](docs/client).
 
@@ -31,7 +31,7 @@ CLI command).
 ledger                    # where things stand, and the one thing to run next
 ledger preview            # the edition as it would print now — free, no agent
 ledger agent              # whatever agent work is due, and only the part not done yet — spends tokens
-ledger cut --name "…"     # print the edition and the message to send with it
+ledger cut --name "…"     # print the edition and open the next release
 ```
 
 While you build, your coding agent records facts with `ledger add`,
@@ -112,8 +112,8 @@ ledger cut --name "Sprint 6 demo"
 When changes are recorded that nobody has prepared, `ledger agent` runs
 `ledger prepare`, and before it, at a terminal, asks you for the reasons nobody
 gave, for free. `prepare` is one interactive session that writes everything the client reads:
-an overview of the release, a one-sentence note on each change, the summary
-list, how to see each new or updated capability, and the message to send, all
+an overview of the release, a one-sentence note on each change, a sentence per
+capability for the first page, and how to see each new or updated one, all
 in plain language for someone who has never seen the code. In the same session it reads the
 code since the last edition for work nobody recorded, asks you the reasons
 nobody gave, and checks what it wrote against the code, which is a good moment
@@ -132,7 +132,7 @@ Before v6 is cut:
 Cut v6 and print its edition anyway? [y/N]
 ```
 
-It prints `docs/client/…_6.pdf` and `…_6-message.txt` beside it.
+It prints `docs/client/…_6.pdf`.
 
 Upgrading from an earlier version? `ledger migrate` brings the ledger over and
 keeps every edition already handed over exactly as it printed.

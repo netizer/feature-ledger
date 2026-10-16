@@ -9,7 +9,7 @@ The source of truth for this product's feature ledger. Commit all of it.
 | `brand.json` | The client-swap surface: logo, one accent colour, fonts. |
 | `releases.json` | The version timeline. The last entry, `status: "future"`, is the release in progress — everything new records against it. `status: "archived"` ones were printed from a corpus in `archive/`. |
 | `features/<id>.json` | One feature: its state at every version it moved (`history`: name, description, how to see it), and what changed and why (`events`). |
-| `compositions.json` | Per release, the "What changed" notes, the summary and the message its edition goes out with, written by `ledger prepare`, and what it had read when it wrote them (`prepared`). |
+| `compositions.json` | Per release, the overview, the "What changed" notes and the summary its edition goes out with, written by `ledger prepare`, and what it had read when it wrote them (`prepared`). |
 | `index.json` | The deliberate order of the corpus, which is what breaks ties within a size band. Maintained automatically. |
 | `subcategories.json` | Sub-section headings, for an area that grew too big to read as one list. |
 | `other-changes.json` | Changes belonging to no single feature. |
@@ -21,7 +21,7 @@ The source of truth for this product's feature ledger. Commit all of it.
 ## Which of it you edit
 
 **The words are yours.** The names, descriptions, how-to-see texts and dev
-notes in `features/<id>.json`, the notes, summary items and message in
+notes in `features/<id>.json`, the overview, notes and summary sentences in
 `compositions.json`, and the prose in `subcategories.json`,
 `other-changes.json` and the `docs` block of `config.json` are meant to be
 opened and rewritten — that is how the ledger comes to sound like something
