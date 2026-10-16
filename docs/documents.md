@@ -69,8 +69,9 @@ to the sizes, then every entry in full, area by area, each with how to see it.
    highlights; this section never leaves recorded work out.
 3. **Everything the product does**, starting on a new page: every feature,
    area by area, one line each (its number, its size, its name and its first
-   sentence) under the area's one-sentence overview, with the key to the sizes
-   at the top. What moved carries its status, which links to its details.
+   sentence) under the area's one-sentence overview. It opens on its own
+   contents, every area with its count and how many of its features moved,
+   and the key to the sizes. What moved carries its status, which links to its details.
 
 `ledger cut --full` (or `ledger build vN --full`) prints any edition as a full
 inventory instead, with a contents list and what moved still marked. An edition

@@ -1,0 +1,11 @@
+{
+  "sweep": {
+    "date": "2026-10-16",
+    "commit": "2a949c43bdffca6ebdcad4d1f2882bcbfe465c50",
+    "files": {
+      "docs/documents.md": "d2f606cfc40b5e5dafbd93f2657932d5ecf131e1",
+      "src/render/ledger-html.mjs": "35d2effb561a00cf62a0d6a1789af80e37c8b9ca",
+      "test/smoke.mjs": "f0f4d0deb0f1db36063fe5772c18a744af4a695b"
+    }
+  }
+}

@@ -8,7 +8,7 @@
     {
       "version": 1,
       "name": "Retiring a feature",
-      "description": "The command ledger remove marks a feature as gone from this release onward, with the reason you give it. It appears once, under the heading No longer available as of this edition, and every earlier edition still shows the feature as it stood at the time."
+      "description": "The command ledger remove marks a feature as gone from this release onward, with the reason you give it. It appears once, under No longer available, and every earlier edition still shows the feature as it stood at the time."
     }
   ]
 }

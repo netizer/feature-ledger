@@ -12,7 +12,8 @@
     },
     {
       "version": 3,
-      "description": "The command ledger rules prints the rules for recording what the product does: the bar for an entry, how to name one, how to record a capability, a change or a removal, and what you edit by hand instead. The project's tone is printed inside it, and a RULES.md in the ledger directory replaces it."
+      "description": "The command ledger rules prints how to record the product: the bar for an entry, its name, and how to record a capability, a change or a removal. A project can replace the rules with its own.",
+      "how_to_see": "Run ledger rules. Its sections are what counts as an entry, a new feature, a change, better words for the same thing, and don't commit."
     }
   ],
   "events": [

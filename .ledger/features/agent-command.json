@@ -8,7 +8,7 @@
     {
       "version": 3,
       "name": "One command for agent work",
-      "description": "The command ledger agent works out which agent task is due, and how much of it is left, from what earlier tasks recorded. It then runs that one task. When nothing is due, it starts no agent and spends nothing.",
+      "description": "The command ledger agent works out which agent task is due, and how much of it is left, from what earlier tasks recorded, then runs that one task. When nothing is due, it starts no agent and spends nothing.",
       "how_to_see": "Record a change, then run ledger agent: it starts the preparation of the edition. Prepare it, run ledger agent again, and it says there is nothing for an agent to do."
     }
   ]

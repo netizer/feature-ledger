@@ -3,7 +3,7 @@
   "audience": "user",
   "category": "Reading the ledger",
   "size": "Small",
-  "dev_notes": "src/commands/read.mjs cmdExport, schema_version 1. Wired into the CLI but absent from `ledger --help`.",
+  "dev_notes": "src/commands/read.mjs cmdExport, schema_version 3, with the compositions alongside the features. Wired into the CLI and listed in `ledger --help`.",
   "history": [
     {
       "version": 1,

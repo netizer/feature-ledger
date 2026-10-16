@@ -16,7 +16,8 @@
     },
     {
       "version": 3,
-      "description": "The command ledger init creates a .ledger directory holding the whole corpus: the product name, the accent colour and the style guide you chose, and version 1 open as the release in progress. Everything the tool needs sits in that one directory, so a Python, Go or Rails repo looks identical to it. The Markdown docs are build output and are added to .gitignore, and so are the PDF editions, unless ledger init --commit-pdfs keeps them in docs/client so every document handed over stays in the repo."
+      "description": "The command ledger init sets up a ledger in an existing project: one directory holding the product name, the accent colour, the style guide you chose, and version 1 open as the release in progress. The generated documents stay out of the repository, unless you choose at setup to keep every client edition in it.",
+      "how_to_see": "In a project with no ledger, run ledger init. It creates the .ledger directory, adds the generated docs to .gitignore, and ends with the next steps: survey the codebase, read and edit the result, commit, then cut the baseline."
     }
   ],
   "events": [

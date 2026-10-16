@@ -9,6 +9,21 @@
       "version": 1,
       "name": "Grouping features into areas",
       "description": "Areas group the entries, and the order of the list is the reading order of every document the ledger produces. The command ledger categories add places one, before or after any other; rename and remove move the structure without touching the entries underneath it. A ledger with no areas puts everything in one called Features and prints it without a heading, so a small product reads as a list of what it does rather than as a chapter of one."
+    },
+    {
+      "version": 3,
+      "description": "Areas group the entries in the reading order of every document, and each area can open with a one-sentence overview. You place an area before or after any other, and a ledger with no areas prints as one plain list.",
+      "how_to_see": "Run ledger categories to see the areas in order, then ledger preview: in the list of every feature at the end of the PDF, each area with an overview opens with that sentence."
+    }
+  ],
+  "events": [
+    {
+      "version": 3,
+      "kind": "change",
+      "what": "An area can carry a one-sentence overview, which opens it in the edition's list of every feature.",
+      "why": "The new approach makes sure the structure is understood.",
+      "why_from": "person",
+      "date": "2026-10-15"
     }
   ]
 }

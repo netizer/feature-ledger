@@ -16,7 +16,8 @@
     },
     {
       "version": 3,
-      "description": "The command ledger status says at once what the open release holds, whether ledger prepare has read everything recorded, what the cut would refuse or warn about, what the corpus holds, and how the setup resolves. Anything valid that would still print badly comes out as a warning. Bare ledger prints the short version, the reasons nobody has given, and the next command. With --quiet it is silent when there is nothing to say, so a commit hook can run it."
+      "description": "The command ledger status shows what the open release holds, whether it is prepared, what the cut would refuse or warn about, and what would print badly. Bare ledger prints the short version, the reasons nobody gave, and the next command to run.",
+      "how_to_see": "Run ledger status: it lists what the release holds, answers Ready to cut? with any warnings, and ends with what would print badly, such as a description that runs long or client text with a file name in it. Run ledger on its own for the short version."
     }
   ],
   "events": [
@@ -35,6 +36,14 @@
       "why": "The cut warns instead of gating, and the ledger no longer maps code to entries.",
       "why_from": "person",
       "date": "2026-10-12"
+    },
+    {
+      "version": 3,
+      "kind": "change",
+      "what": "Status warns about client text that reads like code, such as a file name or a flag, and about a note, a summary item or an overview that runs long.",
+      "why": "The target audience is not necessarily technical.",
+      "why_from": "person",
+      "date": "2026-10-15"
     }
   ]
 }

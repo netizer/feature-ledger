@@ -16,7 +16,7 @@
     },
     {
       "version": 3,
-      "description": "Each edition is a PDF: a first page with the counts and what's new and what changed, then each change in full with how to see it, then one line for every feature. Each feature has one number throughout, and the PDF has bookmarks. ledger cut prints an edition; ledger preview prints a draft.",
+      "description": "Each edition is a PDF whose first page gives an overview of the release, the counts, and what's new and what changed, followed by each change in full with how to see it, then one line for every feature. Every feature keeps one number throughout, and the PDF has bookmarks.",
       "how_to_see": "Run ledger preview and open the PDF. The numbers after each item on the first page lead to the entries that print the same number in their margin."
     }
   ],
@@ -60,6 +60,22 @@
       "why": "A client should see at once what changed and what the product does, and find their way around the document without effort.",
       "why_from": "person",
       "date": "2026-10-15"
+    },
+    {
+      "version": 3,
+      "kind": "change",
+      "what": "The first page opens with a short overview of the release, and a new or changed entry can say why it matters to the reader.",
+      "why": "The document should be easy to read: the previous one was a lot of text, with not enough value for the reader per page.",
+      "why_from": "person",
+      "date": "2026-10-15"
+    },
+    {
+      "version": 3,
+      "kind": "change",
+      "what": "The list of every feature opens on its own contents: each area with its feature count and how many of its features are new, changed or already in place.",
+      "why": "The document should be easy to read: the previous one was a lot of text, with not enough value for the reader per page.",
+      "why_from": "person",
+      "date": "2026-10-16"
     }
   ]
 }

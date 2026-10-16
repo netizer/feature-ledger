@@ -12,7 +12,8 @@
     },
     {
       "version": 3,
-      "description": "The corpus is JSON in the repository, and its prose is yours to rewrite. You reword a name, a description, how to see it or a dev note in the feature's own file, or a \"What changed\" note, a summary item or the message in compositions.json; add the sentence a coding agent had no way of knowing; or cut what the client is better off not reading. Nothing is recorded and nothing is marked as changed, because the product did not move. ledger status then checks every file."
+      "description": "The ledger's prose is yours to rewrite in place: a feature's name, description, how to see it and dev notes, and an edition's notes, summary and message. Nothing is recorded against the release, because the product did not move, and ledger status then checks every file.",
+      "how_to_see": "Reword a description in .ledger/features/<id>.json, or a note in .ledger/compositions.json, then run ledger status: the entry is not listed as changed, and every file is checked."
     }
   ],
   "events": [

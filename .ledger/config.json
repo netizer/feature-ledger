@@ -8,6 +8,12 @@
     "Reading the ledger",
     "The documents it produces"
   ],
+  "area_intros": {
+    "Setting up a ledger": "Starting a ledger in a project, connecting it to your coding agent, and recording what the product already does.",
+    "Recording what the product does": "Recording each capability, and what changed in it and why, while the work happens.",
+    "Reading the ledger": "Checking what the ledger holds, and what the next edition will say, without printing anything.",
+    "The documents it produces": "The editions you hand to a client, and the documents your team reads."
+  },
   "default_category": "Features",
   "style": "google",
   "output": {

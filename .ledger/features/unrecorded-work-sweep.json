@@ -8,7 +8,7 @@
     {
       "version": 3,
       "name": "Finding work nobody recorded",
-      "description": "The command ledger sweep reads the code that changed since it was last read, and records any change someone using the product would notice that nobody recorded. It writes none of the client's text.",
+      "description": "The command ledger sweep prints a brief for an agent that reads the code changed since it was last read and records what a user would notice that nobody recorded. It writes no client text.",
       "how_to_see": "Change some code without recording it, then run ledger sweep: the prompt lists the files that changed since the code was last read."
     }
   ]

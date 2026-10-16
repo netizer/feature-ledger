@@ -16,7 +16,8 @@
     },
     {
       "version": 3,
-      "description": "Every edition marks what moved since the last one, in words and colour: New in green, Changed in blue with a \"What changed\" note, and Already in place in grey for a feature listed for the first time. A first edition prints as a plain inventory."
+      "description": "Every edition marks what moved since the last one, in words and colour: New in green, Changed in blue with a note, and Already in place in grey for a feature listed for the first time. A first edition marks nothing.",
+      "how_to_see": "Run ledger preview and open the PDF: each entry under The changes in detail carries New, Changed or Already in place beside its colour."
     }
   ],
   "events": [

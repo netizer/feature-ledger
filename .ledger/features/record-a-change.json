@@ -3,7 +3,7 @@
   "audience": "user",
   "category": "Recording what the product does",
   "size": "Big",
-  "dev_notes": "src/commands/write.mjs cmdChange, with cmdUpdate as the deprecated alias that turns each old bullet into a `combined` event. Events are appended to the feature's `events` with version, kind, what, why, why_from and date; a change with no history entry at the open release creates one, copying the previous description when none is given. Category, sub-section, size, paths and dev_notes alone are filing and record nothing. A why_from of commit or unknown opens a question through askWhy() in src/questions.mjs.",
+  "dev_notes": "src/commands/write.mjs cmdChange, with cmdUpdate as the deprecated alias that turns each old bullet into a `combined` event. Events are appended to the feature's `events` with version, kind, what, why, why_from and date; a change with no history entry at the open release creates one, copying the previous description when none is given. Category, sub-section, size and dev_notes alone are filing and record nothing; a `paths` field is dropped with a note. A why_from of commit or unknown is listed by unknownReasons() in src/compose.mjs.",
   "history": [
     {
       "version": 1,
@@ -16,7 +16,8 @@
     },
     {
       "version": 3,
-      "description": "The command ledger change records what moved in a feature and why, as two facts, with the full current description when that changed too, and how to see it when the way to reach it moved. A feature that existed before the release can't change without a reason: when nobody can say, --why-unknown keeps the gap as a question rather than a guess, and a reason read off a commit is marked as one. A second change in one release is just another fact, and moving an entry's size or area records nothing."
+      "description": "The command ledger change records what moved in a feature and why, with the new description and how to see it when those moved too. A reason nobody can give is kept as a question rather than guessed, and moving an entry's size or area records nothing.",
+      "how_to_see": "Run ledger change on an entry with --what and --why-unknown, then run ledger on its own: the change is listed under the reasons nobody has vouched for."
     }
   ],
   "events": [

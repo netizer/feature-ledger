@@ -12,7 +12,8 @@
     },
     {
       "version": 3,
-      "description": "The command ledger list prints the whole corpus, one short line per feature: its size, its id, its name, and whether it is new or changed in the release in progress. It filters by area, audience, size, or by what has moved this cycle. The command ledger show prints the single entry you are about to edit: how to see it, its recorded changes, its history on request, its state at any version, or the last edition's text beside today's."
+      "description": "The command ledger list prints the corpus one line per feature, filtered by area, audience, size or what moved. The command ledger show prints one entry, its recorded changes, and on request its history or the last edition's text beside today's.",
+      "how_to_see": "Run ledger show --diff with the id of an entry that changed in this release: it prints the last edition's text, today's text, and the changes recorded in between."
     }
   ],
   "events": [

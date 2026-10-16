@@ -12,7 +12,8 @@
     },
     {
       "version": 3,
-      "description": "The agent tasks, bootstrap, redraft check, style rewrite, prepare and sweep, print a prompt for you to paste into your agent session, or hand it to Claude, Codex or Gemini and wait. When the agent stops, you see its last message, whether it left what its task asks for, and the command that resumes its session."
+      "description": "The agent tasks, prepare, bootstrap, sweep, redraft check and style rewrite, each print a prompt to paste into your agent session, or hand it to Claude, Codex or Gemini. When the agent stops, you see its last message and how to resume it.",
+      "how_to_see": "Run ledger prepare and paste the prompt into your agent session, or run ledger prepare --run claude: when the agent stops, the last lines show its final message, the check of what it left, and the command that resumes its session."
     }
   ],
   "events": [

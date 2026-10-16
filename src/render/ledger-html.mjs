@@ -572,7 +572,25 @@ class LedgerHtml {
       return `<div class="rest-area">${head}${lists}</div>`;
     }).join("");
     return `<section class="part rest" id="${SECTION_IDS.rest}" data-page-start><div class="part-head"><h2>${h(w.rest_title)}</h2>` +
-      `<p class="sub">${h(w.rest_intro)}</p>${this.sizeKey()}</div>${inner}</section>`;
+      `<p class="sub">${h(w.rest_intro)}</p></div>${this.areaIndex()}${this.sizeKey()}${inner}</section>`;
+  }
+
+  /**
+   * The catalogue's own contents: every area, its size, and how much of it
+   * moved. The catalogue is the part a client comes back to to look
+   * something up, so it opens on a map of itself, and a reader can see at a
+   * glance which areas this edition touched.
+   */
+  areaIndex() {
+    if (this.set.unstructured || this.categoryRows.length < 2) return "";
+    const items = this.categoryRows.map(([category, rows], i) => {
+      const moved = ["new", "updated", "backfilled"].map((b) => [b, rows.filter((r) => r.badge === b).length])
+        .filter(([, n]) => n).map(([b, n]) => `<span class="is-${b}">${n} ${h(this.statusLabel(b).toLowerCase())}</span>`)
+        .join(" · ");
+      return `<li><a href="#${this.categoryId(i)}"><span class="num">${i + 1}</span><span class="nm">${h(category)}</span>` +
+        `${moved ? `<span class="mvd">${moved}</span>` : ""}<span class="ct">${rows.length}</span></a></li>`;
+    }).join("");
+    return `<nav class="contents is-index"><h3 class="kicker">Areas</h3><ol>${items}</ol></nav>`;
   }
 
   /** What the size meter means, said once, where sizes are compared. */
@@ -899,6 +917,13 @@ const STYLES = `
   .contents .ct { flex: 0 0 auto; color: var(--ink-faint); font-size: 8pt; font-variant-numeric: tabular-nums; }
   .contents li.closing .num { color: var(--ink-ghost); }
   .contents li.closing .nm { font-weight: 400; color: var(--ink-soft); }
+  /* The catalogue's map of itself: quieter than a front-page contents, since
+     it sits under a part heading rather than opening the document. */
+  .contents.is-index { margin-top: 16px; padding-top: 8px; border-top-color: var(--line); }
+  .contents .mvd { flex: 0 0 auto; font-size: 7.5pt; font-weight: 600; }
+  .contents .mvd .is-new { color: var(--green-deep); }
+  .contents .mvd .is-updated { color: var(--blue-deep); }
+  .contents .mvd .is-backfilled { color: var(--slate-deep); }
 
   /* ---- The size key ---- */
   .size-key {

@@ -13,6 +13,21 @@
     {
       "version": 2,
       "description": "The command ledger note records something that runs across the whole product, such as a wording pass over many screens or a change in what a colour means. It prints once at the end of the edition, under the heading Also since last time, instead of forcing the same note onto a dozen unrelated entries."
+    },
+    {
+      "version": 3,
+      "description": "The command ledger note records something that runs across the whole product, such as a wording pass over many screens. The edition lists it once, under Across the product.",
+      "how_to_see": "Run ledger note --audience user --description with one sentence, then ledger preview: the note is listed under Across the product on the first page and in The changes in detail."
+    }
+  ],
+  "events": [
+    {
+      "version": 3,
+      "kind": "change",
+      "what": "A product-wide note is listed on the edition's first page and printed with the changes in detail under Across the product, instead of at the end of the edition.",
+      "why": "A brief explanation of what changed is a good start of this document.",
+      "why_from": "person",
+      "date": "2026-10-15"
     }
   ]
 }

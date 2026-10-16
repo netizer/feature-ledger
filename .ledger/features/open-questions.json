@@ -3,12 +3,13 @@
   "audience": "user",
   "category": "Recording what the product does",
   "size": "Small",
-  "dev_notes": "questions.json holds them. A `why` question points at an event by index and checks its `what`; answering sets the event's why and why_from person, accepting only changes why_from, and neither of those alone puts a composition out of date unless the words change. A `legacy` question comes from a migrated reason_inferred on a released version and settles without touching anything printed. askInline() in src/commands/questions.mjs is what `ledger cut` calls at a TTY.",
+  "dev_notes": "No store of their own: an event with why_from unknown or commit is the question (unknownReasons() in src/compose.mjs). askReasons() in src/commands/agent.mjs asks them at a TTY and writes why_from person; the prepare brief's section 3 has the agent ask them; cutReport() counts them as a warning; cmdOverview lists up to eight. `ledger questions` is retired with a pointer.",
   "history": [
     {
       "version": 3,
       "name": "Reasons nobody recorded",
-      "description": "A change whose reason nobody knows, or whose reason was read off a commit message, keeps that on the change until a person gives one. Bare ledger lists them, ledger agent asks you each one before it starts an agent, and ledger cut says how many are left."
+      "description": "A reason nobody gave, or one read off a commit message, stays a question until a person answers it. Bare ledger lists them, ledger agent and ledger prepare ask them, and ledger cut counts them.",
+      "how_to_see": "Record a change with --why-unknown, then run ledger on its own: the change is listed under Reasons nobody has vouched for."
     }
   ]
 }

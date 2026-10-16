@@ -12,7 +12,8 @@
     },
     {
       "version": 3,
-      "description": "The command ledger style rewrite prints a brief for rewriting the entries still in an earlier tone, one area at a time. Each finished area is marked done, so an interrupted rewrite carries on from the areas left."
+      "description": "The command ledger style rewrite prints a brief for rewriting the entries still in an earlier tone, area by area. Each area is marked when done, so a rewrite resumes with the areas left.",
+      "how_to_see": "Run ledger style set with another guide, then ledger style rewrite: the brief lists only the entries still in the earlier tone, by area. Mark one area done with ledger style rewrite complete --category and its name, and the next brief leaves it out."
     }
   ],
   "events": [

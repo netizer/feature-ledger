@@ -12,7 +12,8 @@
     },
     {
       "version": 3,
-      "description": "The command ledger add records one capability, with the audience it matters to, its size, its name, a present-tense description of what the product does, and how a reader sees it for themselves. The id you give it is lower-case kebab-case and never changes, so it carries the feature's history through every later rename. An entry filed under an area or a sub-section that doesn't exist is refused as you write it, and the message lists the ones that do."
+      "description": "The command ledger add records one capability: who it matters to, its size, its name, a present-tense description, and how a reader sees it for themselves. Its id never changes, so it carries the feature's history through every rename, and an area that doesn't exist is refused with a list of the ones that do.",
+      "how_to_see": "Run ledger add with a how_to_see field in its JSON, then ledger show with the same id: the How to see it line prints what you gave."
     }
   ],
   "events": [

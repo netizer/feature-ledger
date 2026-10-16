@@ -12,7 +12,8 @@
     },
     {
       "version": 3,
-      "description": "Setup appends a short stanza to whichever agent instruction files the repo already has, CLAUDE.md, AGENTS.md, GEMINI.md, .cursor/rules, .github/copilot-instructions.md or .windsurfrules, and creates AGENTS.md when there are none. The stanza is a pointer rather than a copy: the commands, the tone, how to record what moved and why, the line between recording a change and rewording an entry, and the rule that the agent never commits."
+      "description": "Setup adds a short stanza to each coding-agent instruction file the project has, or creates one. It names the commands and the tone, and tells an agent to record what moved and why, fix wording by hand, and never commit.",
+      "how_to_see": "After ledger init, open AGENTS.md, or CLAUDE.md if the project has one, and find the Feature ledger section. It lists the commands, asks for what moved and why, and ends with Don't commit."
     }
   ],
   "events": [

@@ -36,52 +36,81 @@
     },
     {
       "version": 3,
+      "overview": "Version 3 changes how an edition is written and how it reads. Changes are recorded as facts while the work happens, and the text you read is written once per release, in one session that also finds unrecorded work and checks the text against the code. Each edition is now short: what moved in full, and one line for everything else.",
       "changes": {
         "init-a-ledger": [
-          "Setup named nothing as outside the product. It now also lists the files that aren't product code, such as tests, lockfiles and CI, so that ownership starts with only the product's own code to account for; see “Which code each feature lives in”. What the last preview saw stays out of the repository, since when somebody last looked is theirs."
+          "Setup creates the same ledger as in v2, and its closing steps now have you read and commit the survey's entries and cut the first edition yourself; see “Baseline survey of an existing codebase”."
         ],
         "agent-wiring": [
-          "The stanza told an agent to record a change as a bullet written for the client. It now says to record what moved and why, to name the code a new feature lives in, and to leave a reason it doesn't know as a question: that is how a change is recorded now, and the stanza is often all an agent reads before it records one."
+          "The stanza now tells an agent to record what moved and why in a sentence a client could read, with how to see it when known, and never to commit, prepare or cut unless asked, because agents don't commit for you and the free preview reads well only if the recorded facts do."
         ],
         "baseline-survey": [
-          "The survey recorded each capability without saying where its code was. It now gives every entry the code it lives in, and ends with every product file owned by an entry or marked as not product code, because the audit and the size readout read the code through those paths."
+          "The survey used to cut the baseline itself and record the first audit; it now writes how to see each capability and stops before the cut without committing, because you read, commit and cut the baseline yourself, and there are no audits any more.",
+          "A survey that stops partway now carries on from the entries it already wrote instead of starting again, so the batches already written aren't paid for twice."
+        ],
+        "retone-brief": [
+          "The rewrite brief covered every entry; it now covers only the entries still in the old tone and resumes from the areas left, because the tone of each entry is recorded rather than guessed, so no entry is rewritten into the tone it already has."
         ],
         "authoring-rules": [
-          "The rules taught how to write a client-facing note as each change landed. They now describe a change as what moved and why, the code each entry lives in, and editing the composed notes. Those rules existed to keep mid-release notes honest, and the notes are composed now; an agent reads the rules before its first edit, so every line it doesn't need is paid for on every edit."
+          "The rules were the full guide to writing the ledger, notes for the client included; they now cover only what an agent recording a change needs, because those notes are written once per release and every line an agent reads is paid for on every edit."
+        ],
+        "record-a-capability": [
+          "A new capability can now also record how to see it, the steps a reader follows to check the claim for themselves."
         ],
         "record-a-change": [
-          "ledger update took a bullet written for the client as the change landed. ledger change records two facts instead, what moved and why, and the note the edition prints is composed once for the whole release; see “Composing what changed”. A bullet written mid-release described the state just before that update, which the client often never saw, so the release needed repairing before every cut. ledger update still works."
+          "A change used to be recorded as a note written for the client as it landed; it is now two facts, what moved and why, and the edition's note is written once for the whole release, because a note written mid-release described a state the client often never saw; see “Preparing an edition”.",
+          "A change can now also say how to see the entry, so a client can check each claim for themselves."
         ],
         "editing-by-hand": [
-          "A \"What changed\" note was edited in the feature's own file. Notes and summary items are now edited in compositions.json, because they are composed for the whole release, and a hand-edit there survives the next composition unless the entry it is about moves again."
+          "Besides an entry's own words, you can now reword how to see it and an edition's notes, summary and message, because those are client-facing prose like the rest and are written for the whole release."
         ],
-        "codebase-audit": [
-          "The audit counted every commit since the last one, and handed the agent the changed paths and the commit subjects. It now looks only at code the ledger hasn't accounted for, and hands over the diffs. Counting every commit made a cut wait for an audit after work that had been recorded properly, and an agent given only file names had to work out again which entry each file belonged to."
-        ],
-        "release-review": [
-          "This was “Reviewing a release before it goes out”, which had an agent reword the release in place before every cut. It now checks what the edition says against the code, edits nothing and reports what it doubts as questions, and the cut asks for it only once a project turns it on. Composing the notes from the two editions removed the drafts the review existed to repair; what is left worth a second read is whether the text is true."
+        "areas": [
+          "An area can now open with a one-sentence overview in the edition's list of every feature, so the way the service is organized is clear."
         ],
         "agent-handoff": [
-          "The agent tasks were bootstrap, audit, review, redraft check and style rewrite. Compose, verify and paths brief are tasks now, and review is not: compose and verify replace it, and saying which code each entry lives in needs something that can read the code."
+          "The agent tasks were bootstrap, audit, review, redraft check and style rewrite; the audit and the review are now steps of preparing an edition, and finding work nobody recorded is a task of its own; see “Preparing an edition” and “Finding work nobody recorded”."
+        ],
+        "product-wide-change": [
+          "A product-wide note printed at the end of the edition; it is now listed on the first page and printed with the changes in detail, under Across the product, because a brief explanation of what changed is a good start to the document."
         ],
         "read-the-corpus": [
-          "ledger show printed an entry's current text and, on request, its history. It now also prints the code the entry lives in and its recorded changes, the entry as it stood at any version with --at, and with --diff the last edition's text beside the current one: what a person or an agent needs in front of them before saying what changed."
+          "Showing an entry now also prints how to see it and its recorded changes, and can show it as it stood at any version or beside the last edition's text, which is what you need in front of you before saying what changed."
         ],
         "status-check": [
-          "Status said nothing about the code or about what the edition says about its changes. It now reports the composition, the open questions and how much of the code belongs to an entry, and warns about a description that runs long for its size and a glob that matches no file, the new ways a ledger drifts from its product."
+          "Status showed the checklist the cut ran; it now shows what the cut would refuse and what it would only warn about, and lists the reasons nobody has given, because the cut now warns instead of blocking.",
+          "Status now warns about a description that runs long for its size, because past two or three sentences an edition stops being brief.",
+          "Status also warns about client text that reads like code, such as a file name, and about a note, a summary item or an overview that runs long, because the people who read an edition are not necessarily technical."
         ],
         "release-editions": [
-          "A cut ran five checks, the review among them. It now checks that what the edition says about its changes is composed and up to date, that the edition is verified when that is turned on, and that no question is open; see “Composing what changed” and “Questions only you can answer”. The summary and the review became one composition and an optional check against the code.",
-          "At a terminal, the cut asks the open questions one at a time, and with --run it hands an open audit, composition or verify to a coding agent first. An agent's questions printed at the end of its run were gone with the terminal."
+          "A cut refused to go ahead until five checks passed; it now refuses only an edition that would be wrong, with nothing recorded or a redraft not yet checked, and shows everything else before it asks, because what isn't done is your call and the tool's job is to say it clearly.",
+          "A cut now also writes the message to send beside the edition, and never hands work to a coding agent, so tokens are spent only when someone asks for them."
         ],
         "pdf-edition": [
-          "The front page led straight into the contents list, so the changes were only visible as stripes spread through the whole document. Short lists of what's new and what changed now sit between the two; see “Composing what changed”.",
-          "ledger preview printed a draft and nothing else. It now opens with the size of the release and what moved since the last look, and with --run composes what changed first, because a preview is how the size of the latest changes gets checked, and that shouldn't need a PDF or an agent. Until the changes are composed, a draft prints them as recorded and says so."
+          "An edition printed every entry in full; it now prints only what moved in full, with how to see it, and one line for every other feature, because reprinting unchanged entries made up most of an edition, 13 pages for 25 features in the second.",
+          "Each feature now carries one number that the first page, the details and the full list all cite, and the PDF has bookmarks, so you see at once what changed and find your way around without effort.",
+          "The first page now opens with a short overview of the release, and a new or changed entry can say why it matters to you, so the document is easier to read.",
+          "The list of every feature now opens on its own contents, each area with its count and how many of its features moved, so the document is easier to find your way around.",
+          "A draft now prints the recorded changes, marked as such, until the edition is prepared, because a draft with no notes hid the very changes it was printed to show."
+        ],
+        "markdown-docs": [
+          "The Markdown documents now print how to see each entry under its description, because a description can leave you asking which part of the product it is about, and this answers that the same way every time."
+        ],
+        "change-highlighting": [
+          "Each mark now prints as a word, New, Changed or Already in place, beside its colour, and the changes in detail are grouped in that order, so you see at once what changed."
         ]
+      },
+      "matters": {
+        "baseline-survey": "Nothing is cut or committed until you have read it.",
+        "record-a-capability": "You can check each claim in the edition for yourself.",
+        "record-a-change": "A note can no longer describe a version of a feature you never had.",
+        "areas": "You can see how the service is organized before reading any entry.",
+        "status-check": "Nothing in an edition is written in terms only a developer would follow.",
+        "pdf-edition": "You get more of what you need from each page, and see what changed on the first one.",
+        "markdown-docs": "You can tell which part of the product an entry is about without asking."
       },
       "new": [
         {
-          "text": "What changed is composed once for the whole release, from the last edition and the current one, rather than written as each change landed.",
+          "text": "Changes are recorded as facts, and written up once per release.",
           "covers": [
             "edition-summary",
             "record-a-change",
@@ -92,31 +121,38 @@
           ]
         },
         {
-          "text": "Every feature names the code it lives in, so the audit looks only at work the ledger hasn't heard about.",
+          "text": "One command runs whichever agent task is due, or none at all.",
           "covers": [
-            "path-ownership",
-            "codebase-audit",
-            "baseline-survey",
-            "init-a-ledger"
+            "agent-command"
           ]
         },
         {
-          "text": "The size of the open release, and how much code moved under each feature, shows in the terminal without printing anything.",
+          "text": "Work nobody recorded is found by reading the code that changed.",
           "covers": [
-            "release-size",
-            "pdf-edition",
-            "read-the-corpus"
+            "unrecorded-work-sweep"
           ]
         },
         {
-          "text": "A reason nobody recorded is kept as a question, and the cut asks it before printing.",
+          "text": "Every entry can say how to check it for yourself.",
           "covers": [
-            "open-questions",
-            "release-editions"
+            "record-a-capability",
+            "markdown-docs"
           ]
         },
         {
-          "text": "An older ledger upgrades in one step, and every edition already handed over prints as before.",
+          "text": "A reason nobody gave stays a question until a person answers it.",
+          "covers": [
+            "open-questions"
+          ]
+        },
+        {
+          "text": "The size of the open release shows without printing anything.",
+          "covers": [
+            "release-size"
+          ]
+        },
+        {
+          "text": "An older ledger upgrades in one step, and past editions print unchanged.",
           "covers": [
             "migrate-ledger"
           ]
@@ -124,40 +160,68 @@
       ],
       "changed": [
         {
-          "text": "The release review is now an optional check of the edition against the code, and it edits nothing.",
+          "text": "Editions are short: what moved in full, everything else one line each.",
           "covers": [
-            "release-review"
+            "pdf-edition",
+            "change-highlighting",
+            "areas",
+            "product-wide-change"
           ]
         },
         {
-          "text": "Status also reports open questions, code no feature owns, and descriptions that run long for their size.",
+          "text": "Cutting a release warns instead of blocking, and writes the message.",
+          "covers": [
+            "release-editions"
+          ]
+        },
+        {
+          "text": "The baseline survey stops for you to read, commit and cut it.",
+          "covers": [
+            "baseline-survey",
+            "init-a-ledger"
+          ]
+        },
+        {
+          "text": "Status warns about long descriptions and text that reads like code.",
           "covers": [
             "status-check"
           ]
         }
       ],
-      "quiet": [],
+      "quiet": [
+        "retone-brief",
+        "read-the-corpus"
+      ],
+      "message": "Version 3 of the feature-ledger feature ledger is attached.\n\nWhat's new:\n- Changes are recorded as facts, and written up once per release.\n- One command runs whichever agent task is due, or none at all.\n- Work nobody recorded is found by reading the code that changed.\n- Every entry can say how to check it for yourself.\n- A reason nobody gave stays a question until a person answers it.\n- The size of the open release shows without printing anything.\n- An older ledger upgrades in one step, and past editions print unchanged.\n\nWhat changed:\n- Editions are short: what moved in full, everything else one line each.\n- Cutting a release warns instead of blocking, and writes the message.\n- The baseline survey stops for you to read, commit and cut it.\n- Status warns about long descriptions and text that reads like code.\n\nNo longer available: the ledger audit and the release review. Both are now steps of preparing an edition; the edition says more.\n",
+      "in_place": [],
       "prepared": {
-        "date": "2026-10-12",
-        "commit": null,
+        "date": "2026-10-16",
+        "commit": "2a949c43bdffca6ebdcad4d1f2882bcbfe465c50",
         "entries": {
-          "init-a-ledger": 1,
-          "agent-wiring": 1,
-          "baseline-survey": 1,
-          "authoring-rules": 1,
+          "init-a-ledger": 2,
+          "agent-wiring": 2,
+          "baseline-survey": 3,
+          "retone-brief": 1,
+          "authoring-rules": 2,
           "migrate-ledger": 0,
-          "record-a-change": 1,
-          "editing-by-hand": 1,
-          "codebase-audit": 1,
-          "release-review": 2,
-          "agent-handoff": 2,
-          "path-ownership": 0,
+          "record-a-capability": 1,
+          "record-a-change": 2,
+          "editing-by-hand": 2,
+          "codebase-audit": 2,
+          "areas": 1,
+          "release-review": 3,
+          "agent-handoff": 4,
+          "agent-command": 0,
+          "product-wide-change": 1,
           "open-questions": 0,
-          "read-the-corpus": 1,
-          "status-check": 1,
+          "unrecorded-work-sweep": 0,
+          "read-the-corpus": 2,
+          "status-check": 3,
           "release-size": 0,
-          "release-editions": 2,
-          "pdf-edition": 3,
+          "release-editions": 3,
+          "pdf-edition": 7,
+          "markdown-docs": 1,
+          "change-highlighting": 1,
           "edition-summary": 0
         },
         "notes": 0

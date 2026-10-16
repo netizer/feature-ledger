@@ -9,6 +9,21 @@
       "version": 1,
       "name": "Three Markdown documents for the team",
       "description": "The command ledger build also writes three Markdown documents from the same corpus: FEATURES.md, the client-facing list; FEATURES_EXTENDED.md, the same list with implementation notes under each entry; and DEV_FEATURES.md, the entries only the team sees. All three describe the latest release, so they read as what the product does today. They are build output: the corpus is what you commit, and it carries the documentation's history on its own."
+    },
+    {
+      "version": 3,
+      "description": "The command ledger build also writes three Markdown documents: the client-facing list, the same list with implementation notes, and the entries only the team sees, with how to see each entry. They describe the latest release and are build output.",
+      "how_to_see": "Run ledger build --md and open FEATURES.md in the docs folder: an entry with how to see it prints it under its description."
+    }
+  ],
+  "events": [
+    {
+      "version": 3,
+      "kind": "change",
+      "what": "The Markdown documents print how to see each entry under its description.",
+      "why": "A description can raise the question of which part of the platform it is about, and saying how to see each entry answers it consistently.",
+      "why_from": "person",
+      "date": "2026-10-15"
     }
   ]
 }

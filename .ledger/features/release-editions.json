@@ -16,7 +16,8 @@
     },
     {
       "version": 3,
-      "description": "The command ledger cut gives the open release its name, date and commit, prints its PDF edition into the client folder with the message to send beside it, and opens the next release. It refuses only an edition that would be wrong: one with nothing recorded, or one whose redrafted corpus hasn't been checked against the old. Anything else, such as changes the last prepare hasn't read or a reason nobody gave, it shows first and asks before it goes ahead; --yes answers when nobody is at a terminal."
+      "description": "The command ledger cut gives the open release its name, date and commit, prints its edition with the message to send beside it, and opens the next release. It refuses only an edition that would be wrong, and shows anything else and asks before it goes ahead.",
+      "how_to_see": "With changes not yet prepared, run ledger cut --name \"Demo\": it lists the warnings and asks whether to cut and print the edition anyway before it writes anything. After a cut, the client folder holds the PDF and a message file beside it."
     }
   ],
   "events": [

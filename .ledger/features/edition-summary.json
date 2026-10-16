@@ -8,7 +8,8 @@
     {
       "version": 3,
       "name": "Preparing an edition",
-      "description": "The command ledger prepare prints one brief for an interactive coding-agent session that writes what the client reads about a release: a \"What changed\" note on each updated entry, the summary page, how to see each entry, and the message to send. Run again in the same release, it covers only what moved since. It never commits."
+      "description": "The command ledger prepare prints one brief for an agent session that writes what the client reads: the overview, the first page, a note on each changed entry, and the message. The agent also records unrecorded work, asks you missing reasons, and checks its text against the code.",
+      "how_to_see": "Run ledger prepare: it says what the release holds, then prints the brief to paste into your agent session. When the agent is done, ledger prepare complete prints the first page's lists and the message as the edition will."
     }
   ]
 }

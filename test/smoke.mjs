@@ -532,6 +532,9 @@ assert("the catalogue lists every capability once, with its size, name and first
 assert("…marks what moved, linking to its details",
   v2.includes('<span class="nm">Alpha</span><span class="first">Does the alpha thing, and the adjacent one.</span>' +
     '<span class="mv"><a class="moved is-updated" href="#f-alpha">Changed</a></span>'));
+assert("…and opens on a map of its areas, linking to each",
+  v2.includes('<nav class="contents is-index">') && v2.indexOf('class="contents is-index"') > v2.indexOf('id="everything-else"') &&
+  v2.includes('<li><a href="#area-1"><span class="num">1</span>'));
 assert("…and opens an area with its overview", v2.includes('<p class="area-intro">Everything second, in one place.</p>'));
 assert("the cover counts it all in one row",
   v2.includes('<div class="stat is-new"><b>4</b><span>new</span></div>') &&
